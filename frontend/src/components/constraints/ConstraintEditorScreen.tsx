@@ -57,16 +57,22 @@ export function ConstraintEditorScreen() {
     onSuccess: () => qc.invalidateQueries({ queryKey: key }),
   })
 
-  const exportShacl = async () => {
-    const ttl = await api.constraints.exportShacl(id)
-    const blob = new Blob([ttl], { type: 'text/turtle' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${id}-shapes.ttl`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+  // R8 (Sigma-audit): обёрнуто в useMutation, чтобы ошибки сети не уходили
+  // в unhandled rejection при `onClick={exportShacl}`. react-query сам
+  // ловит throw из mutationFn и кладёт в mutation.error / onError.
+  const exportShacl = useMutation({
+    mutationFn: async () => {
+      const ttl = await api.constraints.exportShacl(id)
+      const blob = new Blob([ttl], { type: 'text/turtle' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${id}-shapes.ttl`
+      a.click()
+      URL.revokeObjectURL(url)
+      return { ok: true as const }
+    },
+  })
 
   const patch = (i: number, p: Partial<EditableConstraint>) =>
     setRows((rs) => rs.map((r, j) => (i === j ? { ...r, ...p } : r)))
@@ -93,10 +99,12 @@ export function ConstraintEditorScreen() {
         />
       </label>
       <button
-        onClick={exportShacl}
-        className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
+        onClick={() => exportShacl.mutate()}
+        disabled={exportShacl.isPending}
+        className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:opacity-60"
       >
-        <Download size={13} className="text-emerald-500" /> Экспорт SHACL
+        <Download size={13} className="text-emerald-500" />
+        {exportShacl.isPending ? 'Экспорт…' : 'Экспорт SHACL'}
       </button>
       <button
         onClick={() => setRows((rs) => [...rs, EMPTY_ROW()])}
@@ -122,12 +130,21 @@ export function ConstraintEditorScreen() {
     { icon: Info,           value: severityCounts.info,      label: 'информационных' },
   ]
 
-  const subHeader = importShacl.data ? (
-    <div className="border-t border-blue-200 bg-blue-50 px-5 py-1.5 text-xs text-blue-800">
-      Импортировано {importShacl.data.merged_constraints} ограничений
-      {importShacl.data.conflicts.length > 0 && ` · ${importShacl.data.conflicts.length} конфликтов перезаписано`}
-    </div>
-  ) : null
+  const subHeader = (
+    <>
+      {importShacl.data && (
+        <div className="border-t border-blue-200 bg-blue-50 px-5 py-1.5 text-xs text-blue-800">
+          Импортировано {importShacl.data.merged_constraints} ограничений
+          {importShacl.data.conflicts.length > 0 && ` · ${importShacl.data.conflicts.length} конфликтов перезаписано`}
+        </div>
+      )}
+      {exportShacl.isError && (
+        <div className="border-t border-rose-200 bg-rose-50 px-5 py-1.5 text-xs text-rose-700">
+          Не удалось экспортировать SHACL: {(exportShacl.error as Error).message}
+        </div>
+      )}
+    </>
+  )
 
   return (
     <div className="flex h-full flex-col bg-stone-50">

@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
-import cytoscape, { type Core, type ElementDefinition } from 'cytoscape'
+import cytoscape, { type Core, type ElementDefinition, type NodeSingular } from 'cytoscape'
 import cola from 'cytoscape-cola'
 import { api, type CyNode } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { asCytoscapeLayout } from '@/lib/cytoscape-cola-types'
 
 cytoscape.use(cola)
 
@@ -59,7 +60,8 @@ export function GraphView() {
     if (cyRef.current) {
       cyRef.current.elements().remove()
       cyRef.current.add(elements)
-      cyRef.current.layout({ name: 'cola', animate: true } as any).run()
+      // R7.2 (Sigma-audit): cola-layout type-safe через asCytoscapeLayout helper.
+      cyRef.current.layout(asCytoscapeLayout({ name: 'cola', animate: true })).run()
       setSelected(null)
       return
     }
@@ -71,7 +73,7 @@ export function GraphView() {
         {
           selector: 'node',
           style: {
-            'background-color': (ele: any) => TYPE_COLOR[ele.data('type')] ?? '#94A3B8',
+            'background-color': (ele: NodeSingular) => TYPE_COLOR[ele.data('type') as string] ?? '#94A3B8',
             label: 'data(label)',
             'font-size': 11,
             'text-valign': 'bottom',
@@ -100,7 +102,7 @@ export function GraphView() {
           style: { 'border-color': '#1A202C', 'border-width': 2 },
         },
       ],
-      layout: { name: 'cola', animate: true } as any,
+      layout: asCytoscapeLayout({ name: 'cola', animate: true }),
       wheelSensitivity: 0.2,
     })
 

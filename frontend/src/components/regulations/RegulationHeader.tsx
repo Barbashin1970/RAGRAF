@@ -3,7 +3,7 @@ import { ChevronRight, ListTree, Pencil, type LucideIcon } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api, type Domain, type Regulation } from '@/lib/api'
 import { cn } from '@/lib/cn'
-import { FALLBACK_VISUAL, getDomainVisual } from '@/lib/domains'
+import { getDomainVisual } from '@/lib/domains'
 
 interface Stat {
   icon: LucideIcon

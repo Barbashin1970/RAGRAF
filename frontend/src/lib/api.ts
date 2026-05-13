@@ -14,7 +14,7 @@ export interface FlowNode {
   deviation?: number | null
   operator?: string | null
   expression?: string | null
-  cases?: Array<{ label: string; value: unknown }> | null
+  cases?: Array<{ id?: string; label: string; value: unknown }> | null
   action?: string | null
   text?: string | null
   priority?: number | null
@@ -109,7 +109,36 @@ export interface GraphPayload { nodes: CyNode[]; edges: CyEdge[]; meta: Record<s
 
 // ---- HTTP helpers ----
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+import type { ZodType } from 'zod'
+import {
+  constraintSchema,
+  constraintsSaveResponseSchema,
+  datasetsResponseSchema,
+  diffResponseSchema,
+  domainsSchema,
+  graphPayloadSchema,
+  historyItemSchema,
+  regulationSchema,
+  ruleDslSchema,
+  saveResponseSchema,
+  searchResponseSchema,
+  shaclImportResponseSchema,
+  validationResultSchema,
+} from './schemas'
+import { z } from 'zod'
+
+/**
+ * Typed HTTP wrapper.
+ * @param schema — опциональная zod-схема для рантайм-валидации. Если задана —
+ *   ответ проверяется через `schema.parse(data)` и возвращается с типом `z.infer<schema>`.
+ *   Если не задана — каст к `T` без проверки (для интернальных вызовов / тестов).
+ *   На сетевом boundary рекомендуется ВСЕГДА передавать schema (R6 из Sigma-audit).
+ */
+async function request<T>(
+  path: string,
+  init?: RequestInit,
+  schema?: ZodType<T>,
+): Promise<T> {
   const r = await fetch(path, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) },
@@ -118,73 +147,73 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const text = await r.text().catch(() => '')
     throw new Error(`${r.status} ${r.statusText}: ${text || path}`)
   }
-  if (r.status === 204) return undefined as T
+  if (r.status === 204) return null as T
   const ct = r.headers.get('content-type') || ''
-  if (ct.includes('application/json')) return r.json() as Promise<T>
-  return r.text() as unknown as T
+  if (ct.includes('application/json')) {
+    const data: unknown = await r.json()
+    if (schema) return schema.parse(data)
+    return data as T
+  }
+  // text/plain (Turtle, raw exports) — возвращаем как есть
+  const text = await r.text()
+  return text as unknown as T
 }
 
 export const api = {
   datasets: {
-    list: () => request<Array<Record<string, unknown>> | Record<string, unknown>>('/api/datasets'),
-    create: (appId: string) => request<unknown>(`/api/datasets/${encodeURIComponent(appId)}`, { method: 'POST' }),
+    list: () => request(`/api/datasets`, undefined, datasetsResponseSchema),
+    create: (appId: string) =>
+      request<unknown>(`/api/datasets/${encodeURIComponent(appId)}`, { method: 'POST' }, z.unknown()),
   },
   regulations: {
-    get: (id: string) => request<Regulation>(`/api/regulations/${encodeURIComponent(id)}`),
+    get: (id: string) => request(`/api/regulations/${encodeURIComponent(id)}`, undefined, regulationSchema),
     save: (id: string, reg: Regulation) =>
-      request<{ ok: string; version: string; pushed_upstream?: boolean; upstream_error?: string }>(
+      request(
         `/api/regulations/${encodeURIComponent(id)}`,
         { method: 'PUT', body: JSON.stringify(reg) },
+        saveResponseSchema,
       ),
     raw: (id: string) => request<string>(`/api/regulations/${encodeURIComponent(id)}/raw`),
-    delete: (id: string) => request<void>(`/api/regulations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    delete: (id: string) => request<null>(`/api/regulations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     history: (id: string) =>
-      request<Array<{
-        version_id: string
-        source_id: string
-        created_at: string
-        author: string
-        comment: string | null
-        diff_summary: string
-        diff_counts: { changed?: number; added?: number; removed?: number; initial?: number }
-      }>>(
+      request(
         `/api/regulations/${encodeURIComponent(id)}/regulation-history`,
+        undefined,
+        z.array(historyItemSchema),
       ),
     diff: (id: string, versionId: string) =>
-      request<{
-        summary: string
-        changes: Array<{
-          op: 'changed' | 'added' | 'removed'
-          path: string
-          label?: string
-          before: unknown
-          after: unknown
-        }>
-        counts: { changed?: number; added?: number; removed?: number; initial?: number }
-      }>(`/api/regulations/${encodeURIComponent(id)}/regulation-diff/${encodeURIComponent(versionId)}`),
+      request(
+        `/api/regulations/${encodeURIComponent(id)}/regulation-diff/${encodeURIComponent(versionId)}`,
+        undefined,
+        diffResponseSchema,
+      ),
     restore: (id: string, versionId: string) =>
-      request<Regulation>(
+      request(
         `/api/regulations/${encodeURIComponent(id)}/regulation-restore/${encodeURIComponent(versionId)}`,
         { method: 'POST' },
+        regulationSchema,
       ),
     publish: (id: string) =>
-      request<Regulation>(`/api/regulations/${encodeURIComponent(id)}/publish`, { method: 'POST' }),
+      request(`/api/regulations/${encodeURIComponent(id)}/publish`, { method: 'POST' }, regulationSchema),
     archive: (id: string) =>
-      request<Regulation>(`/api/regulations/${encodeURIComponent(id)}/archive`, { method: 'POST' }),
+      request(`/api/regulations/${encodeURIComponent(id)}/archive`, { method: 'POST' }, regulationSchema),
   },
   flow: {
-    get: (id: string) => request<RuleDSL>(`/api/regulations/${encodeURIComponent(id)}/flow`),
+    get: (id: string) => request(`/api/regulations/${encodeURIComponent(id)}/flow`, undefined, ruleDslSchema),
     save: (id: string, dsl: RuleDSL) =>
-      request<{ ok: string; version: string }>(
+      request(
         `/api/regulations/${encodeURIComponent(id)}/flow`,
         { method: 'PUT', body: JSON.stringify(dsl) },
+        z.object({ ok: z.string(), version: z.string() }),
       ),
     validate: (id: string, dsl: RuleDSL) =>
-      request<ValidationResult>(
+      request(
         `/api/regulations/${encodeURIComponent(id)}/validate`,
         { method: 'POST', body: JSON.stringify(dsl) },
+        validationResultSchema,
       ),
-    history: (id: string) => request<FlowVersion[]>(`/api/regulations/${encodeURIComponent(id)}/flow/history`),
+    history: (id: string) =>
+      request<FlowVersion[]>(`/api/regulations/${encodeURIComponent(id)}/flow/history`),
     restore: (id: string, versionId: string) =>
       request<FlowVersion>(
         `/api/regulations/${encodeURIComponent(id)}/flow/restore/${encodeURIComponent(versionId)}`,
@@ -192,11 +221,17 @@ export const api = {
       ),
   },
   constraints: {
-    list: (id: string) => request<Constraint[]>(`/api/regulations/${encodeURIComponent(id)}/constraints`),
+    list: (id: string) =>
+      request(
+        `/api/regulations/${encodeURIComponent(id)}/constraints`,
+        undefined,
+        z.array(constraintSchema),
+      ),
     save: (id: string, items: Constraint[]) =>
-      request<{ count: number }>(
+      request(
         `/api/regulations/${encodeURIComponent(id)}/constraints`,
         { method: 'PUT', body: JSON.stringify(items) },
+        constraintsSaveResponseSchema,
       ),
     exportShacl: (id: string) => request<string>(`/api/regulations/${encodeURIComponent(id)}/shacl/export`),
     importShacl: async (id: string, file: File) => {
@@ -204,22 +239,33 @@ export const api = {
       fd.append('file', file)
       const r = await fetch(`/api/regulations/${encodeURIComponent(id)}/shacl/import`, { method: 'POST', body: fd })
       if (!r.ok) throw new Error(`${r.status} ${r.statusText}`)
-      return r.json() as Promise<{ merged_constraints: number; conflicts: unknown[] }>
+      const data: unknown = await r.json()
+      return shaclImportResponseSchema.parse(data)
     },
   },
   graph: {
-    all: (domain?: string) => request<GraphPayload>(
-      domain ? `/api/graph?domain=${encodeURIComponent(domain)}` : '/api/graph',
-    ),
-    forRegulation: (id: string) => request<GraphPayload>(`/api/graph/regulation/${encodeURIComponent(id)}`),
+    all: (domain?: string) =>
+      request(
+        domain ? `/api/graph?domain=${encodeURIComponent(domain)}` : '/api/graph',
+        undefined,
+        graphPayloadSchema,
+      ),
+    forRegulation: (id: string) =>
+      request(
+        `/api/graph/regulation/${encodeURIComponent(id)}`,
+        undefined,
+        graphPayloadSchema,
+      ),
   },
   domains: {
-    list: () => request<Domain[]>('/api/domains'),
+    list: () => request(`/api/domains`, undefined, domainsSchema),
   },
   search: {
     query: (q: string, mode: 'local' | 'global' | 'naive' = 'local') =>
-      request<{ response: string; entities: unknown[]; sources: unknown[] }>(
-        '/api/search', { method: 'POST', body: JSON.stringify({ query: q, mode }) },
+      request(
+        '/api/search',
+        { method: 'POST', body: JSON.stringify({ query: q, mode }) },
+        searchResponseSchema,
       ),
   },
 }

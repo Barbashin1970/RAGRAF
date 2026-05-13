@@ -71,14 +71,18 @@ async def update_regulation(source_id: str, payload: Regulation) -> dict[str, An
 
 
 @router.get("/regulations/{source_id}/regulation-history")
-async def get_regulation_history(source_id: str):
+def get_regulation_history(source_id: str):
     """История правок самого регламента (имя/параметры/рекомендация) с авто-diff_summary.
-    Версии flow живут отдельно по пути /flow/history."""
+
+    Sync `def`: внутри только sync DuckDB-вызовы. FastAPI выполнит в thread-pool,
+    не блокируя event loop. Это правильный паттерн P8 — `async def` без `await`
+    давал ложный сигнал «не блокирую event loop».
+    """
     return regulation_store.history(source_id)
 
 
 @router.get("/regulations/{source_id}/regulation-diff/{version_id}")
-async def get_regulation_diff(source_id: str, version_id: str):
+def get_regulation_diff(source_id: str, version_id: str):
     """Полный структурный diff: что изменилось в этой версии относительно предыдущей."""
     from app.services.regulation_diff import compute_diff
 
@@ -92,7 +96,7 @@ async def get_regulation_diff(source_id: str, version_id: str):
 
 
 @router.post("/regulations/{source_id}/regulation-restore/{version_id}")
-async def restore_regulation(source_id: str, version_id: str) -> Regulation:
+def restore_regulation(source_id: str, version_id: str) -> Regulation:
     reg = regulation_store.restore(source_id, version_id)
     if reg is None:
         raise HTTPException(status_code=404, detail="Версия не найдена")
@@ -100,7 +104,7 @@ async def restore_regulation(source_id: str, version_id: str) -> Regulation:
 
 
 @router.post("/regulations/{source_id}/publish")
-async def publish_regulation(source_id: str) -> Regulation:
+def publish_regulation(source_id: str) -> Regulation:
     """Перевести регламент в статус active (approval workflow)."""
     reg = regulation_store.get(source_id)
     if reg is None:
@@ -111,7 +115,7 @@ async def publish_regulation(source_id: str) -> Regulation:
 
 
 @router.post("/regulations/{source_id}/archive")
-async def archive_regulation(source_id: str) -> Regulation:
+def archive_regulation(source_id: str) -> Regulation:
     """Перевести регламент в статус archived."""
     reg = regulation_store.get(source_id)
     if reg is None:

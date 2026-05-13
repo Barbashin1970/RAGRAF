@@ -11,9 +11,13 @@ router = APIRouter()
 
 
 @router.get("/regulations/{regulation_id}/flow")
-async def get_flow(regulation_id: str) -> RuleDSL:
+def get_flow(regulation_id: str) -> RuleDSL:
     """Загрузить сохранённый flow; если нет — отдать стартовый из фикстуры
-    (когда для регламента есть `.flow.json`); иначе — пустой каркас."""
+    (когда для регламента есть `.flow.json`); иначе — пустой каркас.
+
+    Sync `def`: внутри только sync I/O (filesystem + json). FastAPI выполнит
+    в thread-pool — корректное P8-поведение.
+    """
     dsl = load_flow(regulation_id)
     if dsl is not None:
         return dsl
@@ -24,7 +28,7 @@ async def get_flow(regulation_id: str) -> RuleDSL:
 
 
 @router.put("/regulations/{regulation_id}/flow")
-async def put_flow(regulation_id: str, dsl: RuleDSL) -> dict[str, str]:
+def put_flow(regulation_id: str, dsl: RuleDSL) -> dict[str, str]:
     if dsl.regulation_id != regulation_id:
         raise HTTPException(status_code=400, detail="regulation_id в теле не совпадает с URL")
     version = save_flow(regulation_id, dsl)

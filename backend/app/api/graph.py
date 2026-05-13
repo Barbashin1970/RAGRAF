@@ -19,8 +19,8 @@ router = APIRouter()
 
 
 @router.get("/domains")
-async def list_domains():
-    """Список доменов (для табов в Graph View)."""
+def list_domains():
+    """Список доменов (для табов в Graph View). Sync — данные in-memory."""
     return fixtures.list_domains()
 
 

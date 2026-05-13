@@ -58,7 +58,10 @@ def get_knowledge_graph() -> Any:
     return _kg
 
 
-async def search(query: str, mode: str = "local") -> dict[str, Any]:
+def search(query: str, mode: str = "local") -> dict[str, Any]:
+    """Sync. RAGU search engines синхронные. Если в будущем RAGU добавит
+    async API — обернём в `async def` с `await engine.asearch(query)` или
+    в `await asyncio.to_thread(engine.search, query)`."""
     _ensure_enabled()
     kg = get_knowledge_graph()
     try:

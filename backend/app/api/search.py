@@ -10,9 +10,11 @@ router = APIRouter()
 
 
 @router.post("/search")
-async def search(req: SearchRequest) -> SearchResponse:
+def search(req: SearchRequest) -> SearchResponse:
+    """Sync — ragu_service.search() синхронный (RAGU engines не async).
+    FastAPI выполнит в thread-pool."""
     try:
-        result = await ragu_service.search(req.query, req.mode)
+        result = ragu_service.search(req.query, req.mode)
     except ragu_service.RaguDisabled as e:
         raise HTTPException(status_code=503, detail=str(e)) from e
     return SearchResponse(

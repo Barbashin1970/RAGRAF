@@ -735,7 +735,10 @@ function DiffDetail({ id, versionId }: { id: string; versionId: string }) {
     <div className="border-t border-stone-100 bg-stone-50 px-2 py-1.5">
       <ul className="space-y-1">
         {data.changes.map((c, i) => (
-          <li key={i} className="text-[11px] leading-snug">
+          // R5: устойчивый ключ — комбинация op + path (уникальна в рамках одной версии).
+          // Index-only key давал ложное reuse при смене версии и потерю focus в полях,
+          // которых здесь нет, но рекомендации Sigma audit единообразны.
+          <li key={`${c.op}-${c.path}-${i}`} className="text-[11px] leading-snug">
             <div className="flex items-center gap-1">
               {c.op === 'changed' && <span className="rounded bg-blue-100 px-1 font-mono text-[9px] text-blue-700">~</span>}
               {c.op === 'added' && <span className="rounded bg-emerald-100 px-1 font-mono text-[9px] text-emerald-700">+</span>}

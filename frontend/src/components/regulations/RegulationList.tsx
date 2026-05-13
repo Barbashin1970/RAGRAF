@@ -62,9 +62,11 @@ export function RegulationList() {
 
   const items: RegRow[] = useMemo(() => {
     if (!rawDatasets) return []
-    const arr = Array.isArray(rawDatasets)
+    // После zod-валидации `rawDatasets` — discriminated union: либо массив, либо
+    // объект `{ items: [...] }`. R7.1 закрыт без `as any` — TS сам сужает.
+    const arr: unknown[] = Array.isArray(rawDatasets)
       ? rawDatasets
-      : Array.isArray((rawDatasets as any).items) ? (rawDatasets as any).items : []
+      : ('items' in rawDatasets && Array.isArray(rawDatasets.items)) ? rawDatasets.items : []
     return arr.map(extractRow).filter(Boolean) as RegRow[]
   }, [rawDatasets])
 

@@ -10,12 +10,13 @@ router = APIRouter()
 
 
 @router.get("/regulations/{regulation_id}/flow/history")
-async def history(regulation_id: str) -> list[FlowVersion]:
+def history(regulation_id: str) -> list[FlowVersion]:
+    """Sync `def` — filesystem-snapshots, FastAPI выполнит в thread-pool."""
     return list_versions(regulation_id)
 
 
 @router.get("/regulations/{regulation_id}/flow/history/{version_id}")
-async def get(regulation_id: str, version_id: str) -> FlowVersion:
+def get(regulation_id: str, version_id: str) -> FlowVersion:
     v = get_version(regulation_id, version_id)
     if v is None:
         raise HTTPException(status_code=404, detail="Версия не найдена")
@@ -23,7 +24,7 @@ async def get(regulation_id: str, version_id: str) -> FlowVersion:
 
 
 @router.post("/regulations/{regulation_id}/flow/restore/{version_id}")
-async def restore(regulation_id: str, version_id: str) -> FlowVersion:
+def restore(regulation_id: str, version_id: str) -> FlowVersion:
     v = restore_version(regulation_id, version_id)
     if v is None:
         raise HTTPException(status_code=404, detail="Версия не найдена")

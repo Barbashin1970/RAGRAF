@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Node } from 'reactflow'
 import type { FlowNode, NodeKind, Parameter } from '@/lib/api'
+import { nanoid } from '@/lib/nanoid'
 
 interface Props {
   node: Node<FlowNode> | null
@@ -91,8 +92,14 @@ function ByType({ type, data, parameters, set }: { type: NodeKind; data: FlowNod
       return (
         <div className="mt-2">
           <div className="mb-1 text-xs text-stone-500">Ветки</div>
-          {(data.cases ?? []).map((c, i) => (
-            <div key={i} className="mb-1 flex gap-1">
+          {(data.cases ?? []).map((c, i) => {
+            // R5: устойчивый ключ. Для новых веток мы прописываем `id` через nanoid;
+            // у старых данных id может отсутствовать — используем композит label+i
+            // как «лучший возможный» fallback. При reorder/удалении из середины
+            // композит даёт более стабильный keying чем чистый index.
+            const stableKey = (c as { id?: string }).id ?? `legacy-${i}-${c.label}`
+            return (
+            <div key={stableKey} className="mb-1 flex gap-1">
               <input
                 className="w-1/2 rounded border border-stone-200 px-1.5 py-1 text-xs"
                 value={c.label}
@@ -112,9 +119,16 @@ function ByType({ type, data, parameters, set }: { type: NodeKind; data: FlowNod
                 }}
               />
             </div>
-          ))}
+            )
+          })}
           <button
-            onClick={() => set({ cases: [...(data.cases ?? []), { label: 'Ветка', value: '' }] })}
+            onClick={() => set({
+              cases: [
+                ...(data.cases ?? []),
+                // R5: каждая новая ветка получает стабильный id для рендера.
+                { id: nanoid(6), label: 'Ветка', value: '' },
+              ],
+            })}
             className="mt-1 rounded-md border border-stone-200 px-2 py-1 text-xs hover:bg-surface-offset"
           >
             + ветка
