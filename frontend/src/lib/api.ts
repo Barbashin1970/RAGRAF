@@ -120,6 +120,7 @@ import {
   historyItemSchema,
   regulationSchema,
   ruleDslSchema,
+  sandboxCreateFromParamsResponseSchema,
   sandboxExtractResponseSchema,
   sandboxSearchResponseSchema,
   sandboxStatusSchema,
@@ -296,6 +297,16 @@ export const api = {
         `/api/sandbox/extract-parameters`,
         { method: 'POST', body: JSON.stringify({ text }) },
         sandboxExtractResponseSchema,
+      ),
+    createFromParams: (payload: {
+      name: string
+      domain: string
+      params: Array<{ suggested_name: string; value: number; deviation?: number | null; unit?: string | null }>
+    }) =>
+      request(
+        `/api/sandbox/create-from-params`,
+        { method: 'POST', body: JSON.stringify(payload) },
+        sandboxCreateFromParamsResponseSchema,
       ),
   },
 }

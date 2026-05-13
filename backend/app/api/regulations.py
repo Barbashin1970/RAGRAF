@@ -1,9 +1,6 @@
 """Operate on a single regulation: DuckDB-backed editor + Turtle proxy."""
 from __future__ import annotations
 
-import re
-import unicodedata
-import uuid
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -15,6 +12,7 @@ from app.schemas.domain import Regulation
 from app.services import fixtures, regulation_store, templates
 from app.services.flow_storage import save_flow
 from app.services.regulation_client import client
+from app.services.templates import ensure_unique_source_id, slugify
 from app.services.turtle_bridge import parse_regulation_turtle, regulation_to_turtle
 
 router = APIRouter()
@@ -41,41 +39,6 @@ class CreateRegulationRequest(BaseModel):
     use_template: bool = Field(True, description="Заполнить параметры/flow из шаблона домена")
 
 
-_TRANSLIT = {
-    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "yo",
-    "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m",
-    "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
-    "ф": "f", "х": "h", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "shch",
-    "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
-}
-
-
-def _slugify(text: str, fallback: str = "regulation") -> str:
-    """Имя → kebab-case ASCII slug. Кириллица → транслит, остальные не-ASCII выбрасываются."""
-    s = (text or "").strip().lower()
-    out = []
-    for ch in s:
-        if ch in _TRANSLIT:
-            out.append(_TRANSLIT[ch])
-        elif ch.isascii() and (ch.isalnum() or ch in "-_ "):
-            out.append(ch)
-        elif ch.isspace():
-            out.append(" ")
-        # остальное игнорируем
-    s = "".join(out)
-    # нормализуем — заменяем подряд идущие пробелы/_ на дефис
-    s = re.sub(r"[\s_]+", "-", s)
-    s = re.sub(r"-+", "-", s).strip("-")
-    return s[:60] or fallback
-
-
-def _ensure_unique_source_id(base: str) -> str:
-    """Если slug уже занят в DuckDB — добавляем короткий uuid-суффикс."""
-    if not regulation_store.has(base) and not fixtures.has_fixture(base):
-        return base
-    return f"{base}-{uuid.uuid4().hex[:6]}"
-
-
 @router.post("/regulations", status_code=201)
 def create_regulation(payload: CreateRegulationRequest) -> Regulation:
     """Создать новый регламент по шаблону домена.
@@ -96,8 +59,8 @@ def create_regulation(payload: CreateRegulationRequest) -> Regulation:
             detail=f"Неизвестный домен '{payload.domain}'. Доступны: {[d['id'] for d in fixtures.list_domains()]}",
         )
 
-    raw_slug = _slugify(payload.source_id or payload.name or templates.TEMPLATES.get(payload.domain, {}).get("default_name", "regulation"))
-    source_id = _ensure_unique_source_id(raw_slug)
+    raw_slug = slugify(payload.source_id or payload.name or templates.TEMPLATES.get(payload.domain, {}).get("default_name", "regulation"))
+    source_id = ensure_unique_source_id(raw_slug)
 
     reg, flow = templates.build_regulation(
         source_id=source_id,

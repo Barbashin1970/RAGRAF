@@ -15,6 +15,8 @@
 """
 from __future__ import annotations
 
+import re
+import uuid
 from typing import Any
 
 from app.schemas.domain import (
@@ -25,6 +27,42 @@ from app.schemas.domain import (
     Regulation,
     RuleDSL,
 )
+
+
+# ── Slug helpers (shared between POST /regulations и sandbox create-from-params) ──
+
+_TRANSLIT = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "yo",
+    "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m",
+    "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
+    "ф": "f", "х": "h", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "shch",
+    "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+}
+
+
+def slugify(text: str, fallback: str = "regulation") -> str:
+    """Имя → kebab-case ASCII slug. Кириллица → транслит, остальные не-ASCII выбрасываются."""
+    s = (text or "").strip().lower()
+    out: list[str] = []
+    for ch in s:
+        if ch in _TRANSLIT:
+            out.append(_TRANSLIT[ch])
+        elif ch.isascii() and (ch.isalnum() or ch in "-_ "):
+            out.append(ch)
+        elif ch.isspace():
+            out.append(" ")
+    s = "".join(out)
+    s = re.sub(r"[\s_]+", "-", s)
+    s = re.sub(r"-+", "-", s).strip("-")
+    return s[:60] or fallback
+
+
+def ensure_unique_source_id(base: str) -> str:
+    """Если slug уже занят в DuckDB или среди фикстур — добавляем uuid-суффикс."""
+    from app.services import fixtures, regulation_store
+    if not regulation_store.has(base) and not fixtures.has_fixture(base):
+        return base
+    return f"{base}-{uuid.uuid4().hex[:6]}"
 
 
 def _param(
@@ -252,4 +290,73 @@ def build_regulation(
         status="draft",
     )
     flow = RuleDSL(rule_id=f"rule_{source_id}", regulation_id=source_id, nodes=[], edges=[])
+    return reg, flow
+
+
+def build_regulation_from_params(
+    source_id: str,
+    domain: str,
+    name: str,
+    extracted: list[dict[str, Any]],
+) -> tuple[Regulation, RuleDSL]:
+    """Собрать Regulation + starter flow из извлечённых параметров (sandbox).
+
+    Каждый элемент `extracted` ожидает: suggested_name, value, deviation?, unit?.
+    ID параметра — `suggested_name`, при коллизии добавляется индекс.
+    Рекомендация-скелет ссылается на список параметров и предлагает
+    «уточнить пороги в Flow Editor».
+    """
+    params: list[Parameter] = []
+    used_ids: set[str] = set()
+    for e in extracted:
+        base = (e.get("suggested_name") or "param").strip() or "param"
+        pid = base
+        i = 2
+        while pid in used_ids:
+            pid = f"{base}{i}"
+            i += 1
+        used_ids.add(pid)
+        value = float(e.get("value", 0.0) or 0.0)
+        dev_raw = e.get("deviation")
+        params.append(
+            Parameter(
+                id=pid,
+                name=pid,
+                datatype="decimal",
+                referenceValue=value,
+                deviationAllowed=float(dev_raw) if dev_raw is not None else None,
+                unit=(e.get("unit") or None),
+                minInclusive=0.0 if value >= 0 else None,
+            )
+        )
+
+    if not params:
+        raise ValueError("extracted parameters list must not be empty")
+
+    param_names = ", ".join(p.name for p in params)
+    rec_text = (
+        f"Регламент создан из текста с извлечёнными параметрами: {param_names}. "
+        "При выходе любого из параметров за допустимое отклонение — уведомить "
+        "ответственное лицо. Уточнить пороги, рекомендации и сценарии "
+        "реагирования в Flow Editor."
+    )
+
+    reg = Regulation(
+        id=source_id,
+        name=name,
+        domain=domain,
+        version="0.1",
+        status="draft",
+        parameters=params,
+        constraints=[],
+        recommendations=[
+            Recommendation(
+                id=f"rec_{source_id}",
+                text=rec_text,
+                priority=2,
+                linkedParameters=[p.id for p in params],
+            )
+        ],
+    )
+    flow = _simple_flow(source_id, params, rec_text)
     return reg, flow

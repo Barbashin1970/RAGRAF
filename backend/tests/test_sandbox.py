@@ -147,6 +147,83 @@ def test_extract_source_text_contains_original(client):
     assert "1.5" in extracted[0]["source_text"] or "м/с" in extracted[0]["source_text"]
 
 
+# ── Create regulation from extracted params ──────────────────────────
+
+
+def test_create_from_params_builds_regulation(client):
+    payload = {
+        "name": "Тестовый регламент из песочницы",
+        "domain": "heating",
+        "params": [
+            {"suggested_name": "pressure", "value": 20.5, "deviation": 1.5, "unit": "атм"},
+            {"suggested_name": "temperature", "value": 70.0, "deviation": 10.0, "unit": "°C"},
+        ],
+    }
+    r = client.post("/api/sandbox/create-from-params", json=payload)
+    assert r.status_code == 201
+    body = r.json()
+    assert body["regulation_id"]
+    assert body["domain"] == "heating"
+    assert body["parameters_count"] == 2
+
+    # Регламент реально лежит в DuckDB store — GET должен его отдать.
+    r2 = client.get(f"/api/regulations/{body['regulation_id']}")
+    assert r2.status_code == 200
+    reg = r2.json()
+    assert reg["name"] == payload["name"]
+    assert reg["domain"] == "heating"
+    names = {p["name"] for p in reg["parameters"]}
+    assert {"pressure", "temperature"}.issubset(names)
+    # Параметры пришли с ref/dev из extracted
+    by_name = {p["name"]: p for p in reg["parameters"]}
+    assert by_name["pressure"]["referenceValue"] == 20.5
+    assert by_name["pressure"]["deviationAllowed"] == 1.5
+    assert by_name["pressure"]["unit"] == "атм"
+
+
+def test_create_from_params_rejects_unknown_domain(client):
+    r = client.post(
+        "/api/sandbox/create-from-params",
+        json={
+            "name": "X",
+            "domain": "no-such-domain",
+            "params": [{"suggested_name": "x", "value": 1.0, "unit": "ед"}],
+        },
+    )
+    assert r.status_code == 400
+
+
+def test_create_from_params_rejects_empty_params(client):
+    r = client.post(
+        "/api/sandbox/create-from-params",
+        json={"name": "X", "domain": "heating", "params": []},
+    )
+    # pydantic min_length=1 → 422
+    assert r.status_code == 422
+
+
+def test_create_from_params_deduplicates_param_ids(client):
+    # Два одинаковых suggested_name — оба должны попасть, второй с суффиксом.
+    r = client.post(
+        "/api/sandbox/create-from-params",
+        json={
+            "name": "Diameter Duo",
+            "domain": "heating",
+            "params": [
+                {"suggested_name": "diameter", "value": 5.0, "deviation": 0.2, "unit": "см"},
+                {"suggested_name": "diameter", "value": 8.0, "deviation": 0.3, "unit": "см"},
+            ],
+        },
+    )
+    assert r.status_code == 201
+    body = r.json()
+    assert body["parameters_count"] == 2
+    reg = client.get(f"/api/regulations/{body['regulation_id']}").json()
+    ids = [p["id"] for p in reg["parameters"]]
+    assert "diameter" in ids
+    assert any(i.startswith("diameter") and i != "diameter" for i in ids)
+
+
 def test_extract_real_pdf_excerpt(client):
     """Текст похож на формулировку из Rules-Management.pdf."""
     text = (

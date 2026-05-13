@@ -259,3 +259,10 @@ export const sandboxExtractResponseSchema = z.object({
   extracted: z.array(sandboxExtractedParamSchema),
   count: z.number(),
 })
+
+export const sandboxCreateFromParamsResponseSchema = z.object({
+  regulation_id: z.string(),
+  name: z.string(),
+  domain: z.string().nullable().optional(),
+  parameters_count: z.number(),
+})
