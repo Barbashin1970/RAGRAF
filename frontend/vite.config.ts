@@ -12,7 +12,12 @@ export default defineConfig({
   server: {
     port: Number(process.env.VITE_PORT) || 5173,
     proxy: {
-      '/api': process.env.VITE_API_PROXY || 'http://localhost:8000',
+      '/api':          process.env.VITE_API_PROXY || 'http://localhost:8000',
+      // FastAPI auto-generated Swagger UI, ReDoc и OpenAPI spec — пробрасываем,
+      // чтобы кнопка «Docs» в шапке открывала их с того же origin.
+      '/docs':         process.env.VITE_API_PROXY || 'http://localhost:8000',
+      '/redoc':        process.env.VITE_API_PROXY || 'http://localhost:8000',
+      '/openapi.json': process.env.VITE_API_PROXY || 'http://localhost:8000',
     },
   },
 })

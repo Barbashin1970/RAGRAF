@@ -18,10 +18,94 @@ async def lifespan(_: FastAPI):
     yield
 
 
+TAGS_METADATA = [
+    {
+        "name": "meta",
+        "description": "Служебные эндпоинты — health-check и базовая информация о сервисе.",
+    },
+    {
+        "name": "datasets",
+        "description": (
+            "Список регламентов, доступных пользователю. Объединяет данные из "
+            "локального DuckDB-store (`backend/data/regulations.duckdb`) и "
+            "upstream Sigma API (`/admin/datasets/`). При `USE_FIXTURES=true` "
+            "отдаются только seed-фикстуры."
+        ),
+    },
+    {
+        "name": "regulations",
+        "description": (
+            "Чтение, редактирование, версионирование и approval-workflow "
+            "регламента. Domain-modelled — параметры, рекомендации, метаданные. "
+            "Все правки идут в DuckDB; при `WRITEBACK_UPSTREAM=true` "
+            "сериализуются в Turtle и публикуются в upstream `PUT /data`."
+        ),
+    },
+    {
+        "name": "flow",
+        "description": (
+            "Rule DSL — визуальное правило реагирования (React Flow-граф из 7 "
+            "типов узлов). Загрузка / сохранение / валидация (7 правил из "
+            "regulation-viz-skill.md § Validation Rules)."
+        ),
+    },
+    {
+        "name": "versions",
+        "description": (
+            "История версий Rule DSL — immutable JSON-snapshots в "
+            "`data/versions/{regulation_id}/{version_id}.json`. Restore "
+            "восстанавливает любую версию."
+        ),
+    },
+    {
+        "name": "shacl",
+        "description": (
+            "SHACL-ограничения как табличный CRUD и как Turtle import/export. "
+            "Маппинг `Constraint` ↔ `sh:NodeShape` через rdflib."
+        ),
+    },
+    {
+        "name": "graph",
+        "description": (
+            "Cytoscape-карта регламентов: список доменов и payload для UI. "
+            "Поддерживает фильтр `?domain=heating|housing|safety|environment`."
+        ),
+    },
+    {
+        "name": "search",
+        "description": (
+            "Семантический поиск через RAGU (GraphRAG). Активен только при "
+            "`RAGU_ENABLED=true` и наличии `graph_ragu` в окружении — иначе 503."
+        ),
+    },
+]
+
+
 app = FastAPI(
-    title="RAGRAF — Regulation Graph & Flow Editor",
+    title="RAGRAF API",
     version="0.1.0",
-    description="Визуализатор и редактор регламентов поверх Regulation Management API",
+    summary="Визуализатор и редактор регламентов поверх Regulation Management API (Sigma)",
+    description=(
+        "REST API сервиса **RAGRAF** — слой над upstream Sigma "
+        "([109.202.1.153:8958](http://109.202.1.153:8958/docs)) с собственным "
+        "хранилищем правок (DuckDB) и слоем сериализации Regulation ↔ Turtle / SHACL.\n\n"
+        "**Архитектура источников при чтении `/regulations/{id}`:**\n"
+        "1. DuckDB store (если регламент редактировался)\n"
+        "2. Локальная фикстура (golden seed из `Rules-Management.pdf`)\n"
+        "3. Upstream Sigma API (когда `USE_FIXTURES=false`)\n\n"
+        "**Запись через PUT:** всегда DuckDB + версия в `regulation_history`. "
+        "При `WRITEBACK_UPSTREAM=true` дополнительно публикуется в upstream `/data`.\n\n"
+        "Полная спецификация: [`regulation-viz-skill.md`](https://github.com/RaguTeam/RAGU). "
+        "Каталог фикстур: [`backend/data/fixtures/INDEX.md`](../backend/data/fixtures/INDEX.md)."
+    ),
+    contact={
+        "name": "RAGRAF",
+        "url": "http://localhost:5173",
+    },
+    license_info={
+        "name": "Internal",
+    },
+    openapi_tags=TAGS_METADATA,
     lifespan=lifespan,
 )
 
