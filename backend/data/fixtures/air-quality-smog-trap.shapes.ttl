@@ -1,0 +1,90 @@
+@prefix :    <http://regulations.local/ontology#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:AirQualitySmogTrapShape
+    a sh:NodeShape ;
+    sh:targetClass :Regulation ;
+
+    sh:property [ sh:path :name ; sh:datatype xsd:string ; sh:minCount 1 ] ;
+    sh:property [ sh:path :date ; sh:datatype xsd:date   ; sh:minCount 1 ] ;
+
+    sh:property [
+        sh:path         :windSpeed ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 50.0 ;
+        sh:message      "Скорость ветра, м/с"@ru
+    ] ;
+    sh:property [
+        sh:path         :windSpeedDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 20.0
+    ] ;
+
+    sh:property [
+        sh:path         :pm25Concentration ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive    0.0 ;
+        sh:maxInclusive 1000.0 ;
+        sh:message      "PM2.5, мкг/м³ (норма ВОЗ — 35)"@ru
+    ] ;
+    sh:property [
+        sh:path         :pm25ConcentrationDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive   0.0 ;
+        sh:maxInclusive 200.0
+    ] ;
+
+    sh:property [
+        sh:path         :pdkExceedanceHours ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 24.0 ;
+        sh:message      "Часов превышения ПДК PM2.5 в сутки"@ru
+    ] ;
+    sh:property [
+        sh:path         :pdkExceedanceHoursDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 12.0
+    ] ;
+
+    sh:property [
+        sh:path         :notificationLeadHours ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.5 ;
+        sh:maxInclusive 48.0 ;
+        sh:message      "Заблаговременность SMS уязвимым группам, часы"@ru
+    ] ;
+    sh:property [
+        sh:path         :notificationLeadHoursDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 12.0
+    ] ;
+
+    sh:property [
+        sh:path         :emissionReductionPercent ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive   0.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Целевое снижение выбросов предприятий в режиме НМУ, %"@ru
+    ] ;
+    sh:property [
+        sh:path         :emissionReductionPercentDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 50.0
+    ] .

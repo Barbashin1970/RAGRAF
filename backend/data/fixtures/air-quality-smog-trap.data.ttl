@@ -1,0 +1,64 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент: экологическая ловушка ("чёрное небо") — штиль + загрязнение PM2.5.
+# Источник: NSK_OpenData_Bot — config/rules/ecology_rules.yaml (risks.smog_trap, risks.pdk)
+# и сценарий smog_trap в src/ecology_cache.py.
+#
+# Триггер: ветер < 1.5 м/с (стагнация воздуха) + PM2.5 > 20 мкг/м³.
+# Эскалация:
+#   warning  — рекомендации жителям + уведомление городской службы экологии;
+#   elevated — SMS уязвимым группам (астма, ХОБЛ, дети, пожилые) за 6 ± 2 часа;
+#   critical — режим НМУ, предписания предприятиям на снижение выбросов 15–20%,
+#              экстренное оповещение населения, информирование школ и детсадов.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:windSpeed                       a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:windSpeedDeviation              a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:pm25Concentration               a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:pm25ConcentrationDeviation      a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:pdkExceedanceHours              a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:pdkExceedanceHoursDeviation     a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:notificationLeadHours           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:notificationLeadHoursDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:emissionReductionPercent           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:emissionReductionPercentDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:AirQualitySmogTrapRegulation
+    a                                  :Regulation ;
+    :name                              "Регламент при экологической ловушке: безветрие + загрязнение PM2.5 (НМУ, оповещение уязвимых групп, предписания предприятиям)" ;
+    :date                              "2024-11-30"^^xsd:date ;
+
+    # Скорость ветра, м/с. Норма зимняя 3.0 ± 1.5 ([1.5, 4.5]).
+    # Ниже 1.5 м/с — штиль, стагнация воздуха блокирует рассеивание выбросов.
+    :windSpeed                         3.0 ;
+    :windSpeedDeviation                1.5 ;
+
+    # PM2.5, мкг/м³. Норматив ВОЗ — суточная ПДК 35.0. Норма «жизни» 10 ± 10 ([0, 20]).
+    # > 20 — warning (smog_trap), > 35 — critical (превышение ПДК ВОЗ).
+    :pm25Concentration                10.0 ;
+    :pm25ConcentrationDeviation       10.0 ;
+
+    # Часов в сутки с PM2.5 выше ПДК. Норма 0 ± 4 (допустимо до 4 часов в сутки).
+    :pdkExceedanceHours                0.0 ;
+    :pdkExceedanceHoursDeviation       4.0 ;
+
+    # Заблаговременность SMS уязвимым группам (астма, ХОБЛ, дети, пожилые), часы.
+    # Норматив 6 ± 2 (анонс пика загрязнения для подготовки).
+    :notificationLeadHours             6.0 ;
+    :notificationLeadHoursDeviation    2.0 ;
+
+    # Целевое снижение выбросов предприятий при объявлении режима НМУ, %.
+    # Согласно ecology_cache.py: «снизить выбросы на 15–20%». Норматив 17.5 ± 2.5.
+    :emissionReductionPercent         17.5 ;
+    :emissionReductionPercentDeviation 2.5 ;
+
+    :recommendation                    "При безветрии (ветер < 1.5 м/с) и росте PM2.5 формируется экологическая ловушка. ДЛЯ ЖИТЕЛЕЙ: не открывайте окна для проветривания ночью, включите домашние очистители воздуха, отложите пробежки и интенсивные занятия на улице. ПРИ PM2.5 > 35 мкг/м³ (превышение ПДК ВОЗ): ограничьте время на улице, используйте маски FFP2/N95, не проветривайте помещения. ОПЕРАТИВНЫЕ ДЕЙСТВИЯ: 1) Уведомить городскую службу экологии и оперативного штаба. 2) За 6 ± 2 часа направить SMS уязвимым группам (астма, ХОБЛ, дети, пожилые). 3) При подтверждённом ПДК объявить режим НМУ (неблагоприятные метеоусловия), выпустить предписания предприятиям на снижение выбросов 15–20%. 4) Задействовать систему экстренного оповещения населения, информировать школы и детские сады." .

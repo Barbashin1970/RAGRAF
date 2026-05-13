@@ -16,12 +16,23 @@ FIXTURES_DIR = Path(__file__).resolve().parents[2] / "data" / "fixtures"
 
 # --- Domains -----------------------------------------------------------
 
-DOMAINS: dict[str, str] = {
-    "heating":     "Теплоснабжение",
-    "housing":     "Управление ЖКХ",
-    "safety":      "Безопасность кампуса",
-    "environment": "Городская экология",
-    # будущие: "industrial", "transport", ...
+DOMAINS: dict[str, dict[str, str]] = {
+    "heating": {
+        "label": "Теплоснабжение",
+        "hint":  "Тепловые узлы, давление, температура, аварийные перекрытия",
+    },
+    "housing": {
+        "label": "Управление ЖКХ",
+        "hint":  "ТСЖ, общежития, придомовая территория, сезонные риски",
+    },
+    "safety": {
+        "label": "Безопасность кампуса",
+        "hint":  "Серверные НГУ, эскалация в охрану / 01-101-112 / ЕДДС",
+    },
+    "environment": {
+        "label": "Городская экология",
+        "hint":  "Качество воздуха, PM2.5, НМУ, оповещение уязвимых групп",
+    },
 }
 
 
@@ -56,18 +67,49 @@ REGISTRY: dict[str, dict[str, str]] = {
 
 
 def list_domains() -> list[dict[str, str]]:
-    return [{"id": did, "label": label} for did, label in DOMAINS.items()]
-
-
-def list_fixtures() -> list[dict[str, str]]:
     return [
-        {"id": sid, "source_id": sid, "name": meta["name"], "domain": meta["domain"]}
-        for sid, meta in REGISTRY.items()
+        {"id": did, "label": v["label"], "hint": v["hint"]}
+        for did, v in DOMAINS.items()
     ]
 
 
-def list_fixtures_in_domain(domain: str) -> list[dict[str, str]]:
-    return [f for f in list_fixtures() if f["domain"] == domain]
+def list_fixtures() -> list[dict[str, object]]:
+    """Список регламентов, обогащённый параметрами и ограничениями для UI.
+
+    Счётчики вычисляются на лету из локальных Turtle-файлов (это копеечная
+    операция — RDF-парсинг небольших фикстур). Если фикстура битая —
+    счётчики просто опускаются.
+    """
+    # Импорт внутри функции: turtle_bridge сам не зависит от fixtures, цикла нет,
+    # но импорт в теле позволяет приложению грузиться даже если rdflib временно
+    # сбоит на старте (в тестах, при минимальном venv).
+    from app.services.turtle_bridge import parse_regulation_turtle, parse_shapes_turtle
+
+    out: list[dict[str, object]] = []
+    for sid, meta in REGISTRY.items():
+        item: dict[str, object] = {
+            "id":        sid,
+            "source_id": sid,
+            "name":      meta["name"],
+            "domain":    meta["domain"],
+        }
+        try:
+            data = read_data(sid)
+            shapes = read_shapes(sid)
+            reg = parse_regulation_turtle(data, sid, shapes_turtle=shapes)
+            constraints = parse_shapes_turtle(shapes)
+            item["parameters_count"] = len(reg.parameters)
+            item["constraints_count"] = len(constraints)
+            if reg.recommendations:
+                item["recommendations_count"] = len(reg.recommendations)
+        except Exception:
+            pass
+        out.append(item)
+    return out
+
+
+def list_fixtures_in_domain(domain: str) -> list[dict[str, object]]:
+    return [f for f in list_fixtures() if f.get("domain") == domain]
 
 
 def has_fixture(source_id: str) -> bool:

@@ -78,6 +78,7 @@ export interface Regulation {
 export interface Domain {
   id: string
   label: string
+  hint?: string
 }
 
 export interface ValidationError {

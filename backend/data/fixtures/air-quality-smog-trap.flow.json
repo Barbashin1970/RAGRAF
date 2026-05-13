@@ -1,0 +1,164 @@
+{
+  "rule_id": "rule_air_quality_smog_trap",
+  "regulation_id": "air-quality-smog-trap",
+  "nodes": [
+    {
+      "id": "n_wind_in",
+      "type": "input",
+      "label": "Ветер",
+      "paramRef": "windSpeed",
+      "position": { "x": 60, "y": 60 }
+    },
+    {
+      "id": "n_wind_thr",
+      "type": "threshold",
+      "label": "3.0 ± 1.5 м/с",
+      "refValue": 3.0,
+      "deviation": 1.5,
+      "unit": "м/с",
+      "position": { "x": 320, "y": 60 }
+    },
+    {
+      "id": "n_wind_cmp",
+      "type": "compare",
+      "label": "штиль?",
+      "operator": "less",
+      "position": { "x": 580, "y": 60 }
+    },
+
+    {
+      "id": "n_pm25_in",
+      "type": "input",
+      "label": "PM2.5",
+      "paramRef": "pm25Concentration",
+      "position": { "x": 60, "y": 200 }
+    },
+    {
+      "id": "n_pm25_thr",
+      "type": "threshold",
+      "label": "10 ± 10 мкг/м³",
+      "refValue": 10.0,
+      "deviation": 10.0,
+      "unit": "мкг/м³",
+      "position": { "x": 320, "y": 200 }
+    },
+    {
+      "id": "n_pm25_cmp",
+      "type": "compare",
+      "label": "загрязнение > 20?",
+      "operator": "greater",
+      "position": { "x": 580, "y": 200 }
+    },
+
+    {
+      "id": "n_pdk_in",
+      "type": "input",
+      "label": "Часы выше ПДК",
+      "paramRef": "pdkExceedanceHours",
+      "position": { "x": 60, "y": 340 }
+    },
+    {
+      "id": "n_pdk_thr",
+      "type": "threshold",
+      "label": "0 ± 4 ч/сутки",
+      "refValue": 0.0,
+      "deviation": 4.0,
+      "unit": "ч/сутки",
+      "position": { "x": 320, "y": 340 }
+    },
+    {
+      "id": "n_pdk_cmp",
+      "type": "compare",
+      "label": "ПДК ВОЗ > 35?",
+      "operator": "greater",
+      "position": { "x": 580, "y": 340 }
+    },
+
+    {
+      "id": "n_trap_check",
+      "type": "formula",
+      "label": "Экологическая ловушка",
+      "expression": "windCalm && pm25Elevated",
+      "position": { "x": 820, "y": 130 }
+    },
+    {
+      "id": "n_severity",
+      "type": "switch",
+      "label": "Уровень критичности",
+      "cases": [
+        { "label": "warning",  "value": "warning" },
+        { "label": "elevated", "value": "elevated" },
+        { "label": "critical", "value": "critical" }
+      ],
+      "position": { "x": 820, "y": 280 }
+    },
+
+    {
+      "id": "n_citizen_alert",
+      "type": "output",
+      "label": "Совет жителям",
+      "action": "citizen_alert",
+      "text": "Не открывайте окна для проветривания ночью. Включите домашние очистители воздуха. Отложите пробежки и интенсивные занятия на улице. При PM2.5 > 35 мкг/м³ — маски FFP2/N95 и ограничение времени на улице.",
+      "priority": 3,
+      "position": { "x": 1080, "y": 60 }
+    },
+    {
+      "id": "n_vulnerable_sms",
+      "type": "output",
+      "label": "SMS уязвимым группам",
+      "action": "vulnerable_sms",
+      "text": "За 6 ± 2 часа до пика загрязнения направить SMS уязвимым группам: пациентам с астмой и ХОБЛ, родителям детей младше 7 лет, пожилым (75+). Координация с городской службой здравоохранения.",
+      "priority": 2,
+      "position": { "x": 1080, "y": 200 }
+    },
+    {
+      "id": "n_nmu_regime",
+      "type": "output",
+      "label": "Режим НМУ",
+      "action": "nmu_declare",
+      "text": "Объявить режим НМУ (неблагоприятные метеоусловия). Выпустить предписания предприятиям на снижение выбросов 15–20%. Уведомить городской оперативный штаб и Росгидромет.",
+      "priority": 1,
+      "position": { "x": 1080, "y": 340 }
+    },
+    {
+      "id": "n_emergency_broadcast",
+      "type": "output",
+      "label": "Экстренное оповещение",
+      "action": "emergency_broadcast",
+      "text": "При подтверждённом превышении ПДК ВОЗ (PM2.5 > 35) задействовать систему экстренного оповещения населения. Информировать школы и детские сады об отмене прогулок и подготовке очистителей в помещениях.",
+      "priority": 1,
+      "position": { "x": 1080, "y": 480 }
+    },
+
+    {
+      "id": "n_shacl_pm25",
+      "type": "shacl_constraint",
+      "label": "SHACL: pm25",
+      "constraintRef": "Regulation_pm25Concentration",
+      "position": { "x": 820, "y": 60 }
+    }
+  ],
+  "edges": [
+    { "source": "n_wind_in",   "target": "n_wind_thr" },
+    { "source": "n_wind_thr",  "target": "n_wind_cmp" },
+    { "source": "n_wind_cmp",  "target": "n_trap_check", "condition": "calm" },
+
+    { "source": "n_pm25_in",   "target": "n_pm25_thr" },
+    { "source": "n_pm25_thr",  "target": "n_pm25_cmp" },
+    { "source": "n_pm25_cmp",  "target": "n_trap_check", "condition": "elevated" },
+    { "source": "n_pm25_cmp",  "target": "n_severity",   "condition": "level" },
+
+    { "source": "n_pdk_in",    "target": "n_pdk_thr" },
+    { "source": "n_pdk_thr",   "target": "n_pdk_cmp" },
+    { "source": "n_pdk_cmp",   "target": "n_severity",   "condition": "pdk_exceeded" },
+
+    { "source": "n_trap_check", "target": "n_severity",  "condition": "trap" },
+
+    { "source": "n_severity",  "target": "n_citizen_alert",       "condition": "warning" },
+    { "source": "n_severity",  "target": "n_vulnerable_sms",      "condition": "elevated" },
+    { "source": "n_severity",  "target": "n_nmu_regime",          "condition": "critical" },
+    { "source": "n_severity",  "target": "n_emergency_broadcast", "condition": "critical" },
+
+    { "source": "n_pm25_cmp",  "target": "n_shacl_pm25" }
+  ]
+}
