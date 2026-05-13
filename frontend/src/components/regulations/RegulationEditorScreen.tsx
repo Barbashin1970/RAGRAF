@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  AlertTriangle,
   Archive,
   ChevronDown,
   ChevronUp,
@@ -20,6 +21,7 @@ import {
 import { api, type Parameter, type Regulation } from '@/lib/api'
 import { nanoid } from '@/lib/nanoid'
 import { cn } from '@/lib/cn'
+import { deriveSliderRange, fillPercent as computeFillPercent } from '@/lib/sliderDomain'
 import { RegulationHeader } from './RegulationHeader'
 
 type Tab = 'form' | 'sliders' | 'source'
@@ -473,28 +475,6 @@ function SlidersView({
   )
 }
 
-function deriveSliderRange(p: Parameter): { min: number; max: number; step: number } {
-  const ref = p.referenceValue ?? 0
-  const dev = p.deviationAllowed ?? 1
-  const lo = p.minInclusive
-  const hi = p.maxInclusive
-
-  // Используем SHACL bounds если они есть, иначе строим диапазон вокруг ref±5*dev.
-  let min = lo !== null && lo !== undefined ? lo : ref - 5 * (dev || 1)
-  let max = hi !== null && hi !== undefined ? hi : ref + 5 * (dev || 1)
-  if (min >= max) {
-    min = ref - 10
-    max = ref + 10
-  }
-  const span = max - min
-  // Шаг — эвристика: 1/100 диапазона, округлённая до «красивого» значения.
-  const niceSteps = [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10]
-  const target = span / 100
-  const step = niceSteps.find((s) => s >= target) ?? 10
-
-  return { min, max, step }
-}
-
 function ParameterSliderRow({
   param,
   onChange,
@@ -502,11 +482,11 @@ function ParameterSliderRow({
   param: Parameter
   onChange: (p: Partial<Parameter>) => void
 }) {
-  const { min, max, step } = deriveSliderRange(param)
+  // Pure-функция — не зависит от текущего dev → нет feedback-loop'а, при котором
+  // правка deviation сдвигала reference-thumb (баг из скриншота с 5 ± 11).
+  const { min, max, step, devMax, devOverflow, devTooWide } = deriveSliderRange(param)
   const refValue = param.referenceValue ?? 0
   const devValue = param.deviationAllowed ?? 0
-  // Слайдер deviation — от 0 до половины диапазона.
-  const devMax = Math.max((max - min) / 2, 1)
 
   return (
     <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm">
@@ -539,6 +519,15 @@ function ParameterSliderRow({
         accent="amber"
       />
 
+      {(devOverflow || devTooWide) && (
+        <DeviationWarning
+          overflow={devOverflow}
+          tooWide={devTooWide}
+          devMax={devMax}
+          refValue={refValue}
+        />
+      )}
+
       <div className="mt-1 flex justify-between text-[10px] text-stone-400">
         <span>min: {min}</span>
         {param.minInclusive !== null && param.minInclusive !== undefined && (
@@ -551,6 +540,44 @@ function ParameterSliderRow({
       </div>
     </div>
   )
+}
+
+function DeviationWarning({
+  overflow,
+  tooWide,
+  devMax,
+  refValue,
+}: {
+  overflow: boolean
+  tooWide: boolean
+  devMax: number
+  refValue: number
+}) {
+  // Overflow важнее: рассинхрон визуального диапазона. tooWide — мягкая семантика.
+  if (overflow) {
+    return (
+      <div className="mt-1 flex items-start gap-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+        <AlertTriangle size={12} className="mt-0.5 shrink-0 text-amber-600" />
+        <span>
+          Отклонение не помещается в текущий диапазон (max ≈ {devMax.toFixed(2)}). Расширь SHACL
+          <code className="mx-1 rounded bg-amber-100 px-1">maxInclusive</code> или уменьши deviation —
+          сейчас шарик упирается в правый край.
+        </span>
+      </div>
+    )
+  }
+  if (tooWide) {
+    return (
+      <div className="mt-1 flex items-start gap-1.5 rounded border border-stone-200 bg-stone-50 px-2 py-1 text-[11px] text-stone-600">
+        <AlertTriangle size={12} className="mt-0.5 shrink-0 text-stone-500" />
+        <span>
+          Отклонение больше самого reference ({refValue}). Иногда это норма (например, PM2.5: 10 ± 10),
+          но чаще — опечатка. Перепроверь.
+        </span>
+      </div>
+    )
+  }
+  return null
 }
 
 function SliderRow({
@@ -576,9 +603,9 @@ function SliderRow({
 
   // Доля «выдвинутой» части: сколько процентов диапазона уже выбрано.
   // По этой переменной CSS gradient на ::runnable-track красит левую часть
-  // sky-500 (current), правую — sky-200 (доступный остаток).
-  const span = max - min
-  const fillPercent = span > 0 ? Math.max(0, Math.min(100, ((value - min) / span) * 100)) : 0
+  // sky-500 (current), правую — sky-200 (доступный остаток). Кламп защищает
+  // от value за пределами [min, max] — иначе fill ушёл бы > 100% или < 0%.
+  const fillPercent = computeFillPercent(value, min, max)
 
   const trackTitle =
     `${label}: ${value.toFixed(step < 1 ? 2 : 0)} из диапазона [${min}, ${max}].` +
