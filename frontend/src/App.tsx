@@ -1,10 +1,12 @@
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { Activity, BookOpen, ExternalLink, FileJson, ListTree } from 'lucide-react'
+import { Activity, Beaker, BookOpen, ExternalLink, FileJson, ListTree } from 'lucide-react'
 import { GraphView } from '@/components/graph/GraphView'
 import { RegulationList } from '@/components/regulations/RegulationList'
 import { RegulationEditorScreen } from '@/components/regulations/RegulationEditorScreen'
 import { FlowEditorScreen } from '@/components/flow/FlowEditorScreen'
 import { ConstraintEditorScreen } from '@/components/constraints/ConstraintEditorScreen'
+import { SandboxScreen } from '@/components/sandbox/SandboxScreen'
+import { SandboxBacklog } from '@/components/sandbox/SandboxBacklog'
 import { cn } from '@/lib/cn'
 
 function NavLink({ to, icon: Icon, label }: { to: string; icon: typeof Activity; label: string }) {
@@ -94,6 +96,7 @@ export default function App() {
         <nav className="flex gap-1">
           <NavLink to="/regulations" icon={ListTree} label="Регламенты" />
           <NavLink to="/graph" icon={Activity} label="Граф" />
+          <NavLink to="/sandbox" icon={Beaker} label="Песочница" />
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden text-xs text-stone-500 lg:inline">
@@ -111,6 +114,8 @@ export default function App() {
           <Route path="/regulations/:id/flow" element={<FlowEditorScreen />} />
           <Route path="/regulations/:id/constraints" element={<ConstraintEditorScreen />} />
           <Route path="/graph" element={<GraphView />} />
+          <Route path="/sandbox" element={<SandboxScreen />} />
+          <Route path="/sandbox/backlog" element={<SandboxBacklog />} />
           <Route path="*" element={<div className="p-6 text-stone-500">Страница не найдена</div>} />
         </Routes>
       </main>

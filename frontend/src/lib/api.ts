@@ -120,6 +120,9 @@ import {
   historyItemSchema,
   regulationSchema,
   ruleDslSchema,
+  sandboxExtractResponseSchema,
+  sandboxSearchResponseSchema,
+  sandboxStatusSchema,
   saveResponseSchema,
   searchResponseSchema,
   shaclImportResponseSchema,
@@ -278,6 +281,21 @@ export const api = {
         '/api/search',
         { method: 'POST', body: JSON.stringify({ query: q, mode }) },
         searchResponseSchema,
+      ),
+  },
+  sandbox: {
+    status: () => request(`/api/sandbox/status`, undefined, sandboxStatusSchema),
+    search: (query: string, top_k = 5) =>
+      request(
+        `/api/sandbox/search`,
+        { method: 'POST', body: JSON.stringify({ query, top_k }) },
+        sandboxSearchResponseSchema,
+      ),
+    extractParameters: (text: string) =>
+      request(
+        `/api/sandbox/extract-parameters`,
+        { method: 'POST', body: JSON.stringify({ text }) },
+        sandboxExtractResponseSchema,
       ),
   },
 }

@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import datasets, flow, graph, regulations, shacl, search, validate, versions
+from app.api import datasets, flow, graph, regulations, sandbox, shacl, search, validate, versions
 from app.config import settings
 from app.services import regulation_store
 
@@ -19,6 +19,17 @@ async def lifespan(_: FastAPI):
 
 
 TAGS_METADATA = [
+    {
+        "name": "sandbox",
+        "description": (
+            "Песочница RAGU — изолированные демо-сценарии: семантический поиск "
+            "по регламентам, авто-извлечение параметров из произвольного текста. "
+            "По умолчанию работает в mock-режиме (regex + keyword scoring), "
+            "без необходимости LLM-ключей. При `RAGU_ENABLED=true` сможет "
+            "переключиться на реальный `graph_ragu` (`LocalSearchEngine`, "
+            "`TwoStageArtifactsExtractorLLM` etc.)."
+        ),
+    },
     {
         "name": "meta",
         "description": "Служебные эндпоинты — health-check и базовая информация о сервисе.",
@@ -132,3 +143,4 @@ app.include_router(versions.router, prefix="/api", tags=["versions"])
 app.include_router(shacl.router, prefix="/api", tags=["shacl"])
 app.include_router(graph.router, prefix="/api", tags=["graph"])
 app.include_router(search.router, prefix="/api", tags=["search"])
+app.include_router(sandbox.router, prefix="/api", tags=["sandbox"])

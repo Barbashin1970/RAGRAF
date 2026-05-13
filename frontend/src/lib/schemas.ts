@@ -217,3 +217,45 @@ export const graphPayloadSchema = z.object({
   edges: z.array(cyEdgeSchema),
   meta: z.record(z.string(), z.number()),
 })
+
+// ── Sandbox ────────────────────────────────────────────────────────────
+
+export const sandboxStatusSchema = z.object({
+  mode: z.enum(['mock', 'real']),
+  real_available: z.boolean(),
+  demos: z.array(z.string()),
+  backlog: z.array(z.string()),
+})
+
+export const sandboxSearchResultSchema = z.object({
+  regulation_id: z.string(),
+  regulation_name: z.string(),
+  domain: z.string().nullable().optional(),
+  score: z.number(),
+  matched_terms: z.array(z.string()),
+  snippet: z.string(),
+  parameters_count: z.number(),
+})
+
+export const sandboxSearchResponseSchema = z.object({
+  query: z.string(),
+  mode: z.enum(['mock', 'real']),
+  results: z.array(sandboxSearchResultSchema),
+})
+
+export const sandboxExtractedParamSchema = z.object({
+  id: z.string(),
+  suggested_name: z.string(),
+  value: z.number(),
+  deviation: z.number().nullable().optional(),
+  unit: z.string(),
+  source_text: z.string(),
+  confidence: z.number(),
+  min_inclusive: z.number().nullable().optional(),
+})
+
+export const sandboxExtractResponseSchema = z.object({
+  mode: z.enum(['mock', 'real']),
+  extracted: z.array(sandboxExtractedParamSchema),
+  count: z.number(),
+})
