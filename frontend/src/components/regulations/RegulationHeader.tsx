@@ -63,7 +63,7 @@ export function RegulationHeader({
 
       <div className="px-5 pb-3 pt-3">
         {/* Breadcrumb */}
-        <nav className="flex flex-wrap items-center gap-1 text-xs text-stone-500">
+        <nav className="mb-2 flex flex-wrap items-center gap-1 text-xs text-stone-500">
           <Link to="/regulations" className="inline-flex items-center gap-1 rounded px-1 py-0.5 hover:bg-stone-100 hover:text-stone-700">
             <ListTree size={11} /> Регламенты
           </Link>
@@ -83,33 +83,54 @@ export function RegulationHeader({
           <span className="font-mono text-[10px] text-stone-500">{sourceId}</span>
         </nav>
 
-        {/* Title row */}
-        <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className={cn('mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg', v.iconBg)}>
-              <Icon size={20} className={v.iconFg} />
-            </div>
-            <div className="min-w-0">
-              <h1 className="line-clamp-2 text-base font-semibold leading-snug text-stone-900">
-                {isLoading ? 'Загрузка…' : (regulation?.name ?? sourceId)}
-              </h1>
-              {regulation?.date && (
-                <div className="mt-0.5 text-xs text-stone-500">
-                  Дата принятия: {regulation.date} · версия {regulation.version}
-                </div>
-              )}
+        {/* Two-panel layout: title (grows) | controls (fixed).
+            На широких экранах title и actions — две отдельные «коробки», между
+            ними не происходит вертикального конфликта. На <lg> стекаются —
+            это естественный fallback на узких экранах. */}
+        <div
+          className={cn(
+            'grid items-stretch gap-3',
+            actions ? 'grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1',
+          )}
+        >
+          {/* Left panel — Title */}
+          <div className="rounded-lg border border-stone-200 bg-white px-3 py-2.5 shadow-sm">
+            <div className="flex items-start gap-3">
+              <div
+                className={cn(
+                  'mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+                  v.iconBg,
+                )}
+              >
+                <Icon size={20} className={v.iconFg} />
+              </div>
+              <div className="min-w-0">
+                <h1 className="line-clamp-2 break-words text-base font-semibold leading-snug text-stone-900">
+                  {isLoading ? 'Загрузка…' : (regulation?.name ?? sourceId)}
+                </h1>
+                {regulation?.date && (
+                  <div className="mt-0.5 text-xs text-stone-500">
+                    Дата принятия: {regulation.date} · версия {regulation.version}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
+          {/* Right panel — Controls */}
           {actions && (
-            <div className="flex shrink-0 flex-wrap items-center gap-1.5">
-              {actions}
+            <div className="flex items-center rounded-lg border border-stone-200 bg-white px-2.5 py-2 shadow-sm">
+              <div className="flex flex-nowrap items-center gap-1.5 whitespace-nowrap">
+                {actions}
+              </div>
             </div>
           )}
         </div>
 
-        {/* Stats row + tab nav */}
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        {/* Stats + tabs row.
+            Допускаем wrap здесь — это второстепенная информация, может
+            опуститься ниже без потери смысла. */}
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           {stats && stats.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 text-xs text-stone-600">
               {stats.map((s) => {
