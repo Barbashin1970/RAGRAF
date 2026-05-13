@@ -1,15 +1,34 @@
-# Fixtures — реальные регламенты для калибровки RAGRAF
+# Fixtures — golden seed для RAGRAF
 
-Извлечено из двух источников:
-- `Rules-Management.pdf` (корень проекта) — формальный пример SHACL/OWL онтологии,
-- `~/demo-sigma-main/src/config/regulations.yaml` — реальные сценарии НГУ (демо
-  оперативного центра): пожар в серверной, прорыв теплового ввода, ночная
-  протечка в общежитии и др.
+Извлечено из трёх источников:
+- `Rules-Management.pdf` (корень проекта) — формальный пример SHACL/OWL онтологии Sigma на Apache Jena.
+- `~/demo-sigma-main/src/config/regulations.yaml` — реальные сценарии НГУ-кампуса
+  (пожар в серверной, прорыв теплового ввода, ночная протечка в общежитии, СКУД и др.).
+- `~/NSK_OpenData_Bot/config/rules/ecology_rules.yaml` — экологические пороги Новосибирска
+  (smog_trap, pdk, black_ice, temp_shock, extreme_cold).
 
-Используется как:
-- образец того, как реально выглядит контент в upstream Regulation Management API,
-- локальный fallback (по умолчанию `USE_FIXTURES=true` в `.env.example`),
-- калибровочные данные для разработки UI / валидатора / SHACL-моста.
+## Роль фикстур после DuckDB
+
+С появлением DuckDB-store (`backend/data/regulations.duckdb`) фикстуры стали **seed-only** —
+загружаются в DB один раз при первом старте через `regulation_store.init_db()`, дальше
+**не модифицируются**. Все правки идут в DuckDB через `PUT /api/regulations/{id}` (UI Regulation Editor).
+
+| Где живут данные | Что хранят | Изменяемость |
+|------------------|-----------|--------------|
+| `data/fixtures/*.data.ttl` | OWL онтология + начальные значения параметров | **только при разработке вручную** |
+| `data/fixtures/*.shapes.ttl` | SHACL формы валидации | **только при разработке** + через `POST /shacl/import` |
+| `data/fixtures/*.flow.json` | Стартовый Rule DSL | seed для пустого flow + ручное обновление |
+| `data/regulations.duckdb` | Текущее состояние регламента после UI-правок | **через PUT /regulations/{id}** |
+| `data/flows/{id}.json` | Текущий flow (saved через Flow Editor) | **через PUT /flow** |
+| `data/versions/{id}/*.json` | Immutable snapshots flow | only-append |
+
+**Чтобы пересоздать DuckDB store из фикстур:** удалить `backend/data/regulations.duckdb` —
+сидинг прокатится заново при следующем старте (можно использовать как «сброс к исходному
+состоянию» во время разработки).
+
+Также используется как:
+- **референсная схема** для аналитика — как должна выглядеть Turtle онтология и SHACL-форма правильного регламента;
+- **fallback** для не-редактировавшихся регламентов когда в DuckDB пусто.
 
 ## Регламенты по доменам
 

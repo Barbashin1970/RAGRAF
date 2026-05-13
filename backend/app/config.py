@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     # Когда false — пробуем upstream; при ошибке network/HTTP падаем на фикстуру (если она есть).
     use_fixtures: bool = True
 
+    # Когда true — на PUT /regulations/{id} помимо записи в DuckDB шлём Turtle в upstream `/data`.
+    writeback_upstream: bool = False
+
     ragu_enabled: bool = False
     ragu_storage_folder: str = "./data/ragu_store"
     ragu_llm_model: str = "mistralai/mistral-medium-3"

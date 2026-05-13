@@ -65,7 +65,23 @@
 - Side-panel с полным описанием выбранного узла (полный текст рекомендации, границы SHACL, severity, путь property)
 - Прямой переход «Открыть в редакторе» из Regulation-узла
 
-### 4. Rule Flow Editor
+### 4. Regulation Editor (поля + слайдеры + Turtle)
+
+Полноценный редактор полей регламента — основной экран при клике на регламент в списке. Маршрут `/regulations/:id/edit`.
+
+**Три вкладки** (паттерн перенесён из NSK_OpenData_Bot Studio):
+
+- **Поля** — структурный редактор: имя (textarea), дата принятия, версия, статус (draft/active/archived через chip-выбор), список параметров с inline-редактированием (имя, reference, deviation, единица измерения, SHACL bounds min/max), текст рекомендации с приоритетом 1/2/3.
+- **Слайдеры** — быстрая калибровка `reference` (emerald accent) и `deviation` (amber accent) каждого параметра. Диапазон слайдера выводится автоматически: если есть SHACL `sh:minInclusive` / `sh:maxInclusive` — используем их, иначе эвристика `[ref − 5·dev, ref + 5·dev]`. Шаг — «красивое» значение из `[0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10]` ближайшее к `span/100`.
+- **Turtle** — read-only превью того, что серилизуется наружу через `GET /raw` и при `WRITEBACK_UPSTREAM=true` отправляется в upstream.
+
+**Состояние и сохранение:**
+- Локальный `draft` (структурный clone) — изменения не идут в backend до явного «Сохранить»
+- Кнопка «Сохранить» disabled пока `dirty=false`; «Отменить» — сбрасывает draft к серверу
+- При сохранении создаётся immutable snapshot в DuckDB-таблице `regulation_history`; «История правок» в правой панели показывает все ревизии и позволяет восстановить любую
+- React-query инвалидирует кэши `['regulation', id]`, `['datasets']`, `['flow', id]` — Flow Editor и список подхватят новые значения параметров без перезагрузки страницы
+
+### 5. Rule Flow Editor
 
 - **7 типов узлов** с собственными формами в правой панели:
   - `input` — параметр на вход (зелёный)
@@ -81,7 +97,7 @@
 - **Версионирование** — каждое сохранение создаёт immutable JSON-snapshot в `data/versions/{regulation_id}/{uuid}.json`; UI «История» позволяет восстановить любую версию
 - Autosave draft в `localStorage` каждые 30 секунд
 
-### 5. Constraint Editor
+### 6. Constraint Editor
 
 - Табличный редактор SHACL-ограничений: путь / datatype / minCount / minInclusive / maxInclusive / pattern / severity / message
 - Инлайн-редактирование ячеек; добавление пустой строки; удаление
@@ -89,13 +105,80 @@
 - **Экспорт SHACL Turtle** — скачивание `.ttl`-файла, идентичного формату upstream `/shapes`
 - Счётчики по severity (нарушений / предупреждений / информационных) в шапке
 
-### 6. Опциональная RAGU-интеграция
+### 7. Опциональная RAGU-интеграция
 
 При `RAGU_ENABLED=true` бэкенд использует [RAGU](https://github.com/RaguTeam/RAGU) (PyPI `graph_ragu`) для:
 - автоматического построения knowledge graph из текстов регламентов (`/api/graph`),
 - семантического поиска по содержимому правил (`POST /api/search` с режимами `local` / `global` / `naive`).
 
 Без RAGU `/api/graph` строится детерминистическим adapter-ом напрямую из domain-объектов, `/api/search` возвращает 503.
+
+---
+
+## Слой хранения данных
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  UI (RegulationEditorScreen, FlowEditor, ConstraintEditor)      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+┌─────────────────────────────┼───────────────────────────────────┐
+│                        FastAPI routes                            │
+│                                                                  │
+│  /api/regulations/{id}      /api/regulations/{id}/flow           │
+│  /api/regulations/{id}/raw  /api/regulations/{id}/constraints    │
+└─────────────────────────────────────────────────────────────────┘
+            │                    │                    │
+            ▼                    ▼                    ▼
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+│  DuckDB store    │  │  JSON snapshots  │  │ regulation_client │
+│ regulations.duck │  │ data/flows/      │  │  (httpx → 8958)   │
+│ + parameters     │  │ data/versions/   │  │                   │
+│ + history        │  │                  │  │                   │
+└──────────────────┘  └──────────────────┘  └──────────────────┘
+   authoritative         flow drafts            upstream proxy
+   for editable           + immutable        (used when fixtures
+   regulation data           snapshots         are disabled)
+            │                                          ▲
+            │                                          │
+            ▼                              ┌───────────┴───────┐
+   ┌─────────────────┐                     │ Upstream Sigma    │
+   │ data/fixtures/  │ ── seed at init ──► │ Apache Jena       │
+   │ *.ttl (Rules-   │                     │ 109.202.1.153:    │
+   │ Management.pdf, │                     │ 8958              │
+   │ demo-sigma,     │                     └───────────────────┘
+   │ NSK ecology)    │                              ▲
+   └─────────────────┘                              │
+   golden seed files                  WRITEBACK_UPSTREAM=true →
+   (never mutated)                  PUT /data + PUT /shapes
+```
+
+**Источники и приоритеты при чтении `GET /api/regulations/{id}`:**
+
+1. DuckDB store (если регламент редактировался — `regulations.duckdb` создаётся автоматически при первом старте)
+2. Локальная фикстура (для не-редактировавшихся регламентов или при `USE_FIXTURES=true`)
+3. Upstream Sigma API (когда `USE_FIXTURES=false` и в store пусто)
+
+**Запись `PUT /api/regulations/{id}`:**
+- Всегда пишем в DuckDB (создаётся snapshot в `regulation_history`)
+- Если `WRITEBACK_UPSTREAM=true` — дополнительно сериализуем в Turtle через `regulation_to_turtle()` и шлём `PUT /api/v1/regulations/{id}/data` в upstream
+
+### Схема DuckDB
+
+`backend/data/regulations.duckdb` (3 таблицы, создаются в lifespan при первом старте):
+
+```sql
+regulations (source_id PK, name, domain, date, version, status,
+             recommendation, recommendation_priority, updated_at)
+
+parameters  (PRIMARY KEY (source_id, id), name, datatype, ref_value,
+             deviation, unit, min_inclusive, max_inclusive, position)
+
+regulation_history (version_id PK, source_id, snapshot JSON,
+                    created_at, author, comment)
+```
+
+Почему DuckDB, а не SQLite: тот же file-in-file формат без сетевой инфраструктуры, native JSON-тип для snapshot-ов истории, быстрый аналитический COUNT(*) на больших списках. Mature Python binding (`duckdb>=1.2`).
 
 ---
 
@@ -115,13 +198,14 @@ RAGRAF/
 │   │   │   ├── graph.py          # /api/graph, /api/domains, /api/graph/regulation/{id}
 │   │   │   └── search.py         # /api/search
 │   │   ├── services/
-│   │   │   ├── regulation_client.py  # httpx-клиент к upstream + fixtures fallback
-│   │   │   ├── turtle_bridge.py      # rdflib parsing/serialization, SHACL bridge
+│   │   │   ├── regulation_client.py  # httpx-клиент к upstream + store/fixtures fallback
+│   │   │   ├── regulation_store.py   # DuckDB CRUD: regulations + parameters + history
+│   │   │   ├── turtle_bridge.py      # rdflib parse/serialize + Regulation→Turtle writeback
 │   │   │   ├── validator.py          # 7 правил валидации Rule DSL
-│   │   │   ├── flow_storage.py       # immutable JSON-snapshots
-│   │   │   ├── graph_builder.py      # domain → Cytoscape adapter
+│   │   │   ├── flow_storage.py       # immutable JSON-snapshots для flow
+│   │   │   ├── graph_builder.py      # domain → Cytoscape adapter (short_label, descriptions)
 │   │   │   ├── ragu_service.py       # ленивый singleton KnowledgeGraph
-│   │   │   └── fixtures.py           # DOMAINS, REGISTRY, чтение .ttl/.json
+│   │   │   └── fixtures.py           # DOMAINS, REGISTRY — seed-only (golden examples)
 │   │   ├── adapters/
 │   │   │   └── cytoscape_adapter.py  # RAGU KnowledgeGraph → Cytoscape JSON
 │   │   ├── schemas/domain.py     # Pydantic: Regulation, RuleDSL, Constraint, …
@@ -129,9 +213,10 @@ RAGRAF/
 │   │   └── main.py
 │   ├── data/
 │   │   ├── fixtures/             # реальные регламенты (.data.ttl, .shapes.ttl, .flow.json)
-│   │   │   └── INDEX.md          # реестр всех фикстур
-│   │   ├── flows/                # текущие сохранённые DSL (gitignore)
-│   │   ├── versions/             # immutable snapshots (gitignore)
+│   │   │   └── INDEX.md          # реестр фикстур — seed для DuckDB при первом старте
+│   │   ├── regulations.duckdb    # DuckDB store — authoritative для редактируемых регламентов (gitignore)
+│   │   ├── flows/                # текущие сохранённые DSL flow (gitignore)
+│   │   ├── versions/             # immutable JSON snapshots flow (gitignore)
 │   │   └── ragu_store/           # RAGU storage (gitignore)
 │   ├── requirements.txt
 │   └── .env.example
@@ -140,7 +225,7 @@ RAGRAF/
 │   ├── src/
 │   │   ├── app/                  # маршрутизация
 │   │   ├── components/
-│   │   │   ├── regulations/      # RegulationList, RegulationHeader (shared)
+│   │   │   ├── regulations/      # RegulationList, RegulationEditorScreen (3 views), RegulationHeader (shared)
 │   │   │   ├── flow/             # FlowEditorScreen, FlowCanvas, NodePalette, PropertyPanel, nodes/
 │   │   │   ├── graph/            # GraphView (Cytoscape + tabs)
 │   │   │   └── constraints/      # ConstraintEditorScreen
@@ -216,10 +301,13 @@ Health: <http://localhost:8000/health> · OpenAPI: <http://localhost:8000/docs> 
 
 | Метод | Путь | Возвращает |
 |-------|------|------------|
-| `GET` | `/api/datasets` | Список регламентов (id, name, domain, parameters_count, constraints_count) |
+| `GET` | `/api/datasets` | Список регламентов из DuckDB store (id, name, domain, parameters_count, constraints_count, recommendations_count) |
 | `GET` | `/api/domains` | Список доменов (id, label, hint) |
-| `GET` | `/api/regulations/{id}` | Регламент в нашей domain-структуре (Pydantic) |
-| `GET` | `/api/regulations/{id}/raw` | Сырой Turtle регламента (для отладки) |
+| `GET` | `/api/regulations/{id}` | Регламент в нашей domain-структуре. Приоритет: DuckDB → fixture → upstream |
+| `PUT` | `/api/regulations/{id}` | **Редактирование регламента целиком**. Пишет в DuckDB; при `WRITEBACK_UPSTREAM=true` сериализует Turtle и шлёт в upstream |
+| `GET` | `/api/regulations/{id}/regulation-history` | История правок самого регламента (имя, параметры, рекомендация) — отдельная от истории flow |
+| `POST` | `/api/regulations/{id}/regulation-restore/{version_id}` | Восстановить регламент из snapshot |
+| `GET` | `/api/regulations/{id}/raw` | Сырой Turtle регламента (для отладки, читается из DuckDB после правок) |
 | `PUT` | `/api/regulations/{id}/raw` | Записать сырой Turtle в upstream |
 | `DELETE` | `/api/regulations/{id}` | Очистить регламент |
 
@@ -262,8 +350,11 @@ Upstream проксируется: `109.202.1.153:8958/api/v1/regulations/{sourc
 REGULATION_API_URL=http://109.202.1.153:8958
 REGULATION_API_TIMEOUT=15
 
-# Источник данных
+# Источник данных при GET (если в DuckDB нет правок)
 USE_FIXTURES=true               # true = только локальные фикстуры; false = пробовать upstream
+
+# Запись наверх в upstream при сохранении регламента (PUT /regulations/{id})
+WRITEBACK_UPSTREAM=false        # true = после DuckDB-сохранения публикуем Turtle в upstream PUT /data
 
 # RAGU (опционально)
 RAGU_ENABLED=false
@@ -310,8 +401,9 @@ DATA_DIR=./data
 - FastAPI 0.115 + Uvicorn
 - Pydantic 2 + pydantic-settings
 - httpx (async HTTP к upstream)
-- rdflib 7 + pyshacl (SHACL bridge, парсинг Turtle)
+- rdflib 7 + pyshacl (SHACL bridge, парсинг и серилизация Turtle)
 - networkx (графовая валидация цикло-связности)
+- duckdb ≥ 1.2 (локальное хранилище отредактированных регламентов + история)
 - graph_ragu (опционально — GraphRAG-движок)
 
 **Frontend (Node 18+):**
@@ -339,18 +431,23 @@ DATA_DIR=./data
 
 - [x] Список регламентов с группировкой по доменам, поиском, счётчиками
 - [x] Graph View с Cytoscape + cola layout, табами по доменам, side-panel
+- [x] **Regulation Editor — 3 вкладки (Поля / Слайдеры / Turtle)** + история правок + writeback
+- [x] **DuckDB store** для редактируемых регламентов (regulations + parameters + regulation_history)
+- [x] **Regulation → Turtle serializer** для writeback в upstream
 - [x] Rule Flow Editor: 7 типов узлов, DnD-палитра, property panel, save/validate
 - [x] Constraint Editor: таблица, инлайн-редактирование, import/export SHACL Turtle, счётчики severity
 - [x] Validation: 7 правил, подсветка ошибочных узлов
-- [x] Versioning: immutable JSON snapshots + restore UI
-- [x] Унифицированная шапка детальных страниц с доменным акцентом, breadcrumb, табами Flow/Constraint/Graph
+- [x] Versioning flow: immutable JSON snapshots + restore UI
+- [x] Унифицированная шапка детальных страниц с доменным акцентом, breadcrumb, табами Редактировать/Поток/Ограничения/Граф
 - [x] 6 регламентов в 4 доменах (Теплоснабжение, Управление ЖКХ, Безопасность кампуса, Городская экология)
 
 ## Дальше (Should/Nice Have)
 
+- [ ] Кнопка «Сбросить к исходнику» (re-seed одного регламента из фикстуры)
 - [ ] Diff визуализация между версиями
-- [ ] Approval workflow (draft → review → active)
+- [ ] Approval workflow (draft → review → active) — статус уже есть в схеме DuckDB
 - [ ] Анимация simulation mode на canvas
 - [ ] AI-подсказки constraint через RAGU LocalSearch
 - [ ] Code-splitting (предупреждение Vite о chunk > 500 kB)
 - [ ] Расширение реестра: `traffic`, `industrial`, `transport` домены (черновики в `ecology_rules.yaml` и `traffic_rules.yaml` NSK_OpenData_Bot)
+- [ ] Импорт регламента из YAML/JSON (по аналогии с upload SHACL)

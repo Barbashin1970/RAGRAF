@@ -2,6 +2,7 @@ import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Activity, GitBranch, ListTree, Shield } from 'lucide-react'
 import { GraphView } from '@/components/graph/GraphView'
 import { RegulationList } from '@/components/regulations/RegulationList'
+import { RegulationEditorScreen } from '@/components/regulations/RegulationEditorScreen'
 import { FlowEditorScreen } from '@/components/flow/FlowEditorScreen'
 import { ConstraintEditorScreen } from '@/components/constraints/ConstraintEditorScreen'
 import { cn } from '@/lib/cn'
@@ -43,6 +44,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/regulations" replace />} />
           <Route path="/regulations" element={<RegulationList />} />
+          <Route path="/regulations/:id/edit" element={<RegulationEditorScreen />} />
           <Route path="/regulations/:id/flow" element={<FlowEditorScreen />} />
           <Route path="/regulations/:id/constraints" element={<ConstraintEditorScreen />} />
           <Route path="/graph" element={<GraphView />} />

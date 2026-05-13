@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { ChevronRight, ListTree, type LucideIcon } from 'lucide-react'
+import { ChevronRight, ListTree, Pencil, type LucideIcon } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api, type Domain, type Regulation } from '@/lib/api'
 import { cn } from '@/lib/cn'
@@ -19,7 +19,7 @@ interface Props {
   /** ID источника — показываем как чип */
   sourceId: string
   /** Активная вкладка для подсветки в локальной мини-навигации */
-  active: 'flow' | 'constraints' | 'graph'
+  active: 'edit' | 'flow' | 'constraints' | 'graph'
   /** Live-счётчики, специфичные для экрана (узлы потока / строки таблицы / …) */
   stats?: Stat[]
   /** Кнопки действий справа в шапке */
@@ -164,32 +164,38 @@ function TabSwitcher({
   domain,
 }: {
   sourceId: string
-  active: 'flow' | 'constraints' | 'graph'
+  active: 'edit' | 'flow' | 'constraints' | 'graph'
   domain: string | null | undefined
 }) {
-  const tabs: Array<{ id: 'flow' | 'constraints' | 'graph'; label: string; to: string }> = [
-    { id: 'flow',        label: 'Поток',       to: `/regulations/${sourceId}/flow` },
-    { id: 'constraints', label: 'Ограничения', to: `/regulations/${sourceId}/constraints` },
-    { id: 'graph',       label: 'Граф',        to: domain ? `/graph?domain=${domain}` : '/graph' },
+  type TabId = 'edit' | 'flow' | 'constraints' | 'graph'
+  const tabs: Array<{ id: TabId; label: string; to: string; icon?: LucideIcon }> = [
+    { id: 'edit',        label: 'Редактировать', to: `/regulations/${sourceId}/edit`,        icon: Pencil },
+    { id: 'flow',        label: 'Поток',         to: `/regulations/${sourceId}/flow` },
+    { id: 'constraints', label: 'Ограничения',   to: `/regulations/${sourceId}/constraints` },
+    { id: 'graph',       label: 'Граф',          to: domain ? `/graph?domain=${domain}` : '/graph' },
   ]
   const v = getDomainVisual(domain)
 
   return (
     <div className="inline-flex rounded-md border border-stone-200 bg-white p-0.5">
-      {tabs.map((t) => (
-        <Link
-          key={t.id}
-          to={t.to}
-          className={cn(
-            'rounded px-2.5 py-1 text-xs font-medium transition',
-            t.id === active
-              ? cn(v.chipBg, v.chipFg)
-              : 'text-stone-600 hover:bg-stone-50',
-          )}
-        >
-          {t.label}
-        </Link>
-      ))}
+      {tabs.map((t) => {
+        const TIcon = t.icon
+        return (
+          <Link
+            key={t.id}
+            to={t.to}
+            className={cn(
+              'inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition',
+              t.id === active
+                ? cn(v.chipBg, v.chipFg)
+                : 'text-stone-600 hover:bg-stone-50',
+            )}
+          >
+            {TIcon && <TIcon size={11} />}
+            {t.label}
+          </Link>
+        )
+      })}
     </div>
   )
 }

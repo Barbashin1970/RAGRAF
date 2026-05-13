@@ -19,7 +19,8 @@ from typing import Any
 import httpx
 
 from app.config import settings
-from app.services import fixtures
+from app.services import fixtures, regulation_store
+from app.services.turtle_bridge import regulation_to_turtle
 
 
 class RegulationClient:
@@ -39,6 +40,25 @@ class RegulationClient:
     # ---- datasets ----
 
     async def list_datasets(self) -> list[dict[str, Any]] | dict[str, Any]:
+        # DuckDB store — authoritative источник для редактируемых регламентов.
+        # Когда store сидится из фикстур (init_db), мы автоматически получаем
+        # стартовый набор. Дальше редактирование идёт в store.
+        try:
+            store_items = regulation_store.list_all()
+            if store_items:
+                # Дополняем поле name из реестра фикстур если оно длиннее
+                # (имена в REGISTRY — описательные, в Turtle часто короче).
+                fx_index = {f["id"]: f for f in fixtures.list_fixtures()}
+                for item in store_items:
+                    fx = fx_index.get(item["id"])
+                    if fx and len(str(fx.get("name", ""))) > len(str(item.get("name", ""))):
+                        item["name"] = fx["name"]
+                    if fx and "constraints_count" in fx:
+                        item.setdefault("constraints_count", fx.get("constraints_count"))
+                return store_items
+        except Exception:
+            pass  # fall through to upstream / fixtures
+
         if settings.use_fixtures:
             return fixtures.list_fixtures()
 
@@ -63,9 +83,19 @@ class RegulationClient:
     # ---- regulations (data, Turtle) ----
 
     async def get_data(self, source_id: str) -> str:
+        # 1) DuckDB store — если регламент редактировался, отдаём свежую Turtle.
+        try:
+            reg = regulation_store.get(source_id)
+            if reg is not None:
+                return regulation_to_turtle(reg)
+        except Exception:
+            pass
+
+        # 2) Локальная фикстура.
         if settings.use_fixtures and fixtures.has_fixture(source_id):
             return fixtures.read_data(source_id)
 
+        # 3) Upstream.
         async def call():
             async with self._client() as c:
                 r = await c.get(f"/api/v1/regulations/{source_id}/data")

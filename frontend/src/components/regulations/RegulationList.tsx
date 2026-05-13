@@ -10,6 +10,7 @@ import {
   Loader2,
   type LucideIcon,
   Network,
+  Pencil,
   Search,
   Shield,
   Sliders,
@@ -240,7 +241,7 @@ function RegulationCard({ reg, visual }: { reg: RegRow; visual: DomainVisual }) 
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-2">
             <Link
-              to={`/regulations/${reg.id}/flow`}
+              to={`/regulations/${reg.id}/edit`}
               className="line-clamp-2 font-medium leading-snug text-stone-900 transition hover:text-primary"
               title={reg.name}
             >
@@ -274,6 +275,13 @@ function RegulationCard({ reg, visual }: { reg: RegRow; visual: DomainVisual }) 
 
         <div className="flex shrink-0 items-center gap-1.5">
           <ActionButton
+            to={`/regulations/${reg.id}/edit`}
+            icon={Pencil}
+            label="Редактор"
+            colorClasses="border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-300 hover:bg-violet-100"
+            iconColor="text-violet-500"
+          />
+          <ActionButton
             to={`/regulations/${reg.id}/flow`}
             icon={Workflow}
             label="Поток"
@@ -295,9 +303,9 @@ function RegulationCard({ reg, visual }: { reg: RegRow; visual: DomainVisual }) 
             iconColor="text-emerald-500"
           />
           <Link
-            to={`/regulations/${reg.id}/flow`}
+            to={`/regulations/${reg.id}/edit`}
             className="hidden h-8 w-8 items-center justify-center rounded-md text-stone-400 transition hover:bg-stone-100 hover:text-stone-700 sm:inline-flex"
-            title="Открыть редактор потока"
+            title="Открыть редактор полей"
           >
             <ChevronRight size={16} />
           </Link>

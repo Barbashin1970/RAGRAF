@@ -8,6 +8,7 @@ rdflib==7.1.1
 pyshacl==0.26.0
 networkx==3.4.2
 python-dotenv==1.0.1
+duckdb>=1.2,<2
 
 # RAGU — heavy, optional. Раскомментируй когда подключаем GraphRAG-индекс.
 # graph_ragu==0.1.*

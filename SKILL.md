@@ -206,6 +206,61 @@ useMutation({
 
 ---
 
+## Skill: Three-view regulation editor (Поля / Слайдеры / Turtle)
+
+**Применение:** редактор регламента `/regulations/:id/edit` — основной экран для аналитика.
+
+**Референс:** NSK_OpenData_Bot Studio — [`~/NSK_OpenData_Bot/src/static/studio.html`](../NSK_OpenData_Bot/src/static/studio.html) + [`~/NSK_OpenData_Bot/src/routes/admin.py`](../NSK_OpenData_Bot/src/routes/admin.py). Там три вкладки для YAML-регламентов: **YAML source / Tree (parsed) / Quick sliders** (`{path, label, min, max, step}`).
+
+**Адаптация под Turtle/OWL:**
+
+| Studio (YAML) | RAGRAF Editor (Turtle) |
+|---------------|------------------------|
+| YAML source view | Turtle source view (read-only) |
+| Tree (parsed YAML) | Form view (Pydantic-mapped поля) |
+| Quick sliders (path) | Sliders view (per-parameter ref + dev) |
+
+**Авто-range у слайдеров:** в NSK слайдеры описаны вручную; у нас выводятся из SHACL `sh:minInclusive`/`sh:maxInclusive`, fallback на эвристику `[ref − 5·dev, ref + 5·dev]`. Шаг — ближайший nice из `[0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10]` к `span/100`. См. `deriveSliderRange()` в [`RegulationEditorScreen.tsx`](frontend/src/components/regulations/RegulationEditorScreen.tsx).
+
+**Local draft + dirty-state:** `draft` — структурный клон серверного state. «Сохранить» disabled пока `draft === regulation`. «Отменить» восстанавливает draft. После save react-query инвалидирует `['regulation', id]`, `['datasets']`, `['flow', id]` — все экраны подхватят свежие значения автоматически.
+
+---
+
+## Skill: DuckDB как локальный store
+
+**Применение:** authoritative-хранилище редактируемых регламентов. Заменяет «хардкод в фикстурах» — теперь правки persist'ятся между перезапусками.
+
+**Стек:** `duckdb>=1.2`. Файл `backend/data/regulations.duckdb` создаётся в lifespan-handler FastAPI. Три таблицы: `regulations`, `parameters`, `regulation_history` (JSON-snapshot для каждой версии).
+
+**Threading:** используем `threading.RLock()` (reentrant) — иначе `init_db → seed → save()` повторно захватывает тот же лок и deadlock'ит на старте. Урок: NSK для своего YAML-store избегал этого через простой file write — у нас DuckDB и нужен явный лок.
+
+**Сидинг:** при первом старте парсим все фикстуры из `data/fixtures/`, заливаем в DB через `save()`. После сида фикстуры — golden seed (не модифицируются), DB — source of truth.
+
+**Источники чтения по приоритету** (в `regulation_client.get_data` и `api/regulations.get`):
+1. DuckDB store (если регламент редактировался)
+2. Фикстура (для не-редактировавшихся)
+3. Upstream Sigma (если `USE_FIXTURES=false` и в store пусто)
+
+**Запись через `PUT /api/regulations/{id}`:** всегда DuckDB + snapshot. Опционально `WRITEBACK_UPSTREAM=true` → также `regulation_to_turtle()` → `PUT /api/v1/regulations/{id}/data` в upstream.
+
+---
+
+## Skill: Regulation → Turtle serializer
+
+**Применение:** writeback домена в формат OWL-онтологии (как в `Rules-Management.pdf` и фикстурах).
+
+**Контракт:** `regulation_to_turtle(reg: Regulation) -> str` в [`turtle_bridge.py`](backend/app/services/turtle_bridge.py). Эмитит:
+- `:Regulation a owl:Class`
+- Для каждого param: `:<param> a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal` + парное `:<param>Deviation`
+- Метапроперти: `:name xsd:string`, `:date xsd:date`, `:recommendation xsd:string`
+- Инстанс: `:<PascalCase>Regulation a :Regulation` с плоскими scalar-значениями (`:pressure 22.0 ; :pressureDeviation 2.0 ; …`)
+
+Имя инстанса — `_instance_local_name(source_id)`: `pressure-diameter → PressureDiameterRegulation`. Стабильный URI при редактировании.
+
+**Зачем:** упрощает интеграцию с любым SHACL-валидатором (pyshacl, Apache Jena Sigma) — формат бит-в-бит идентичный фикстурам из PDF.
+
+---
+
 ## Skill: Versioning / immutable snapshots
 
 **Применение:** при каждом `PUT /flow` создаём `FlowVersion` snapshot. Хранение — JSON-файлы на FS (на старте), потом PostgreSQL (`flow_versions` table).

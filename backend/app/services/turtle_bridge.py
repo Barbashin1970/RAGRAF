@@ -131,6 +131,86 @@ def constraints_to_shacl_turtle(constraints: list[Constraint]) -> str:
     return g.serialize(format="turtle")
 
 
+# ---- Regulation domain → Turtle (writeback) ---------------------------
+
+
+def regulation_to_turtle(reg: Regulation) -> str:
+    """Сериализовать `Regulation` обратно в Turtle, как в фикстурах.
+
+    Формат повторяет онтологию из Rules-Management.pdf: для каждого параметра
+    объявляем `owl:DatatypeProperty` + парное `<name>Deviation`, далее
+    экземпляр `:<Name>Regulation` с плоскими scalar-свойствами.
+
+    Идентификатор инстанса берём из `reg.id` — преобразуем в PascalCase,
+    добавляем суффикс `Regulation`. Это даёт стабильный URI при редактировании.
+    """
+    from rdflib import Graph, Literal, Namespace
+    from rdflib.namespace import OWL, RDF, RDFS, XSD
+
+    g = Graph()
+    REG_NS = Namespace("http://regulations.local/ontology#")
+    g.bind("", REG_NS)
+    g.bind("owl", OWL)
+    g.bind("rdf", RDF)
+    g.bind("rdfs", RDFS)
+    g.bind("xsd", XSD)
+
+    REG_CLASS = REG_NS["Regulation"]
+    g.add((REG_CLASS, RDF.type, OWL.Class))
+
+    # Стандартные мета-свойства
+    for prop_name, rng in (
+        ("name", XSD.string),
+        ("date", XSD.date),
+        ("recommendation", XSD.string),
+    ):
+        pred = REG_NS[prop_name]
+        g.add((pred, RDF.type, OWL.DatatypeProperty))
+        g.add((pred, RDFS.domain, REG_CLASS))
+        g.add((pred, RDFS.range, rng))
+
+    # Параметры и их *Deviation — оба decimal
+    for p in reg.parameters:
+        for nm in (p.name, f"{p.name}Deviation"):
+            pred = REG_NS[nm]
+            g.add((pred, RDF.type, OWL.DatatypeProperty))
+            g.add((pred, RDFS.domain, REG_CLASS))
+            g.add((pred, RDFS.range, XSD.decimal))
+
+    instance = REG_NS[_instance_local_name(reg.id)]
+    g.add((instance, RDF.type, REG_CLASS))
+    if reg.name:
+        g.add((instance, REG_NS["name"], Literal(reg.name)))
+    if reg.date:
+        g.add((instance, REG_NS["date"], Literal(reg.date, datatype=XSD.date)))
+    for p in reg.parameters:
+        if p.referenceValue is not None:
+            g.add((instance, REG_NS[p.name], Literal(float(p.referenceValue), datatype=XSD.decimal)))
+        if p.deviationAllowed is not None:
+            g.add(
+                (
+                    instance,
+                    REG_NS[f"{p.name}Deviation"],
+                    Literal(float(p.deviationAllowed), datatype=XSD.decimal),
+                )
+            )
+    if reg.recommendations:
+        text = reg.recommendations[0].text or ""
+        if text:
+            g.add((instance, REG_NS["recommendation"], Literal(text)))
+
+    return g.serialize(format="turtle")
+
+
+def _instance_local_name(source_id: str) -> str:
+    """source_id → PascalCase + 'Regulation'. `roof-snow-fencing` → `RoofSnowFencingRegulation`."""
+    parts = [p for p in source_id.replace("_", "-").split("-") if p]
+    pascal = "".join(p[:1].upper() + p[1:] for p in parts)
+    if not pascal.endswith("Regulation"):
+        pascal += "Regulation"
+    return pascal
+
+
 # ---- Parsers ----------------------------------------------------------
 
 

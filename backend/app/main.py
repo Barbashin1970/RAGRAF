@@ -5,10 +5,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import datasets, flow, graph, regulations, shacl, search, validate, versions
 from app.config import settings
+from app.services import regulation_store
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Создаём DuckDB schema и сидим из фикстур при первом старте.
+    try:
+        regulation_store.init_db()
+    except Exception as e:
+        print(f"[lifespan] regulation_store.init_db failed: {e}")
     yield
 
 

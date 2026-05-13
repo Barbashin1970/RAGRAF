@@ -131,8 +131,22 @@ export const api = {
   },
   regulations: {
     get: (id: string) => request<Regulation>(`/api/regulations/${encodeURIComponent(id)}`),
+    save: (id: string, reg: Regulation) =>
+      request<{ ok: string; version: string; pushed_upstream?: boolean; upstream_error?: string }>(
+        `/api/regulations/${encodeURIComponent(id)}`,
+        { method: 'PUT', body: JSON.stringify(reg) },
+      ),
     raw: (id: string) => request<string>(`/api/regulations/${encodeURIComponent(id)}/raw`),
     delete: (id: string) => request<void>(`/api/regulations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    history: (id: string) =>
+      request<Array<{ version_id: string; source_id: string; created_at: string; author: string; comment: string | null }>>(
+        `/api/regulations/${encodeURIComponent(id)}/regulation-history`,
+      ),
+    restore: (id: string, versionId: string) =>
+      request<Regulation>(
+        `/api/regulations/${encodeURIComponent(id)}/regulation-restore/${encodeURIComponent(versionId)}`,
+        { method: 'POST' },
+      ),
   },
   flow: {
     get: (id: string) => request<RuleDSL>(`/api/regulations/${encodeURIComponent(id)}/flow`),
