@@ -295,6 +295,67 @@ Health: <http://localhost:8000/health> · OpenAPI: <http://localhost:8000/docs> 
 
 ---
 
+## Тесты
+
+Три уровня; запускать после крупных правок чтобы ловить регрессию.
+
+### Backend — pytest (46 тестов, ~4 сек)
+
+```bash
+cd backend
+.venv/bin/pytest -q              # быстро
+.venv/bin/pytest -v              # с именами тестов
+.venv/bin/pytest tests/test_regulation_diff.py  # один файл
+```
+
+Покрыто:
+- **`test_regulation_diff.py`** (9) — структурный diff: создание / нет изменений / param value / добавление / удаление / рекомендация / truncation / агрегация
+- **`test_turtle_bridge.py`** (8) — round-trip `Regulation → Turtle → Regulation`, SHACL bounds propagation, severity / message, PascalCase URI инстанса
+- **`test_regulation_store.py`** (8) — CRUD на DuckDB: сидинг 6 фикстур, history с diff_summary, restore с новой версией, prev_snapshot lookup
+- **`test_validator.py`** (8) — 7 правил DSL: isolated nodes, missing IO, dangling edges, unknown paramRef, циклы, threshold bounds, shacl ref
+- **`test_api_endpoints.py`** (13) — FastAPI TestClient: /health, /domains, /datasets, GET/PUT регламента, history+diff, publish/archive, /flow стартер, /constraints, /validate
+
+Каждый тест в изолированной `tmp/`-папке (не пересекается с dev DuckDB).
+
+### Frontend — vitest (18 тестов, ~0.6 сек)
+
+```bash
+cd frontend
+npm test                # одноразовый прогон
+npm run test:watch      # watch-mode
+```
+
+Покрыто:
+- **`rulesDsl.test.ts`** (9) — `dslToFlow` / `flowToDsl` round-trip, layered layout без позиций, condition в edges, новые узлы из canvas
+- **`domains.test.ts`** (5) — DOMAIN_VISUALS таблица: 4 базовых домена с 6 цветовыми полями, fallback для null/unknown
+- **`nanoid.test.ts`** (4) — длина / уникальность / URL-safe символы
+
+### E2E smoke — `scripts/e2e-smoke.sh` (13 проверок, ~3 сек)
+
+```bash
+./scripts/e2e-smoke.sh                # полный цикл
+./scripts/e2e-smoke.sh --keep-server  # оставить тестовый бэкенд для ручной отладки
+```
+
+Поднимает изолированный backend на `:8888` с `tmp/`-DATA_DIR (не трогает dev-сервер), прогоняет:
+1. `/api/domains` ≥4
+2. `/api/datasets` = 6 регламентов после seed
+3. GET pressure-diameter pressure=20.5 (соответствует PDF)
+4. PUT с правкой → версия создана
+5. Reload → pressure=25.0, +flow параметр
+6. History → ≥2 версий с `diff_summary`
+7. `regulation-diff/{vid}` → структурный diff
+8. POST `/publish` → status=active
+9. POST `/archive` → status=archived
+10. POST `/regulation-restore` → возврат к seed
+11. `/constraints` ≥6 SHACL
+12. `/raw` Turtle содержит `:PressureDiameterRegulation`
+13. `/graph?domain=...` домены изолированы
+
+Запускать перед merge / после крупных рефакторингов.
+
+---
+
 ## REST API
 
 ### Регламенты и домены

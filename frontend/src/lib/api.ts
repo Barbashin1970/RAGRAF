@@ -139,14 +139,38 @@ export const api = {
     raw: (id: string) => request<string>(`/api/regulations/${encodeURIComponent(id)}/raw`),
     delete: (id: string) => request<void>(`/api/regulations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     history: (id: string) =>
-      request<Array<{ version_id: string; source_id: string; created_at: string; author: string; comment: string | null }>>(
+      request<Array<{
+        version_id: string
+        source_id: string
+        created_at: string
+        author: string
+        comment: string | null
+        diff_summary: string
+        diff_counts: { changed?: number; added?: number; removed?: number; initial?: number }
+      }>>(
         `/api/regulations/${encodeURIComponent(id)}/regulation-history`,
       ),
+    diff: (id: string, versionId: string) =>
+      request<{
+        summary: string
+        changes: Array<{
+          op: 'changed' | 'added' | 'removed'
+          path: string
+          label?: string
+          before: unknown
+          after: unknown
+        }>
+        counts: { changed?: number; added?: number; removed?: number; initial?: number }
+      }>(`/api/regulations/${encodeURIComponent(id)}/regulation-diff/${encodeURIComponent(versionId)}`),
     restore: (id: string, versionId: string) =>
       request<Regulation>(
         `/api/regulations/${encodeURIComponent(id)}/regulation-restore/${encodeURIComponent(versionId)}`,
         { method: 'POST' },
       ),
+    publish: (id: string) =>
+      request<Regulation>(`/api/regulations/${encodeURIComponent(id)}/publish`, { method: 'POST' }),
+    archive: (id: string) =>
+      request<Regulation>(`/api/regulations/${encodeURIComponent(id)}/archive`, { method: 'POST' }),
   },
   flow: {
     get: (id: string) => request<RuleDSL>(`/api/regulations/${encodeURIComponent(id)}/flow`),

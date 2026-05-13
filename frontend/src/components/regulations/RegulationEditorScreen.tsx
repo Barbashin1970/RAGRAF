@@ -2,13 +2,18 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  Archive,
+  ChevronDown,
+  ChevronUp,
   CircleSlash,
   CopyCheck,
   FileCode2,
   History,
   type LucideIcon,
   Plus,
+  RotateCcw,
   Save,
+  Send,
   Sliders,
   Trash2,
 } from 'lucide-react'
@@ -55,21 +60,56 @@ export function RegulationEditorScreen() {
     return JSON.stringify(regulation) !== JSON.stringify(draft)
   }, [regulation, draft])
 
+  const invalidateAll = () => {
+    qc.invalidateQueries({ queryKey: ['regulation', id] })
+    qc.invalidateQueries({ queryKey: ['datasets'] })
+    qc.invalidateQueries({ queryKey: ['flow', id] })
+    qc.invalidateQueries({ queryKey: ['regulation-history', id] })
+  }
+
   const save = useMutation({
     mutationFn: (next: Regulation) => api.regulations.save(id, next),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['regulation', id] })
-      qc.invalidateQueries({ queryKey: ['datasets'] })
-      qc.invalidateQueries({ queryKey: ['flow', id] })
-    },
+    onSuccess: invalidateAll,
+  })
+
+  const publish = useMutation({
+    mutationFn: () => api.regulations.publish(id),
+    onSuccess: invalidateAll,
+  })
+  const archive = useMutation({
+    mutationFn: () => api.regulations.archive(id),
+    onSuccess: invalidateAll,
   })
 
   const stats = [
     { icon: Sliders, value: draft?.parameters.length ?? 0, label: 'параметров' },
   ]
 
+  const currentStatus = regulation?.status ?? 'draft'
   const actions = (
     <>
+      {/* Approval workflow */}
+      {currentStatus !== 'active' && (
+        <button
+          onClick={() => publish.mutate()}
+          disabled={publish.isPending || dirty}
+          title={dirty ? 'Сначала сохраните черновик' : 'Перевести в статус active'}
+          className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:opacity-50"
+        >
+          <Send size={13} className="text-emerald-500" />
+          {publish.isPending ? 'Публикую…' : 'Опубликовать'}
+        </button>
+      )}
+      {currentStatus === 'active' && (
+        <button
+          onClick={() => archive.mutate()}
+          disabled={archive.isPending}
+          className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-600 transition hover:bg-stone-50 disabled:opacity-50"
+        >
+          <Archive size={13} className="text-stone-500" />
+          {archive.isPending ? 'Архивирую…' : 'Архивировать'}
+        </button>
+      )}
       <button
         onClick={() => setShowHistory((x) => !x)}
         className={cn(
@@ -576,6 +616,7 @@ function SourceView({ sourceId, draft }: { sourceId: string; draft: Regulation }
 // ──────────────────────────────────────────────────────────
 
 function HistoryPanel({ id, onRestore }: { id: string; onRestore: () => void }) {
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const { data, isLoading } = useQuery({
     queryKey: ['regulation-history', id],
     queryFn: () => api.regulations.history(id),
@@ -586,27 +627,132 @@ function HistoryPanel({ id, onRestore }: { id: string; onRestore: () => void }) 
   })
 
   return (
-    <aside className="w-72 shrink-0 overflow-y-auto border-l border-stone-200 bg-white p-3 text-sm">
-      <div className="mb-2 text-xs uppercase tracking-wide text-stone-500">История правок</div>
+    <aside className="w-80 shrink-0 overflow-y-auto border-l border-stone-200 bg-white p-3 text-sm">
+      <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-wide text-stone-500">
+        <span>История правок</span>
+        {data && <span className="rounded-full bg-stone-100 px-2 py-0.5">{data.length}</span>}
+      </div>
       {isLoading && <div className="text-stone-500">Загрузка…</div>}
-      {(data ?? []).map((v) => (
-        <div key={v.version_id} className="mb-1.5 rounded-md border border-stone-200 p-2">
-          <div className="font-mono text-[10px] text-stone-500">{v.version_id.slice(0, 8)}</div>
-          <div className="text-xs text-stone-700">{new Date(v.created_at).toLocaleString('ru-RU')}</div>
-          <div className="text-xs text-stone-500">{v.author}</div>
-          {v.comment && <div className="line-clamp-2 text-xs text-stone-600">{v.comment}</div>}
-          <button
-            onClick={() => restore.mutate(v.version_id)}
-            className="mt-1 rounded-md border border-stone-200 px-2 py-0.5 text-[10px] hover:bg-stone-50"
+      {(data ?? []).map((v, idx) => {
+        const isLatest = idx === 0
+        const isInitial = v.diff_counts.initial && v.diff_counts.initial > 0
+        const expanded = expandedId === v.version_id
+        return (
+          <div
+            key={v.version_id}
+            className={cn(
+              'mb-1.5 overflow-hidden rounded-md border bg-white transition',
+              isLatest ? 'border-primary/40 ring-1 ring-primary/20' : 'border-stone-200',
+            )}
           >
-            Восстановить
-          </button>
-        </div>
-      ))}
+            <div className="p-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-[10px] text-stone-500">{v.version_id.slice(0, 8)}</span>
+                  {isLatest && (
+                    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary">
+                      текущая
+                    </span>
+                  )}
+                  {isInitial && (
+                    <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-medium text-emerald-700">
+                      seed
+                    </span>
+                  )}
+                </div>
+                <DiffBadges counts={v.diff_counts} />
+              </div>
+              <div className="mt-0.5 text-[11px] text-stone-600">
+                {new Date(v.created_at).toLocaleString('ru-RU')} · {v.author}
+              </div>
+              <div className="mt-1 text-xs leading-snug text-stone-800">
+                <span className="font-medium">{v.diff_summary}</span>
+              </div>
+              {v.comment && v.comment !== 'UI edit' && (
+                <div className="mt-1 line-clamp-2 text-[11px] italic text-stone-500">{v.comment}</div>
+              )}
+
+              <div className="mt-2 flex items-center gap-1.5">
+                <button
+                  onClick={() => setExpandedId(expanded ? null : v.version_id)}
+                  className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2 py-0.5 text-[10px] text-stone-700 hover:bg-stone-50"
+                  disabled={!!isInitial}
+                  title={isInitial ? 'Это первая версия — сравнивать не с чем' : ''}
+                >
+                  {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                  {expanded ? 'Скрыть' : 'Что изменилось'}
+                </button>
+                <button
+                  onClick={() => restore.mutate(v.version_id)}
+                  disabled={isLatest || restore.isPending}
+                  className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] text-amber-800 hover:bg-amber-100 disabled:opacity-40"
+                >
+                  <RotateCcw size={11} className="text-amber-500" />
+                  Восстановить
+                </button>
+              </div>
+            </div>
+
+            {expanded && <DiffDetail id={id} versionId={v.version_id} />}
+          </div>
+        )
+      })}
       {!isLoading && (data?.length ?? 0) === 0 && (
         <div className="text-stone-400">Правок ещё не было.</div>
       )}
     </aside>
+  )
+}
+
+function DiffBadges({ counts }: { counts: { changed?: number; added?: number; removed?: number; initial?: number } }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {!!counts.added && (
+        <span className="rounded-full bg-emerald-100 px-1.5 text-[9px] font-medium text-emerald-700">+{counts.added}</span>
+      )}
+      {!!counts.removed && (
+        <span className="rounded-full bg-rose-100 px-1.5 text-[9px] font-medium text-rose-700">−{counts.removed}</span>
+      )}
+      {!!counts.changed && (
+        <span className="rounded-full bg-blue-100 px-1.5 text-[9px] font-medium text-blue-700">~{counts.changed}</span>
+      )}
+    </div>
+  )
+}
+
+function DiffDetail({ id, versionId }: { id: string; versionId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['regulation-diff', id, versionId],
+    queryFn: () => api.regulations.diff(id, versionId),
+  })
+  if (isLoading) {
+    return <div className="border-t border-stone-100 bg-stone-50 px-2 py-1.5 text-[11px] text-stone-400">Загрузка diff…</div>
+  }
+  if (!data || data.changes.length === 0) {
+    return <div className="border-t border-stone-100 bg-stone-50 px-2 py-1.5 text-[11px] text-stone-400">Без структурных изменений</div>
+  }
+  return (
+    <div className="border-t border-stone-100 bg-stone-50 px-2 py-1.5">
+      <ul className="space-y-1">
+        {data.changes.map((c, i) => (
+          <li key={i} className="text-[11px] leading-snug">
+            <div className="flex items-center gap-1">
+              {c.op === 'changed' && <span className="rounded bg-blue-100 px-1 font-mono text-[9px] text-blue-700">~</span>}
+              {c.op === 'added' && <span className="rounded bg-emerald-100 px-1 font-mono text-[9px] text-emerald-700">+</span>}
+              {c.op === 'removed' && <span className="rounded bg-rose-100 px-1 font-mono text-[9px] text-rose-700">−</span>}
+              <span className="font-medium text-stone-800">{c.label || c.path}</span>
+            </div>
+            {c.op === 'changed' && (
+              <div className="ml-3.5 mt-0.5 break-words text-[11px] text-stone-600">
+                <span className="rounded bg-rose-50 px-1 line-through text-rose-700">{String(c.before)}</span>
+                <span className="mx-1 text-stone-400">→</span>
+                <span className="rounded bg-emerald-50 px-1 text-emerald-700">{String(c.after)}</span>
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

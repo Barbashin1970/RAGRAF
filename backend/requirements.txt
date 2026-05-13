@@ -10,5 +10,9 @@ networkx==3.4.2
 python-dotenv==1.0.1
 duckdb>=1.2,<2
 
+# Tests
+pytest==8.3.4
+pytest-asyncio==0.24.0
+
 # RAGU — heavy, optional. Раскомментируй когда подключаем GraphRAG-индекс.
 # graph_ragu==0.1.*

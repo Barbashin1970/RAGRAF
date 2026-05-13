@@ -263,11 +263,19 @@ def save(reg: Regulation, author: str = "anonymous", comment: str | None = None)
 
 
 def history(source_id: str) -> list[dict[str, Any]]:
+    """История правок + автоматический diff_summary для каждой версии.
+
+    diff_summary считается между парой соседних snapshot-ов (текущая ↔ предыдущая
+    по created_at), чтобы UI мог сразу показать «что изменилось» без отдельного
+    запроса. Структурный diff (полный список changes) отдаётся по `/regulation-diff/{vid}`.
+    """
+    from app.services.regulation_diff import compute_diff
+
     with _LOCK:
         c = _connection()
         rows = c.execute(
             """
-            SELECT version_id, source_id, created_at, author, comment
+            SELECT version_id, source_id, snapshot, created_at, author, comment
             FROM regulation_history
             WHERE source_id = ?
             ORDER BY created_at DESC
@@ -275,16 +283,76 @@ def history(source_id: str) -> list[dict[str, Any]]:
             """,
             [source_id],
         ).fetchall()
-    return [
-        {
-            "version_id": r[0],
-            "source_id": r[1],
-            "created_at": r[2].isoformat() if r[2] else None,
-            "author": r[3],
-            "comment": r[4],
-        }
-        for r in rows
-    ]
+
+    parsed: list[dict[str, Any]] = []
+    for r in rows:
+        snap = r[2] if isinstance(r[2], dict) else json.loads(r[2])
+        parsed.append(
+            {
+                "version_id": r[0],
+                "source_id": r[1],
+                "_snapshot": snap,
+                "created_at": r[3].isoformat() if r[3] else None,
+                "author": r[4],
+                "comment": r[5],
+            }
+        )
+
+    # Считаем diff между текущей версией и следующей более старой (по списку — это i+1).
+    out: list[dict[str, Any]] = []
+    for i, h in enumerate(parsed):
+        prev_snap = parsed[i + 1]["_snapshot"] if i + 1 < len(parsed) else None
+        try:
+            new_reg = Regulation.model_validate(h["_snapshot"])
+            old_reg = Regulation.model_validate(prev_snap) if prev_snap else None
+            diff = compute_diff(old_reg, new_reg)
+        except Exception:
+            diff = {"summary": "—", "changes": [], "counts": {}}
+        out.append(
+            {
+                "version_id": h["version_id"],
+                "source_id": h["source_id"],
+                "created_at": h["created_at"],
+                "author": h["author"],
+                "comment": h["comment"],
+                "diff_summary": diff["summary"],
+                "diff_counts": diff["counts"],
+            }
+        )
+    return out
+
+
+def get_snapshot(source_id: str, version_id: str) -> dict[str, Any] | None:
+    with _LOCK:
+        c = _connection()
+        row = c.execute(
+            "SELECT snapshot FROM regulation_history WHERE version_id = ? AND source_id = ?",
+            [version_id, source_id],
+        ).fetchone()
+    if row is None:
+        return None
+    return row[0] if isinstance(row[0], dict) else json.loads(row[0])
+
+
+def get_prev_snapshot(source_id: str, version_id: str) -> dict[str, Any] | None:
+    """Snapshot версии, которая шла непосредственно перед `version_id`."""
+    with _LOCK:
+        c = _connection()
+        row = c.execute(
+            """
+            WITH target AS (
+                SELECT created_at FROM regulation_history
+                WHERE source_id = ? AND version_id = ?
+            )
+            SELECT snapshot FROM regulation_history
+            WHERE source_id = ? AND created_at < (SELECT created_at FROM target)
+            ORDER BY created_at DESC LIMIT 1
+            """,
+            [source_id, version_id, source_id],
+        ).fetchone()
+    if row is None:
+        return None
+    return row[0] if isinstance(row[0], dict) else json.loads(row[0])
 
 
 def restore(source_id: str, version_id: str) -> Regulation | None:
