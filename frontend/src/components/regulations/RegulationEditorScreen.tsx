@@ -482,11 +482,32 @@ function ParameterSliderRow({
   param: Parameter
   onChange: (p: Partial<Parameter>) => void
 }) {
-  // Pure-функция — не зависит от текущего dev → нет feedback-loop'а, при котором
-  // правка deviation сдвигала reference-thumb (баг из скриншота с 5 ± 11).
-  const { min, max, step, devMax, devOverflow, devTooWide } = deriveSliderRange(param)
+  // Snapshot диапазона: фиксируем при монтировании / при смене SHACL bounds.
+  // Без этого был положительный feedback: тянешь reference вправо → ref растёт →
+  // padding = 2·|ref| → max растёт → правый край уходит → можно тянуть ещё дальше →
+  // экспоненциальный взрыв (на скриншоте: ref=5 → 78 млрд мм за несколько кликов).
+  // Pure deriveSliderRange зависит от ref, и это правильно для чистой функции —
+  // но в UI нам нужна стабильная шкала.
+  const [snapshot, setSnapshot] = useState(() => deriveSliderRange(param))
+
+  // Пересчитываем snapshot только при смене параметра или SHACL bounds —
+  // именно тогда юзер ЯВНО хочет новый масштаб.
+  useEffect(() => {
+    setSnapshot(deriveSliderRange(param))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [param.id, param.minInclusive, param.maxInclusive])
+
+  const { min, max, step, devMax } = snapshot
   const refValue = param.referenceValue ?? 0
   const devValue = param.deviationAllowed ?? 0
+
+  // Флаги переполнения пересчитываем по актуальному значению (не snapshot'у),
+  // иначе они «застывают» с момента монтирования.
+  const devOverflow = Math.abs(devValue) > devMax
+  const devTooWide = refValue !== 0 && Math.abs(devValue) > Math.abs(refValue)
+  const refOutOfRange = refValue < min || refValue > max
+
+  const rebase = () => setSnapshot(deriveSliderRange(param))
 
   return (
     <div className="rounded-lg border border-stone-200 bg-white p-3 shadow-sm">
@@ -519,6 +540,8 @@ function ParameterSliderRow({
         accent="amber"
       />
 
+      {refOutOfRange && <RefOutOfRangeBanner refValue={refValue} min={min} max={max} onRebase={rebase} />}
+
       {(devOverflow || devTooWide) && (
         <DeviationWarning
           overflow={devOverflow}
@@ -538,6 +561,38 @@ function ParameterSliderRow({
         )}
         <span>max: {max}</span>
       </div>
+    </div>
+  )
+}
+
+function RefOutOfRangeBanner({
+  refValue,
+  min,
+  max,
+  onRebase,
+}: {
+  refValue: number
+  min: number
+  max: number
+  onRebase: () => void
+}) {
+  // ref вышел за зафиксированный snapshot — обычно когда юзер напечатал большое число
+  // в number-input справа. Кнопка перерасчитывает масштаб ВРУЧНУЮ — это страховка от
+  // случайного экспоненциального взрыва, но при явном желании всё работает.
+  return (
+    <div className="mt-1 flex items-center justify-between gap-2 rounded border border-sky-200 bg-sky-50 px-2 py-1 text-[11px] text-sky-800">
+      <span className="flex items-center gap-1.5">
+        <AlertTriangle size={12} className="shrink-0 text-sky-600" />
+        Значение <b className="font-mono">{refValue}</b> вне текущего масштаба [{min}, {max}] —
+        слайдер прижат к краю.
+      </span>
+      <button
+        type="button"
+        onClick={onRebase}
+        className="shrink-0 rounded border border-sky-300 bg-white px-2 py-0.5 font-medium text-sky-700 hover:bg-sky-100"
+      >
+        Перерасчитать масштаб
+      </button>
     </div>
   )
 }

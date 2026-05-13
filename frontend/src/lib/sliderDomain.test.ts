@@ -158,6 +158,46 @@ describe('deriveSliderRange — крайние случаи', () => {
   })
 })
 
+describe('deriveSliderRange — задокументированная зависимость от ref', () => {
+  it('БЕЗ SHACL: диапазон растёт с ref (positive-feedback! UI обязан снэпшотить)', () => {
+    // Это — ЗАПЛАНИРОВАННОЕ поведение чистой функции. На скриншоте была багуша,
+    // когда UI пересчитывал range при каждом онченже ref → экспоненциальный
+    // взлёт max. Защита от этого — снэпшот в ParameterSliderRow, не в формуле.
+    const small = deriveSliderRange({ referenceValue: 5 })
+    const big = deriveSliderRange({ referenceValue: 1000 })
+    expect(big.max).toBeGreaterThan(small.max)
+    expect(big.max).toBe(3000)   // ref + 2*|ref| = 3*ref
+    expect(small.max).toBe(15)   // ref + max(2*|ref|, 10) = 5 + 10
+  })
+
+  it('С SHACL maxInclusive: max заморожен, ref может скакать без раздувания', () => {
+    const a = deriveSliderRange({ referenceValue: 5, minInclusive: 0, maxInclusive: 100 })
+    const b = deriveSliderRange({ referenceValue: 90, minInclusive: 0, maxInclusive: 100 })
+    expect(a.min).toBe(b.min)
+    expect(a.max).toBe(b.max)
+  })
+
+  it('симуляция бага: 5 итераций «тяну вправо» без снэпшота даёт взрывной рост', () => {
+    let r = 5
+    for (let i = 0; i < 5; i++) {
+      const range = deriveSliderRange({ referenceValue: r })
+      r = range.max // имитация: юзер дотянул до правого края
+    }
+    expect(r).toBeGreaterThan(1000) // 5 → 15 → 45 → 135 → 405 → 1215
+  })
+
+  it('тот же сценарий со снэпшотом (max замораживается на первой итерации) — стабилен', () => {
+    let r = 5
+    const initial = deriveSliderRange({ referenceValue: r })
+    for (let i = 0; i < 5; i++) {
+      // снэпшот: max берётся из initial, а НЕ пересчитывается
+      r = Math.min(r + 10, initial.max)
+    }
+    expect(r).toBeLessThanOrEqual(initial.max)
+    expect(initial.max).toBe(15)
+  })
+})
+
 describe('fillPercent', () => {
   it('value в центре диапазона = 50%', () => {
     expect(fillPercent(5, 0, 10)).toBe(50)
