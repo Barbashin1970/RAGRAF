@@ -2,10 +2,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Edge, Node } from 'reactflow'
-import { CheckCircle2, History, Save, XCircle } from 'lucide-react'
+import {
+  CheckCircle2,
+  GitCommitVertical,
+  History,
+  Network,
+  Save,
+  Shield,
+  Sliders,
+  XCircle,
+} from 'lucide-react'
 import { api, type FlowNode, type RuleDSL } from '@/lib/api'
 import { dslToFlow, flowToDsl } from '@/lib/rulesDsl'
 import { useFlowStore } from '@/store/flowStore'
+import { cn } from '@/lib/cn'
+import { RegulationHeader } from '../regulations/RegulationHeader'
 import { FlowCanvas } from './FlowCanvas'
 import { NodePalette } from './NodePalette'
 import { PropertyPanel } from './PropertyPanel'
@@ -73,42 +84,70 @@ export function FlowEditorScreen() {
     setSelected(null)
   }
 
-  return (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center gap-2 border-b border-stone-200 bg-white px-4 py-2 text-sm">
-        <div className="font-semibold">{regulation?.name ?? id}</div>
-        <div className="text-xs text-stone-500">{regulation?.parameters.length ?? 0} параметров</div>
-        <div className="ml-auto flex items-center gap-1.5">
-          <button
-            onClick={() => validateMutation.mutate(currentDsl)}
-            className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-xs hover:bg-surface-offset"
-          >
-            <CheckCircle2 size={12} /> Проверить
-          </button>
-          <button
-            onClick={() => {
-              clearErrors()
-              saveMutation.mutate(currentDsl)
-            }}
-            className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs text-white hover:opacity-90"
-          >
-            <Save size={12} /> Сохранить
-          </button>
-          <button
-            onClick={() => setShowHistory((x) => !x)}
-            className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-xs hover:bg-surface-offset"
-          >
-            <History size={12} /> История
-          </button>
-        </div>
-      </div>
+  const validating = validateMutation.isPending
+  const saving = saveMutation.isPending
 
-      {globalErrors.length > 0 && (
-        <div className="border-b border-accent-notification bg-accent-notification-highlight px-4 py-1.5 text-xs text-accent-notification">
-          <XCircle size={12} className="-mt-0.5 mr-1 inline" />
-          {globalErrors.map((e) => `${e.code}: ${e.message}`).join(' · ')}
-        </div>
-      )}
+  const actions = (
+    <>
+      <button
+        onClick={() => validateMutation.mutate(currentDsl)}
+        disabled={validating}
+        className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800 transition hover:border-amber-300 hover:bg-amber-100 disabled:opacity-60"
+      >
+        <CheckCircle2 size={13} className="text-amber-500" />
+        {validating ? 'Проверка…' : 'Проверить'}
+      </button>
+      <button
+        onClick={() => {
+          clearErrors()
+          saveMutation.mutate(currentDsl)
+        }}
+        disabled={saving}
+        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
+      >
+        <Save size={13} />
+        {saving ? 'Сохраняю…' : 'Сохранить'}
+      </button>
+      <button
+        onClick={() => setShowHistory((x) => !x)}
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition',
+          showHistory
+            ? 'border-stone-300 bg-stone-100 text-stone-800'
+            : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50',
+        )}
+      >
+        <History size={13} className="text-stone-500" />
+        История
+      </button>
+    </>
+  )
+
+  const stats = [
+    { icon: Sliders,           value: regulation?.parameters.length ?? 0, label: 'параметров' },
+    { icon: Network,           value: nodes.length,                       label: 'узлов'      },
+    { icon: GitCommitVertical, value: edges.length,                       label: 'связей'     },
+    { icon: Shield,            value: regulation?.constraints.length ?? 0, label: 'ограничений' },
+  ]
+
+  const subHeader = globalErrors.length > 0 ? (
+    <div className="border-t border-rose-200 bg-rose-50 px-5 py-1.5 text-xs text-rose-700">
+      <XCircle size={12} className="-mt-0.5 mr-1 inline" />
+      {globalErrors.map((e) => `${e.code}: ${e.message}`).join(' · ')}
+    </div>
+  ) : null
+
+  return (
+    <div className="flex h-full flex-col bg-stone-50">
+      <RegulationHeader
+        regulation={regulation}
+        isLoading={isLoading}
+        sourceId={id}
+        active="flow"
+        stats={stats}
+        actions={actions}
+        subHeader={subHeader}
+      />
 
       <div className="flex min-h-0 flex-1">
         <NodePalette />

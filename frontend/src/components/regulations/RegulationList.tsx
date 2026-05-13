@@ -5,23 +5,19 @@ import {
   Activity,
   AlertCircle,
   Boxes,
-  Building2,
   ChevronRight,
   FileText,
-  Flame,
-  Leaf,
   Loader2,
   type LucideIcon,
   Network,
   Search,
-  Settings2,
   Shield,
-  ShieldAlert,
   Sliders,
   Workflow,
 } from 'lucide-react'
 import { api, type Domain } from '@/lib/api'
 import { cn } from '@/lib/cn'
+import { type DomainVisual, FALLBACK_VISUAL, getDomainVisual } from '@/lib/domains'
 
 interface RegRow {
   id: string
@@ -30,69 +26,6 @@ interface RegRow {
   parameters_count?: number
   constraints_count?: number
   recommendations_count?: number
-}
-
-interface DomainVisual {
-  icon: LucideIcon
-  /** background of the icon chip */
-  iconBg: string
-  iconFg: string
-  /** left accent stripe on the card */
-  accent: string
-  /** chip with count */
-  chipBg: string
-  chipFg: string
-  /** subtle border for the card */
-  cardBorder: string
-}
-
-const DOMAIN_VISUALS: Record<string, DomainVisual> = {
-  heating: {
-    icon: Flame,
-    iconBg: 'bg-orange-100',
-    iconFg: 'text-orange-700',
-    accent: 'bg-orange-500',
-    chipBg: 'bg-orange-50',
-    chipFg: 'text-orange-700',
-    cardBorder: 'border-orange-100 hover:border-orange-300',
-  },
-  housing: {
-    icon: Building2,
-    iconBg: 'bg-blue-100',
-    iconFg: 'text-blue-700',
-    accent: 'bg-blue-500',
-    chipBg: 'bg-blue-50',
-    chipFg: 'text-blue-700',
-    cardBorder: 'border-blue-100 hover:border-blue-300',
-  },
-  safety: {
-    icon: ShieldAlert,
-    iconBg: 'bg-rose-100',
-    iconFg: 'text-rose-700',
-    accent: 'bg-rose-500',
-    chipBg: 'bg-rose-50',
-    chipFg: 'text-rose-700',
-    cardBorder: 'border-rose-100 hover:border-rose-300',
-  },
-  environment: {
-    icon: Leaf,
-    iconBg: 'bg-emerald-100',
-    iconFg: 'text-emerald-700',
-    accent: 'bg-emerald-500',
-    chipBg: 'bg-emerald-50',
-    chipFg: 'text-emerald-700',
-    cardBorder: 'border-emerald-100 hover:border-emerald-300',
-  },
-}
-
-const FALLBACK_VISUAL: DomainVisual = {
-  icon: Settings2,
-  iconBg: 'bg-stone-100',
-  iconFg: 'text-stone-700',
-  accent: 'bg-stone-400',
-  chipBg: 'bg-stone-50',
-  chipFg: 'text-stone-700',
-  cardBorder: 'border-stone-200 hover:border-stone-300',
 }
 
 function extractRow(d: unknown): RegRow | null {
@@ -259,7 +192,7 @@ function DomainSection({
   fallbackKey: string | null
   items: RegRow[]
 }) {
-  const v = (domain?.id && DOMAIN_VISUALS[domain.id]) || FALLBACK_VISUAL
+  const v = domain?.id ? getDomainVisual(domain.id) : FALLBACK_VISUAL
   const Icon = v.icon
   const label = domain?.label ?? (fallbackKey ?? 'Без домена')
 

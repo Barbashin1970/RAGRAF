@@ -1,34 +1,167 @@
 # RAGRAF
 
-Визуализатор и редактор регламентов: knowledge graph (Cytoscape) + node-based rule flow (React Flow) + табличный редактор SHACL над **Regulation Management API**.
+**RAGRAF** — web-сервис визуализации и редактирования регламентов промышленных и городских систем. Работает поверх REST-API управления регламентами Sigma (`http://109.202.1.153:8958`), подмешивает GraphRAG-движок [RAGU](https://github.com/RaguTeam/RAGU) для семантического обогащения и предоставляет три взаимосвязанные рабочие среды:
 
-Спецификация продукта: [`regulation-viz-skill.md`](regulation-viz-skill.md). Каталог навыков, используемых при разработке: [`SKILL.md`](SKILL.md).
+- **Graph View** — обзорная карта знаний всех регламентов на Cytoscape.js (force-directed layout, фильтрация по доменам).
+- **Rule Flow Editor** — визуальный node-based редактор правил реагирования на React Flow (7 типов узлов, DnD-палитра, валидация, версионирование).
+- **Constraint Editor** — табличный редактор SHACL-ограничений с инлайн-редактированием и импортом/экспортом Turtle.
+
+Целевая аудитория: аналитики и архитекторы семантических систем (РДФ/OWL + SHACL), эксплуатационные службы ТСЖ/НГУ/ЕДДС, операторы инцидент-центров уровня Sigma.
+
+Полная продуктовая спецификация: [`regulation-viz-skill.md`](regulation-viz-skill.md). Каталог технических навыков: [`SKILL.md`](SKILL.md).
 
 ---
 
-## Структура
+## Что умеет сервис
+
+### 1. Управление регламентами по доменам
+
+Регламенты сгруппированы по бизнес-доменам — это устраняет «кашу» в графе и даёт каждому домену свою визуальную идентичность (иконка Lucide, акцентный цвет, подсказка):
+
+| Домен | Иконка | Цвет | Описание | Регламенты |
+|-------|--------|------|----------|------------|
+| **Теплоснабжение** | 🔥 `Flame` | orange | Тепловые узлы, давление, температура, аварийные перекрытия | `pressure-diameter`, `heat-inlet-breach` |
+| **Управление ЖКХ** | 🏢 `Building2` | blue | ТСЖ, общежития, придомовая территория, сезонные риски | `roof-snow-fencing`, `dormitory-flood` |
+| **Безопасность кампуса** | 🛡 `ShieldAlert` | rose | Серверные НГУ, эскалация в охрану / 01-101-112 / ЕДДС | `thermal-incident-server` |
+| **Городская экология** | 🌿 `Leaf` | emerald | Качество воздуха, PM2.5, НМУ, оповещение уязвимых групп | `air-quality-smog-trap` |
+
+Каждый регламент содержит: имя, дату, набор параметров (`<name>` + парное `<name>Deviation`), SHACL-форму с границами `sh:minInclusive`/`sh:maxInclusive`, рекомендацию (многострочный текст), стартовый Rule DSL для flow-редактора.
+
+### 2. Реальные данные из 6 регламентов
+
+Из коробки загружено **6 регламентов** (включены при `USE_FIXTURES=true`):
+
+#### Теплоснабжение
+
+- **`pressure-diameter`** — Регламент на допустимые параметры давления и диаметра трубопроводов водоснабжения.
+  *Источник:* `Rules-Management.pdf` (Постановление № 001/2023). Параметры: давление 20.5 ± 1.5 атм, диаметр 5.0 ± 0.2 см. Триггер: выход за допустимый диапазон → проверка герметичности.
+
+- **`heat-inlet-breach`** — Регламент при прорыве теплового ввода.
+  *Источник:* `~/demo-sigma-main/src/config/regulations.yaml` (сценарий `heat-inlet-breach`). Параметры: давление 4.0 ± 0.5 атм, температура подачи 70 ± 10 °C, скорость падения давления 0.0 ± 0.2 атм/мин, время подтверждения обходчика 7 ± 3 мин, окно оповещения медблока 15 ± 5 мин. Эскалация: обходчик → smart-valve → аварийная бригада + оповещение реанимационного медблока.
+
+#### Управление ЖКХ
+
+- **`roof-snow-fencing`** — Регламент огораживания придомовой территории при риске схода снега и падения сосулек (ТСЖ).
+  *Источник:* пользовательский ТСЖ-кейс. Параметры: температура −2 ± 2 °C, скорость подъёма 0.5 ± 0.5 °C/ч, толщина снега 3 ± 2 см, длина сосулек 5 ± 5 см, заблаговременность SMS 4 ± 1 ч. Триггер: резкий выход температуры с минуса на плюс → SMS подрядчику и управляющему, монтаж сигнальной ленты, наряд на очистку кровли.
+
+- **`dormitory-flood`** — Регламент при ночной протечке в жилом блоке общежития.
+  *Источник:* `demo-sigma-main` (сценарий `dormitory-flood`, регламент управления кампуса НГУ). Параметры: уровень воды 0 ± 0.5 см, расход стояка 0.5 ± 0.3 м³/ч, начало ночного режима 22.0 ± 0.5 ч, время прибытия коменданта 15 ± 5 мин, порог эвакуации 5 ± 1 см. Эскалация: комендант на осмотр (минимизация контакта с жильцами) → автоматическое перекрытие стояка после подтверждения → эвакуация в холл 1-го этажа при критическом уровне.
+
+#### Безопасность кампуса
+
+- **`thermal-incident-server`** — Регламент при термическом инциденте в серверной НГУ (перегрев / задымление).
+  *Источник:* `demo-sigma-main` (сценарий `thermal-incident`) + Инструкция НГУ — Приложение №6 к приказу № 721-3 от 26.03.2024. Параметры: температура серверной 22 ± 4 °C, концентрация дыма 0 ± 50 ppm, расход охлаждения 800 ± 200 м³/ч, время подтверждения старшего ИТ 5 ± 2 мин, время эскалации в ЕДДС 10 ± 3 мин. Уровни: warning → ИТ-служба; elevated → охрана НГУ + дежурный; critical (T > 35 °C либо дым > 200 ppm) → 01/101/112 + ЕДДС.
+
+#### Городская экология
+
+- **`air-quality-smog-trap`** — Регламент при экологической ловушке: безветрие + загрязнение PM2.5.
+  *Источник:* `~/NSK_OpenData_Bot/config/rules/ecology_rules.yaml` (`risks.smog_trap`, `risks.pdk`) + `src/ecology_cache.py`. Параметры: ветер 3.0 ± 1.5 м/с (порог штиля 1.5), PM2.5 10 ± 10 мкг/м³ (норматив ВОЗ 35), часов выше ПДК 0 ± 4, заблаговременность SMS уязвимым 6 ± 2 ч, целевое снижение выбросов 17.5 ± 2.5 %. Эскалация: рекомендации жителям (очистители, маски FFP2) → SMS астма/ХОБЛ/дети/пожилые → режим НМУ + предписания предприятиям 15–20% → экстренное оповещение населения + школы/детсады при ПДК ВОЗ.
+
+### 3. Graph View
+
+- Cytoscape.js с force-directed cola layout
+- **Фильтр по доменам** через табы в шапке — каждый домен отображается отдельно; «все» показывает мерж
+- Цветовая семантика типов узлов: Regulation (teal), Parameter (green), Constraint (gray), Recommendation (orange), Source (light gray)
+- Side-panel с полным описанием выбранного узла (полный текст рекомендации, границы SHACL, severity, путь property)
+- Прямой переход «Открыть в редакторе» из Regulation-узла
+
+### 4. Rule Flow Editor
+
+- **7 типов узлов** с собственными формами в правой панели:
+  - `input` — параметр на вход (зелёный)
+  - `threshold` — эталон ± допустимое отклонение (синий)
+  - `compare` — сравнение значения с диапазоном (золотистый)
+  - `formula` — выражение JS-like для составных условий (фиолетовый)
+  - `switch` — маршрутизация по значениям (оранжевый)
+  - `output` — рекомендация / действие (красный)
+  - `shacl_constraint` — ссылка на SHACL-ограничение (серый пунктир)
+- Палитра с **нативным React Flow drag-and-drop** (HTML5 `dataTransfer`)
+- Property panel специфично для каждого типа узла
+- **Live-валидация** через `POST /api/regulations/{id}/validate`: 7 правил (isolated node, IO-path, compare arity, paramRef, threshold bounds, cycles, SHACL refs), подсветка ошибок ring-color на узле
+- **Версионирование** — каждое сохранение создаёт immutable JSON-snapshot в `data/versions/{regulation_id}/{uuid}.json`; UI «История» позволяет восстановить любую версию
+- Autosave draft в `localStorage` каждые 30 секунд
+
+### 5. Constraint Editor
+
+- Табличный редактор SHACL-ограничений: путь / datatype / minCount / minInclusive / maxInclusive / pattern / severity / message
+- Инлайн-редактирование ячеек; добавление пустой строки; удаление
+- **Импорт SHACL Turtle** — merge с конфликт-репортом (последняя запись побеждает, конфликты возвращаются клиенту)
+- **Экспорт SHACL Turtle** — скачивание `.ttl`-файла, идентичного формату upstream `/shapes`
+- Счётчики по severity (нарушений / предупреждений / информационных) в шапке
+
+### 6. Опциональная RAGU-интеграция
+
+При `RAGU_ENABLED=true` бэкенд использует [RAGU](https://github.com/RaguTeam/RAGU) (PyPI `graph_ragu`) для:
+- автоматического построения knowledge graph из текстов регламентов (`/api/graph`),
+- семантического поиска по содержимому правил (`POST /api/search` с режимами `local` / `global` / `naive`).
+
+Без RAGU `/api/graph` строится детерминистическим adapter-ом напрямую из domain-объектов, `/api/search` возвращает 503.
+
+---
+
+## Структура проекта
 
 ```
 RAGRAF/
-├── backend/           # FastAPI: домен, валидация, SHACL bridge, RAGU, версии
+├── backend/                      # FastAPI
 │   ├── app/
-│   │   ├── api/       # routers
-│   │   ├── services/  # turtle_bridge, regulation_client, validator, ragu_service, flow_storage
-│   │   ├── adapters/  # cytoscape_adapter (RAGU → Cy)
-│   │   ├── schemas/   # pydantic domain
+│   │   ├── api/                  # routers по доменам
+│   │   │   ├── datasets.py       # /api/datasets, /api/datasets/{app_id}
+│   │   │   ├── regulations.py    # /api/regulations/{id}, /raw, DELETE
+│   │   │   ├── flow.py           # /api/regulations/{id}/flow
+│   │   │   ├── validate.py       # /api/regulations/{id}/validate
+│   │   │   ├── versions.py       # /api/regulations/{id}/flow/history|restore
+│   │   │   ├── shacl.py          # /api/regulations/{id}/constraints, /shacl/{export,import}
+│   │   │   ├── graph.py          # /api/graph, /api/domains, /api/graph/regulation/{id}
+│   │   │   └── search.py         # /api/search
+│   │   ├── services/
+│   │   │   ├── regulation_client.py  # httpx-клиент к upstream + fixtures fallback
+│   │   │   ├── turtle_bridge.py      # rdflib parsing/serialization, SHACL bridge
+│   │   │   ├── validator.py          # 7 правил валидации Rule DSL
+│   │   │   ├── flow_storage.py       # immutable JSON-snapshots
+│   │   │   ├── graph_builder.py      # domain → Cytoscape adapter
+│   │   │   ├── ragu_service.py       # ленивый singleton KnowledgeGraph
+│   │   │   └── fixtures.py           # DOMAINS, REGISTRY, чтение .ttl/.json
+│   │   ├── adapters/
+│   │   │   └── cytoscape_adapter.py  # RAGU KnowledgeGraph → Cytoscape JSON
+│   │   ├── schemas/domain.py     # Pydantic: Regulation, RuleDSL, Constraint, …
+│   │   ├── config.py             # pydantic-settings
 │   │   └── main.py
-│   ├── data/          # хранилище flow + версии (gitignore)
+│   ├── data/
+│   │   ├── fixtures/             # реальные регламенты (.data.ttl, .shapes.ttl, .flow.json)
+│   │   │   └── INDEX.md          # реестр всех фикстур
+│   │   ├── flows/                # текущие сохранённые DSL (gitignore)
+│   │   ├── versions/             # immutable snapshots (gitignore)
+│   │   └── ragu_store/           # RAGU storage (gitignore)
 │   ├── requirements.txt
 │   └── .env.example
-├── frontend/          # React 18 + Vite + Tailwind + React Flow + Cytoscape
-│   └── src/
-│       ├── components/{regulations,graph,flow,constraints}/
-│       ├── lib/{api,rulesDsl,cn,nanoid}.ts
-│       ├── store/flowStore.ts
-│       └── App.tsx
-├── SKILL.md
-├── regulation-viz-skill.md
-└── README.md
+│
+├── frontend/                     # React 18 + Vite + Tailwind
+│   ├── src/
+│   │   ├── app/                  # маршрутизация
+│   │   ├── components/
+│   │   │   ├── regulations/      # RegulationList, RegulationHeader (shared)
+│   │   │   ├── flow/             # FlowEditorScreen, FlowCanvas, NodePalette, PropertyPanel, nodes/
+│   │   │   ├── graph/            # GraphView (Cytoscape + tabs)
+│   │   │   └── constraints/      # ConstraintEditorScreen
+│   │   ├── lib/
+│   │   │   ├── api.ts            # типизированный REST-клиент
+│   │   │   ├── domains.ts        # DOMAIN_VISUALS (общий для всех страниц)
+│   │   │   ├── rulesDsl.ts       # DSL ↔ React Flow serialization
+│   │   │   ├── cn.ts             # classnames helper
+│   │   │   └── nanoid.ts
+│   │   ├── store/flowStore.ts    # zustand: ошибки валидации, выбор узла
+│   │   ├── App.tsx
+│   │   ├── main.tsx
+│   │   └── styles.css
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── SKILL.md                      # каталог навыков разработки
+├── regulation-viz-skill.md       # продуктовая спецификация
+├── README.md                     # этот файл
+├── start.command                 # пускалка для macOS/Linux
+└── start.bat                     # пускалка для Windows
 ```
 
 ---
@@ -40,12 +173,12 @@ RAGRAF/
 - **macOS / Linux:** двойной клик по `start.command` (или `./start.command` в терминале)
 - **Windows:** двойной клик по `start.bat`
 
-Скрипт сам:
-1. создаёт `backend/.venv` и ставит зависимости (если ещё нет),
-2. делает `npm install` во `frontend/` (если ещё нет),
-3. копирует `backend/.env.example` → `backend/.env`,
-4. поднимает FastAPI (`:8000`) и Vite (`:5173`), ждёт пока оба ответят,
-5. открывает `http://localhost:5173` в браузере.
+Скрипт:
+1. Создаёт `backend/.venv` и ставит зависимости (если ещё нет)
+2. Делает `npm install` во `frontend/` (если ещё нет)
+3. Копирует `backend/.env.example` → `backend/.env`
+4. Поднимает FastAPI (`:8000`) и Vite (`:5173`), ждёт пока оба ответят
+5. Открывает `http://localhost:5173` в браузере
 
 Лог-файлы — в `logs/backend.log` и `logs/frontend.log`. Остановка — `Ctrl+C` (закрывает оба сервиса).
 
@@ -60,7 +193,7 @@ RAGRAF/
 --port-front=5174       другой порт frontend
 ```
 
-### Ручной запуск (если без скрипта)
+### Ручной запуск
 
 ```bash
 # Backend
@@ -73,78 +206,151 @@ cp .env.example .env
 cd frontend && npm install && npm run dev
 ```
 
-Health: <http://localhost:8000/health>. OpenAPI: <http://localhost:8000/docs>. UI: <http://localhost:5173>.
+Health: <http://localhost:8000/health> · OpenAPI: <http://localhost:8000/docs> · UI: <http://localhost:5173>
 
 ---
 
-## REST API (наш слой)
+## REST API
+
+### Регламенты и домены
+
+| Метод | Путь | Возвращает |
+|-------|------|------------|
+| `GET` | `/api/datasets` | Список регламентов (id, name, domain, parameters_count, constraints_count) |
+| `GET` | `/api/domains` | Список доменов (id, label, hint) |
+| `GET` | `/api/regulations/{id}` | Регламент в нашей domain-структуре (Pydantic) |
+| `GET` | `/api/regulations/{id}/raw` | Сырой Turtle регламента (для отладки) |
+| `PUT` | `/api/regulations/{id}/raw` | Записать сырой Turtle в upstream |
+| `DELETE` | `/api/regulations/{id}` | Очистить регламент |
+
+### Rule Flow
 
 | Метод | Путь | Назначение |
-|-------|------|------------|
-| `GET` | `/api/datasets` | Список регламентов |
-| `GET` | `/api/regulations/{id}` | Регламент (domain JSON) |
-| `GET` | `/api/regulations/{id}/raw` | Регламент сырым Turtle |
-| `GET/PUT` | `/api/regulations/{id}/flow` | Rule DSL |
-| `POST` | `/api/regulations/{id}/validate` | Валидация DSL |
-| `GET` | `/api/regulations/{id}/flow/history` | История версий |
+|-------|------|-----------|
+| `GET` | `/api/regulations/{id}/flow` | Rule DSL (если нет saved — отдаёт стартер из фикстуры) |
+| `PUT` | `/api/regulations/{id}/flow` | Сохранить DSL, создать новую версию |
+| `POST` | `/api/regulations/{id}/validate` | Валидация DSL — возвращает список ошибок (7 правил) |
+| `GET` | `/api/regulations/{id}/flow/history` | Список snapshot-ов |
+| `GET` | `/api/regulations/{id}/flow/history/{version_id}` | Одна версия |
 | `POST` | `/api/regulations/{id}/flow/restore/{version_id}` | Восстановить версию |
-| `GET/PUT` | `/api/regulations/{id}/constraints` | SHACL constraints (наш JSON) |
-| `GET` | `/api/regulations/{id}/shacl/export` | Turtle |
-| `POST` | `/api/regulations/{id}/shacl/import` | multipart upload .ttl |
-| `GET` | `/api/graph` | Cytoscape JSON всех регламентов |
-| `GET` | `/api/graph/regulation/{id}` | Подграф одного |
-| `POST` | `/api/search` | Поиск через RAGU (опционально) |
 
-Upstream: проксируем `109.202.1.153:8958/api/v1/regulations/{source_id}/{data,shapes}`.
+### SHACL Constraints
+
+| Метод | Путь | Назначение |
+|-------|------|-----------|
+| `GET` | `/api/regulations/{id}/constraints` | Список Constraint (наш JSON) |
+| `PUT` | `/api/regulations/{id}/constraints` | Полная замена набора ограничений |
+| `GET` | `/api/regulations/{id}/shacl/export` | Turtle |
+| `POST` | `/api/regulations/{id}/shacl/import` | Multipart .ttl, merge + конфликт-репорт |
+
+### Graph & Search
+
+| Метод | Путь | Назначение |
+|-------|------|-----------|
+| `GET` | `/api/graph` | Cytoscape JSON всех регламентов (опц. `?domain=heating`) |
+| `GET` | `/api/graph/regulation/{id}` | Подграф одного регламента |
+| `POST` | `/api/search` | Семантический поиск через RAGU (`{query, mode}`) |
+
+Upstream проксируется: `109.202.1.153:8958/api/v1/regulations/{source_id}/{data,shapes}` + `/admin/datasets/`.
 
 ---
 
-## RAGU GraphRAG (опционально)
+## Конфигурация (`.env`)
 
-```bash
-.venv/bin/pip install graph_ragu
-# в .env:
-RAGU_ENABLED=true
-OPENAI_BASE_URL=https://...
-OPENAI_API_KEY=...
+```env
+# Upstream
+REGULATION_API_URL=http://109.202.1.153:8958
+REGULATION_API_TIMEOUT=15
+
+# Источник данных
+USE_FIXTURES=true               # true = только локальные фикстуры; false = пробовать upstream
+
+# RAGU (опционально)
+RAGU_ENABLED=false
+RAGU_STORAGE_FOLDER=./data/ragu_store
+RAGU_LLM_MODEL=mistralai/mistral-medium-3
+RAGU_EMBED_MODEL=emb-qwen/qwen3-embedding-8b
+OPENAI_BASE_URL=
+OPENAI_API_KEY=
+
+# CORS
+CORS_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+
+# Storage
+DATA_DIR=./data
 ```
 
-Иначе `/api/graph` собирается напрямую из domain объектов, а `/api/search` отвечает 503.
-
 ---
 
-## Калибровочные данные
+## Калибровочные данные и источники
 
-В [`backend/data/fixtures/`](backend/data/fixtures/INDEX.md) — реальный регламент из `Rules-Management.pdf`:
-- `pressure-diameter.data.ttl` — онтология и инстанс `PressureAndDiameterRegulation` (Постановление № 001/2023, давление 20.5 ± 1.5 атм, диаметр 5.0 ± 0.2 см)
-- `pressure-diameter.shapes.ttl` — `RegulationShape` (SHACL, 6 property constraints)
-- `pressure-diameter.flow.json` — стартовый Rule DSL для редактора потока
-- `etl-incoming.json` / `etl-enriched.json` — пример данных ETL из теплосети
+См. полный реестр в [`backend/data/fixtures/INDEX.md`](backend/data/fixtures/INDEX.md). Источники реальных регламентов:
 
-По умолчанию `USE_FIXTURES=true` — данные берутся из этих файлов. Чтобы переключиться на живой upstream, поставь `USE_FIXTURES=false` в `backend/.env` (фикстура останется как fallback при недоступности).
+- **`Rules-Management.pdf`** (корень проекта) — пример SHACL/OWL онтологии Sigma на основе Apache Jena. Извлечён как `pressure-diameter.*`.
+- **`~/demo-sigma-main/src/config/regulations.yaml`** — 8 сценариев НГУ-кампуса (пожар в серверной, прорыв тепловвода, ночная протечка, СКУД и т.д.). Использованы 3: `thermal-incident`, `heat-inlet-breach`, `dormitory-flood`.
+- **`~/NSK_OpenData_Bot/config/rules/ecology_rules.yaml`** — экологические пороги Новосибирска (5 рисков: smog_trap, pdk, black_ice, temp_shock, extreme_cold). Использован `smog_trap` + `pdk`.
+
+Чтобы переключиться на живой upstream вместо фикстур — поставь `USE_FIXTURES=false` в `backend/.env` (фикстура останется как fallback при недоступности).
+
+### Как добавить новый регламент
+
+1. Положи три файла в `backend/data/fixtures/`:
+   - `<source_id>.data.ttl` — OWL онтология + инстанс `:Regulation` с парами `<param>` / `<param>Deviation`
+   - `<source_id>.shapes.ttl` — SHACL NodeShape с границами и сообщениями `@ru`
+   - `<source_id>.flow.json` — стартовый Rule DSL (опционально)
+2. Добавь запись в `backend/app/services/fixtures.py:REGISTRY` с `name` и `domain`
+3. Если есть новые единицы измерения параметров — допиши в `app/services/turtle_bridge.py:PARAM_UNITS`
+4. Если домен новый — добавь его в `fixtures.py:DOMAINS` и в `frontend/src/lib/domains.ts:DOMAIN_VISUALS` (иконка + цвет)
 
 ---
 
 ## Стек
 
-- **Backend:** FastAPI 0.115, pydantic 2, httpx, rdflib + pyshacl, networkx, опц. graph_ragu
-- **Frontend:** React 18, Vite 5, TypeScript, Tailwind 3, React Flow 11, Cytoscape 3 + cola, @tanstack/react-query, zustand, react-router
+**Backend (Python 3.10+):**
+- FastAPI 0.115 + Uvicorn
+- Pydantic 2 + pydantic-settings
+- httpx (async HTTP к upstream)
+- rdflib 7 + pyshacl (SHACL bridge, парсинг Turtle)
+- networkx (графовая валидация цикло-связности)
+- graph_ragu (опционально — GraphRAG-движок)
+
+**Frontend (Node 18+):**
+- React 18 + TypeScript 5
+- Vite 5 (dev/build) + Tailwind 3
+- React Flow 11 (node-based editor)
+- Cytoscape 3 + cytoscape-cola (graph view)
+- @tanstack/react-query (server state, optimistic mutations)
+- Zustand (client state)
+- React Router 6
+- Lucide React (иконки)
+- @dnd-kit (используется только для будущего реордеринга в constraint table; node palette — нативный React Flow DnD)
 
 ---
 
-## Реализовано (MVP)
+## Дизайн-система
 
-- [x] Список регламентов (`/regulations`)
-- [x] Graph View с Cytoscape + cola layout, легендой, side-panel
+Тёплый бежевый фон + teal-акцент (`--color-primary: #2C7A7B`). Доменные акценты — orange/blue/rose/emerald через Tailwind палитру. См. [`frontend/src/lib/domains.ts`](frontend/src/lib/domains.ts) для централизованной таблицы `DOMAIN_VISUALS` (иконка Lucide + 6 цветовых ролей: iconBg/iconFg, accent, chipBg/chipFg, cardBorder, sectionBg).
+
+Все user-facing тексты — **русский**. Код, переменные, технические комментарии — английский. SHACL `sh:message` использует тег `@ru`.
+
+---
+
+## Реализовано
+
+- [x] Список регламентов с группировкой по доменам, поиском, счётчиками
+- [x] Graph View с Cytoscape + cola layout, табами по доменам, side-panel
 - [x] Rule Flow Editor: 7 типов узлов, DnD-палитра, property panel, save/validate
-- [x] Constraint Editor: таблица, инлайн-редактирование, import/export SHACL Turtle
+- [x] Constraint Editor: таблица, инлайн-редактирование, import/export SHACL Turtle, счётчики severity
 - [x] Validation: 7 правил, подсветка ошибочных узлов
 - [x] Versioning: immutable JSON snapshots + restore UI
+- [x] Унифицированная шапка детальных страниц с доменным акцентом, breadcrumb, табами Flow/Constraint/Graph
+- [x] 6 регламентов в 4 доменах (Теплоснабжение, Управление ЖКХ, Безопасность кампуса, Городская экология)
 
-## Дальше (Should/Nice Have из спеки)
+## Дальше (Should/Nice Have)
 
 - [ ] Diff визуализация между версиями
 - [ ] Approval workflow (draft → review → active)
-- [ ] Анимация simulation mode
+- [ ] Анимация simulation mode на canvas
 - [ ] AI-подсказки constraint через RAGU LocalSearch
 - [ ] Code-splitting (предупреждение Vite о chunk > 500 kB)
+- [ ] Расширение реестра: `traffic`, `industrial`, `transport` домены (черновики в `ecology_rules.yaml` и `traffic_rules.yaml` NSK_OpenData_Bot)
