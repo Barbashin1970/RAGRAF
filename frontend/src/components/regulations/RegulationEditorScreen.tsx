@@ -447,9 +447,22 @@ function SlidersView({
   return (
     <div className="space-y-3">
       <div className="rounded-md border border-blue-100 bg-blue-50/40 px-4 py-3 text-xs text-blue-900">
-        Слайдеры — быстрая калибровка <b>reference</b> и <b>deviation</b> каждого параметра. Диапазон слайдера берётся
-        из SHACL <code>sh:minInclusive</code> / <code>sh:maxInclusive</code>, шаг — эвристика. Точные значения можно
-        править на вкладке «Поля». Сохранение — общее, кнопкой «Сохранить» в шапке.
+        <div className="mb-2">
+          Слайдеры — быстрая калибровка <b>reference</b> и <b>deviation</b> каждого параметра. Диапазон берётся из
+          SHACL <code>sh:minInclusive</code> / <code>sh:maxInclusive</code>, шаг — эвристика. Точные значения можно
+          править на вкладке «Поля». Сохранение — общее, кнопкой «Сохранить» в шапке.
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-blue-100 pt-2 text-[11px]">
+          <span className="font-medium text-blue-900">Подсказка:</span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-1.5 w-7 rounded-full bg-sky-500" />
+            <span className="text-stone-700">слева от шарика — выдвинутая часть параметра (текущее значение)</span>
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="inline-block h-1.5 w-7 rounded-full bg-sky-200" />
+            <span className="text-stone-700">справа — куда ещё можно дорастить в рамках SHACL</span>
+          </span>
+        </div>
       </div>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         {draft.parameters.map((p, idx) => (
@@ -558,8 +571,19 @@ function SliderRow({
   accent: 'emerald' | 'amber'
 }) {
   // `text-emerald-500` / `text-amber-500` управляет цветом thumb через `currentColor`
-  // в .ragraf-range, а accent-* — заполненной частью трека (browser-native).
-  const accentClass = accent === 'emerald' ? 'accent-emerald-500 text-emerald-500' : 'accent-amber-500 text-amber-500'
+  // в .ragraf-range. Заполненная/пустая части track — sky-500/sky-200 через --fill.
+  const accentClass = accent === 'emerald' ? 'text-emerald-500' : 'text-amber-500'
+
+  // Доля «выдвинутой» части: сколько процентов диапазона уже выбрано.
+  // По этой переменной CSS gradient на ::runnable-track красит левую часть
+  // sky-500 (current), правую — sky-200 (доступный остаток).
+  const span = max - min
+  const fillPercent = span > 0 ? Math.max(0, Math.min(100, ((value - min) / span) * 100)) : 0
+
+  const trackTitle =
+    `${label}: ${value.toFixed(step < 1 ? 2 : 0)} из диапазона [${min}, ${max}].` +
+    `\nСлева от шарика (sky-500) — текущее значение, справа (sky-200) — куда ещё можно сдвинуть.`
+
   return (
     <div className="mb-2 flex items-center gap-2 text-xs">
       <span className="w-20 shrink-0 text-stone-500">{label}</span>
@@ -570,6 +594,8 @@ function SliderRow({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
+        title={trackTitle}
+        style={{ ['--fill' as never]: `${fillPercent}%` }}
         className={cn('ragraf-range flex-1', accentClass)}
       />
       <input
