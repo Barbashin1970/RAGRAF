@@ -11,6 +11,7 @@ import {
   type LucideIcon,
   Network,
   Pencil,
+  Plus,
   Search,
   Shield,
   Sliders,
@@ -19,6 +20,7 @@ import {
 import { api, type Domain } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { type DomainVisual, FALLBACK_VISUAL, getDomainVisual } from '@/lib/domains'
+import { CreateRegulationDialog } from './CreateRegulationDialog'
 
 interface RegRow {
   id: string
@@ -51,6 +53,7 @@ function extractRow(d: unknown): RegRow | null {
 
 export function RegulationList() {
   const [query, setQuery] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
   const { data: rawDatasets, isLoading, error } = useQuery({
     queryKey: ['datasets'],
     queryFn: () => api.datasets.list(),
@@ -137,11 +140,16 @@ export function RegulationList() {
               className="w-full rounded-md border border-stone-200 bg-white py-1.5 pl-8 pr-3 text-sm placeholder:text-stone-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
             />
           </div>
-          <div className="hidden text-xs text-stone-400 sm:block">
-            источник: <span className="font-mono">upstream /admin/datasets</span>
-          </div>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:opacity-90"
+          >
+            <Plus size={14} /> Создать регламент
+          </button>
         </div>
       </div>
+
+      <CreateRegulationDialog open={showCreate} onClose={() => setShowCreate(false)} />
 
       {/* Body */}
       <div className="min-h-0 flex-1 overflow-auto px-6 py-5">

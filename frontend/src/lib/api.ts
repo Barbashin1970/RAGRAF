@@ -166,6 +166,18 @@ export const api = {
       request<unknown>(`/api/datasets/${encodeURIComponent(appId)}`, { method: 'POST' }, z.unknown()),
   },
   regulations: {
+    /** Создать новый регламент по шаблону домена (или пустой при `use_template=false`). */
+    create: (payload: {
+      domain: string
+      name?: string
+      source_id?: string
+      use_template?: boolean
+    }) =>
+      request(
+        `/api/regulations`,
+        { method: 'POST', body: JSON.stringify(payload) },
+        regulationSchema,
+      ),
     get: (id: string) => request(`/api/regulations/${encodeURIComponent(id)}`, undefined, regulationSchema),
     save: (id: string, reg: Regulation) =>
       request(

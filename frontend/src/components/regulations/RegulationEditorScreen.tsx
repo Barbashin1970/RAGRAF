@@ -451,9 +451,11 @@ function SlidersView({
         из SHACL <code>sh:minInclusive</code> / <code>sh:maxInclusive</code>, шаг — эвристика. Точные значения можно
         править на вкладке «Поля». Сохранение — общее, кнопкой «Сохранить» в шапке.
       </div>
-      {draft.parameters.map((p, idx) => (
-        <ParameterSliderRow key={p.id} param={p} onChange={(patch) => update(idx, patch)} />
-      ))}
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {draft.parameters.map((p, idx) => (
+          <ParameterSliderRow key={p.id} param={p} onChange={(patch) => update(idx, patch)} />
+        ))}
+      </div>
     </div>
   )
 }
@@ -555,7 +557,9 @@ function SliderRow({
   onChange: (v: number) => void
   accent: 'emerald' | 'amber'
 }) {
-  const accentClass = accent === 'emerald' ? 'accent-emerald-500' : 'accent-amber-500'
+  // `text-emerald-500` / `text-amber-500` управляет цветом thumb через `currentColor`
+  // в .ragraf-range, а accent-* — заполненной частью трека (browser-native).
+  const accentClass = accent === 'emerald' ? 'accent-emerald-500 text-emerald-500' : 'accent-amber-500 text-amber-500'
   return (
     <div className="mb-2 flex items-center gap-2 text-xs">
       <span className="w-20 shrink-0 text-stone-500">{label}</span>
@@ -566,7 +570,7 @@ function SliderRow({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className={cn('flex-1', accentClass)}
+        className={cn('ragraf-range flex-1', accentClass)}
       />
       <input
         type="number"
