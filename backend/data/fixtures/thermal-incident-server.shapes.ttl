@@ -1,0 +1,102 @@
+@prefix :    <http://regulations.local/ontology#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# SHACL форма для ThermalIncidentServerRegulation.
+# Все параметры обязательны (sh:minCount 1); диапазоны — физически осмысленные.
+
+:ThermalIncidentServerShape
+    a sh:NodeShape ;
+    sh:targetClass :Regulation ;
+
+    sh:property [
+        sh:path     :name ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:message  "Регламент должен содержать имя"@ru
+    ] ;
+    sh:property [
+        sh:path     :date ;
+        sh:datatype xsd:date ;
+        sh:minCount 1
+    ] ;
+
+    sh:property [
+        sh:path         :serverTemperature ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive   0.0 ;
+        sh:maxInclusive  60.0 ;
+        sh:message      "Температура воздуха в серверной, °C"@ru
+    ] ;
+    sh:property [
+        sh:path         :serverTemperatureDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 15.0
+    ] ;
+
+    sh:property [
+        sh:path         :smokeConcentration ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive    0.0 ;
+        sh:maxInclusive 2000.0 ;
+        sh:message      "Концентрация дыма / CO, ppm"@ru
+    ] ;
+    sh:property [
+        sh:path         :smokeConcentrationDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive   0.0 ;
+        sh:maxInclusive 500.0
+    ] ;
+
+    sh:property [
+        sh:path         :coolingFlowRate ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive    0.0 ;
+        sh:maxInclusive 5000.0 ;
+        sh:message      "Расход охлаждения, м³/ч"@ru
+    ] ;
+    sh:property [
+        sh:path         :coolingFlowRateDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive    0.0 ;
+        sh:maxInclusive 2000.0
+    ] ;
+
+    sh:property [
+        sh:path         :confirmTimeMinutes ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.5 ;
+        sh:maxInclusive 30.0 ;
+        sh:message      "Время до подтверждения старшего ИТ-инженера, мин"@ru
+    ] ;
+    sh:property [
+        sh:path         :confirmTimeMinutesDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 10.0
+    ] ;
+
+    sh:property [
+        sh:path         :escalationTimeMinutes ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  1.0 ;
+        sh:maxInclusive 60.0 ;
+        sh:message      "Время до эскалации в 01/101/112 и ЕДДС, мин"@ru
+    ] ;
+    sh:property [
+        sh:path         :escalationTimeMinutesDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 15.0
+    ] .

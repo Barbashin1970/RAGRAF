@@ -1,0 +1,90 @@
+@prefix :    <http://regulations.local/ontology#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:DormitoryFloodShape
+    a sh:NodeShape ;
+    sh:targetClass :Regulation ;
+
+    sh:property [ sh:path :name ; sh:datatype xsd:string ; sh:minCount 1 ] ;
+    sh:property [ sh:path :date ; sh:datatype xsd:date   ; sh:minCount 1 ] ;
+
+    sh:property [
+        sh:path         :waterLevel ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive   0.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Уровень воды на этаже, см"@ru
+    ] ;
+    sh:property [
+        sh:path         :waterLevelDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 5.0
+    ] ;
+
+    sh:property [
+        sh:path         :stackFlowRate ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 20.0 ;
+        sh:message      "Расход через стояк, м³/ч"@ru
+    ] ;
+    sh:property [
+        sh:path         :stackFlowRateDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 5.0
+    ] ;
+
+    sh:property [
+        sh:path         :nightModeStart ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 24.0 ;
+        sh:message      "Час начала ночного режима, ч"@ru
+    ] ;
+    sh:property [
+        sh:path         :nightModeStartDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 4.0
+    ] ;
+
+    sh:property [
+        sh:path         :commandantArrivalTime ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  1.0 ;
+        sh:maxInclusive 60.0 ;
+        sh:message      "Время прибытия коменданта, мин"@ru
+    ] ;
+    sh:property [
+        sh:path         :commandantArrivalTimeDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 20.0
+    ] ;
+
+    sh:property [
+        sh:path         :evacuationThresholdLevel ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  1.0 ;
+        sh:maxInclusive 50.0 ;
+        sh:message      "Уровень воды для эвакуации, см"@ru
+    ] ;
+    sh:property [
+        sh:path         :evacuationThresholdLevelDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 5.0
+    ] .

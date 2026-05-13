@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-11-25T06:06:57.929013",
+  "value": {
+    "charts": [
+      {
+        "title": "Прогноз p по рёбрам",
+        "xKey": "edge_id",
+        "data": [
+          { "edge_id": 0, "pred_p": 0.091, "ref_p": 0.1 },
+          { "edge_id": 1, "pred_p": 0.062, "ref_p": 0.1 }
+        ]
+      }
+    ]
+  }
+}

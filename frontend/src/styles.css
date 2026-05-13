@@ -1,0 +1,33 @@
+/* React Flow base styles (must be included for the canvas to layout).
+   @import must come before @tailwind directives per CSS spec. */
+@import 'reactflow/dist/style.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html, body, #root { height: 100%; }
+body { font-family: 'Inter', system-ui, sans-serif; }
+
+/* Cytoscape container default */
+.cy-canvas { width: 100%; height: 100%; }
+
+/* React Flow node-type colors — see regulation-viz-skill.md § Design System */
+.rf-node {
+  @apply rounded-md border bg-white px-3 py-2 text-sm shadow-sm transition;
+  min-width: 140px;
+}
+.rf-node--input       { @apply bg-accent-success-highlight   border-accent-success; }
+.rf-node--threshold   { @apply bg-accent-blue-highlight      border-accent-blue; }
+.rf-node--compare     { @apply bg-accent-gold-highlight      border-accent-gold; }
+.rf-node--formula     { @apply bg-accent-purple-highlight    border-accent-purple; }
+.rf-node--switch      { @apply bg-accent-orange-highlight    border-accent-orange; }
+.rf-node--output      { @apply bg-accent-notification-highlight border-accent-notification; }
+.rf-node--shacl_constraint { @apply bg-surface-offset border-stone-300 border-dashed; }
+
+.rf-node--error { @apply ring-2 ring-accent-notification; }
+.rf-node--selected { @apply ring-2 ring-primary; }

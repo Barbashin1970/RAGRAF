@@ -1,0 +1,168 @@
+{
+  "rule_id": "rule_roof_snow_fencing",
+  "regulation_id": "roof-snow-fencing",
+  "nodes": [
+    {
+      "id": "n_temp_in",
+      "type": "input",
+      "label": "Температура воздуха",
+      "paramRef": "temperature",
+      "position": { "x": 60, "y": 60 }
+    },
+    {
+      "id": "n_temp_thr",
+      "type": "threshold",
+      "label": "−2.0 ± 2.0 °C",
+      "refValue": -2.0,
+      "deviation": 2.0,
+      "unit": "°C",
+      "position": { "x": 300, "y": 60 }
+    },
+    {
+      "id": "n_temp_cmp",
+      "type": "compare",
+      "label": "выход на плюс?",
+      "operator": "outside_range",
+      "position": { "x": 560, "y": 60 }
+    },
+
+    {
+      "id": "n_rise_in",
+      "type": "input",
+      "label": "Скорость подъёма T",
+      "paramRef": "temperatureRiseRate",
+      "position": { "x": 60, "y": 200 }
+    },
+    {
+      "id": "n_rise_thr",
+      "type": "threshold",
+      "label": "0.5 ± 0.5 °C/ч",
+      "refValue": 0.5,
+      "deviation": 0.5,
+      "unit": "°C/ч",
+      "position": { "x": 300, "y": 200 }
+    },
+    {
+      "id": "n_rise_cmp",
+      "type": "compare",
+      "label": "резкое потепление?",
+      "operator": "outside_range",
+      "position": { "x": 560, "y": 200 }
+    },
+
+    {
+      "id": "n_snow_in",
+      "type": "input",
+      "label": "Снег на кровле",
+      "paramRef": "snowDepth",
+      "position": { "x": 60, "y": 340 }
+    },
+    {
+      "id": "n_snow_thr",
+      "type": "threshold",
+      "label": "3.0 ± 2.0 см",
+      "refValue": 3.0,
+      "deviation": 2.0,
+      "unit": "см",
+      "position": { "x": 300, "y": 340 }
+    },
+    {
+      "id": "n_snow_cmp",
+      "type": "compare",
+      "label": "превышение?",
+      "operator": "outside_range",
+      "position": { "x": 560, "y": 340 }
+    },
+
+    {
+      "id": "n_ice_in",
+      "type": "input",
+      "label": "Длина сосулек",
+      "paramRef": "iceLength",
+      "position": { "x": 60, "y": 480 }
+    },
+    {
+      "id": "n_ice_thr",
+      "type": "threshold",
+      "label": "5.0 ± 5.0 см",
+      "refValue": 5.0,
+      "deviation": 5.0,
+      "unit": "см",
+      "position": { "x": 300, "y": 480 }
+    },
+    {
+      "id": "n_ice_cmp",
+      "type": "compare",
+      "label": "опасные сосульки?",
+      "operator": "outside_range",
+      "position": { "x": 560, "y": 480 }
+    },
+
+    {
+      "id": "n_risk_aggr",
+      "type": "formula",
+      "label": "Сводный признак риска",
+      "expression": "tempOutOfRange && riseRapid || snowExcess || iceCritical",
+      "position": { "x": 820, "y": 200 }
+    },
+
+    {
+      "id": "n_sms",
+      "type": "output",
+      "label": "SMS ответственным",
+      "action": "sms_notify",
+      "text": "Направить SMS управляющему ТСЖ и ответственным подрядчика за 4 ± 1 час до прогнозируемого риска: «Прогноз резкого потепления, риск схода снега / падения сосулек. Подтвердите готовность к работам».",
+      "priority": 1,
+      "position": { "x": 1080, "y": 60 }
+    },
+    {
+      "id": "n_fence",
+      "type": "output",
+      "label": "Огородить ленту",
+      "action": "fence_install",
+      "text": "Огородить придомовую территорию сигнальной лентой по периметру свесов кровли и спускных площадок до завершения работ по очистке.",
+      "priority": 1,
+      "position": { "x": 1080, "y": 200 }
+    },
+    {
+      "id": "n_roof_clean",
+      "type": "output",
+      "label": "Очистка кровли",
+      "action": "roof_cleaning",
+      "text": "Выдать наряд подрядчику на очистку кровли от снега и сбивание сосулек; цель — снизить массу тающего снега и размер наледи до выхода температуры в плюс.",
+      "priority": 2,
+      "position": { "x": 1080, "y": 340 }
+    },
+
+    {
+      "id": "n_shacl_temp",
+      "type": "shacl_constraint",
+      "label": "SHACL: temperature",
+      "constraintRef": "Regulation_temperature",
+      "position": { "x": 820, "y": 60 }
+    }
+  ],
+  "edges": [
+    { "source": "n_temp_in",  "target": "n_temp_thr" },
+    { "source": "n_temp_thr", "target": "n_temp_cmp" },
+    { "source": "n_temp_cmp", "target": "n_risk_aggr", "condition": "outside" },
+
+    { "source": "n_rise_in",  "target": "n_rise_thr" },
+    { "source": "n_rise_thr", "target": "n_rise_cmp" },
+    { "source": "n_rise_cmp", "target": "n_risk_aggr", "condition": "rapid" },
+
+    { "source": "n_snow_in",  "target": "n_snow_thr" },
+    { "source": "n_snow_thr", "target": "n_snow_cmp" },
+    { "source": "n_snow_cmp", "target": "n_risk_aggr", "condition": "excess" },
+
+    { "source": "n_ice_in",  "target": "n_ice_thr" },
+    { "source": "n_ice_thr", "target": "n_ice_cmp" },
+    { "source": "n_ice_cmp", "target": "n_risk_aggr", "condition": "critical" },
+
+    { "source": "n_risk_aggr", "target": "n_sms",        "condition": "true" },
+    { "source": "n_risk_aggr", "target": "n_fence",      "condition": "true" },
+    { "source": "n_risk_aggr", "target": "n_roof_clean", "condition": "true" },
+
+    { "source": "n_temp_cmp", "target": "n_shacl_temp" }
+  ]
+}

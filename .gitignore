@@ -1,0 +1,11 @@
+node_modules
+dist
+.venv
+__pycache__
+*.pyc
+.env
+.DS_Store
+*.log
+backend/data/flows
+backend/data/versions
+backend/data/ragu_store

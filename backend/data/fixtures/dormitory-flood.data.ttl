@@ -1,0 +1,58 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент при ночной протечке в жилом блоке общежития (demo-sigma-main `dormitory-flood`).
+# Источник: внутренний регламент управления кампуса НГУ (демо). Ночной режим
+# минимизирует контакт с жильцами — отсекатель стояка закрывается только после
+# подтверждения коменданта; готовится временное размещение в холле 1-го этажа.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:waterLevel               a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:waterLevelDeviation      a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:stackFlowRate            a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:stackFlowRateDeviation   a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:nightModeStart           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:nightModeStartDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:commandantArrivalTime    a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:commandantArrivalTimeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:evacuationThresholdLevel a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:evacuationThresholdLevelDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:DormitoryFloodRegulation
+    a                                  :Regulation ;
+    :name                              "Регламент при ночной протечке в жилом блоке общежития (отсекатель стояка, комендант, эвакуация в холл)" ;
+    :date                              "2024-09-25"^^xsd:date ;
+
+    # Уровень воды на этаже, см. Норма 0 ± 0.5; протечка фиксируется при выходе.
+    :waterLevel                        0.0 ;
+    :waterLevelDeviation               0.5 ;
+
+    # Расход воды через стояк, м³/ч. Норма 0.5 ± 0.3 (ночной режим);
+    # резкий рост — признак прорыва.
+    :stackFlowRate                     0.5 ;
+    :stackFlowRateDeviation            0.3 ;
+
+    # Час начала ночного режима. Норматив 22.0 ± 0.5 (с 21:30 до 22:30).
+    # Используется как «time-of-day» предикат для смягчения контакта с жильцами.
+    :nightModeStart                   22.0 ;
+    :nightModeStartDeviation           0.5 ;
+
+    # Время прибытия коменданта на этаж, минуты. Норматив 15 ± 5.
+    # До этого момента автоматическое перекрытие стояка не выполняется.
+    :commandantArrivalTime            15.0 ;
+    :commandantArrivalTimeDeviation    5.0 ;
+
+    # Уровень воды для перевода в режим эвакуации, см. Норматив 5 ± 1.
+    # Превышение → жильцы блока переводятся в холл 1-го этажа, эскалация руководителю.
+    :evacuationThresholdLevel          5.0 ;
+    :evacuationThresholdLevelDeviation 1.0 ;
+
+    :recommendation                    "Ночная протечка — специфика режима: 1) Минимизировать контакт с жильцами, эвакуация только при выходе воды на этаж. 2) Поручить коменданту физический осмотр теплового узла и смежных этажей (прибытие 15 ± 5 минут). 3) Отсекатель стояка закрывается АВТОМАТИЧЕСКИ ТОЛЬКО ПОСЛЕ подтверждения коменданта. 4) Параллельно подготовить временное размещение в холле 1-го этажа на случай эвакуации. 5) При уровне воды > 5 ± 1 см — эскалация руководителю управления кампуса НГУ, перевод жильцов в холл." .

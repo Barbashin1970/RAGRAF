@@ -1,0 +1,140 @@
+{
+  "rule_id": "rule_heat_inlet_breach",
+  "regulation_id": "heat-inlet-breach",
+  "nodes": [
+    {
+      "id": "n_pressure_in",
+      "type": "input",
+      "label": "Давление узла",
+      "paramRef": "inletPressure",
+      "position": { "x": 60, "y": 60 }
+    },
+    {
+      "id": "n_pressure_thr",
+      "type": "threshold",
+      "label": "4.0 ± 0.5 атм",
+      "refValue": 4.0,
+      "deviation": 0.5,
+      "unit": "атм",
+      "position": { "x": 320, "y": 60 }
+    },
+    {
+      "id": "n_pressure_cmp",
+      "type": "compare",
+      "label": "давление вне нормы?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 60 }
+    },
+
+    {
+      "id": "n_fall_in",
+      "type": "input",
+      "label": "Скорость падения P",
+      "paramRef": "pressureFallRate",
+      "position": { "x": 60, "y": 200 }
+    },
+    {
+      "id": "n_fall_thr",
+      "type": "threshold",
+      "label": "0.0 ± 0.2 атм/мин",
+      "refValue": 0.0,
+      "deviation": 0.2,
+      "unit": "атм/мин",
+      "position": { "x": 320, "y": 200 }
+    },
+    {
+      "id": "n_fall_cmp",
+      "type": "compare",
+      "label": "резкое падение?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 200 }
+    },
+
+    {
+      "id": "n_temp_in",
+      "type": "input",
+      "label": "Температура подачи",
+      "paramRef": "inletTemperature",
+      "position": { "x": 60, "y": 340 }
+    },
+    {
+      "id": "n_temp_thr",
+      "type": "threshold",
+      "label": "70 ± 10 °C",
+      "refValue": 70.0,
+      "deviation": 10.0,
+      "unit": "°C",
+      "position": { "x": 320, "y": 340 }
+    },
+    {
+      "id": "n_temp_cmp",
+      "type": "compare",
+      "label": "температура вне нормы?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 340 }
+    },
+
+    {
+      "id": "n_breach_check",
+      "type": "formula",
+      "label": "Подтверждённый прорыв",
+      "expression": "pressureFell && pressureOutOfRange",
+      "position": { "x": 820, "y": 130 }
+    },
+
+    {
+      "id": "n_walker_confirm",
+      "type": "output",
+      "label": "Запрос обходчика",
+      "action": "request_walker_confirm",
+      "text": "Запросить подтверждение обходчика в окне 7 ± 3 минут. До подтверждения smart-valve в режиме готовности, автоматического перекрытия не выполнять (защита от ложного срабатывания).",
+      "priority": 2,
+      "position": { "x": 1080, "y": 60 }
+    },
+    {
+      "id": "n_smart_valve",
+      "type": "output",
+      "label": "Перекрыть smart-valve",
+      "action": "smart_valve_close",
+      "text": "После подтверждения обходчика выполнить автоматическое перекрытие smart-valve, уведомить инженерную службу и городские теплосети.",
+      "priority": 1,
+      "position": { "x": 1080, "y": 200 }
+    },
+    {
+      "id": "n_emergency_brigade",
+      "type": "output",
+      "label": "Аварийная бригада",
+      "action": "emergency_brigade",
+      "text": "Вызов аварийной бригады теплосетей, координация с ЕДДС. Параллельно — оповещение смежного медицинского реанимационного блока в окне 15 ± 5 минут для перевода на резервный контур.",
+      "priority": 1,
+      "position": { "x": 1080, "y": 340 }
+    },
+
+    {
+      "id": "n_shacl_pressure",
+      "type": "shacl_constraint",
+      "label": "SHACL: inletPressure",
+      "constraintRef": "Regulation_inletPressure",
+      "position": { "x": 820, "y": 60 }
+    }
+  ],
+  "edges": [
+    { "source": "n_pressure_in",  "target": "n_pressure_thr" },
+    { "source": "n_pressure_thr", "target": "n_pressure_cmp" },
+    { "source": "n_pressure_cmp", "target": "n_breach_check", "condition": "pressure_out" },
+
+    { "source": "n_fall_in",      "target": "n_fall_thr" },
+    { "source": "n_fall_thr",     "target": "n_fall_cmp" },
+    { "source": "n_fall_cmp",     "target": "n_breach_check", "condition": "fall" },
+
+    { "source": "n_temp_in",      "target": "n_temp_thr" },
+    { "source": "n_temp_thr",     "target": "n_temp_cmp" },
+    { "source": "n_temp_cmp",     "target": "n_smart_valve", "condition": "temp_out" },
+
+    { "source": "n_breach_check", "target": "n_walker_confirm",     "condition": "true" },
+    { "source": "n_breach_check", "target": "n_smart_valve",        "condition": "after_confirm" },
+    { "source": "n_breach_check", "target": "n_emergency_brigade",  "condition": "confirmed_breach" },
+
+    { "source": "n_pressure_cmp", "target": "n_shacl_pressure" }
+  ]
+}

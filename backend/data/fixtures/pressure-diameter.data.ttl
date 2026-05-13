@@ -1,0 +1,30 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Онтология регламентов трубопроводов водоснабжения
+# Источник: Rules-Management.pdf, страница 3
+# Постановление № 001/2023, дата принятия: 2023-10-01
+
+:Regulation  a  owl:Class .
+
+:name              a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date              a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:pressure          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:diameter          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:pressureDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:diameterDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:recommendation    a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+# Конкретный регламент — экземпляр класса :Regulation
+:PressureAndDiameterRegulation
+    a                    :Regulation ;
+    :name                "Регламент на допустимые параметры давления и диаметра для трубопроводов водоснабжения" ;
+    :date                "2023-10-01"^^xsd:date ;
+    :pressure            20.5 ;
+    :pressureDeviation   1.5 ;
+    :diameter            5.0 ;
+    :diameterDeviation   0.2 ;
+    :recommendation      "Остановите систему, проверьте герметичность трубопровода на наличие утечек и проведите необходимый ремонт." .

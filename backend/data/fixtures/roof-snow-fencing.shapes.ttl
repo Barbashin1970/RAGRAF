@@ -1,0 +1,104 @@
+@prefix :    <http://regulations.local/ontology#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# SHACL форма для RoofSnowFencingRegulation.
+# Конструкция повторяет RegulationShape из Rules-Management.pdf:
+# для каждого параметра — sh:path + sh:datatype + sh:minCount + границы sh:minInclusive/sh:maxInclusive.
+
+:RoofSnowFencingShape
+    a sh:NodeShape ;
+    sh:targetClass :Regulation ;
+
+    sh:property [
+        sh:path     :name ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:message  "Регламент должен содержать имя"@ru
+    ] ;
+    sh:property [
+        sh:path     :date ;
+        sh:datatype xsd:date ;
+        sh:minCount 1 ;
+        sh:message  "Дата принятия регламента обязательна"@ru
+    ] ;
+
+    sh:property [
+        sh:path         :temperature ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive -50.0 ;
+        sh:maxInclusive  50.0 ;
+        sh:message      "Температура воздуха в диапазоне [-50; 50] °C"@ru
+    ] ;
+    sh:property [
+        sh:path         :temperatureDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 10.0
+    ] ;
+
+    sh:property [
+        sh:path         :temperatureRiseRate ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 10.0 ;
+        sh:message      "Скорость подъёма температуры, °C/ч"@ru
+    ] ;
+    sh:property [
+        sh:path         :temperatureRiseRateDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive  5.0
+    ] ;
+
+    sh:property [
+        sh:path         :snowDepth ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive   0.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Толщина снежного покрова на кровле, см"@ru
+    ] ;
+    sh:property [
+        sh:path         :snowDepthDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :iceLength ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive   0.0 ;
+        sh:maxInclusive 200.0 ;
+        sh:message      "Длина сосулек, см"@ru
+    ] ;
+    sh:property [
+        sh:path         :iceLengthDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :smsLeadHours ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.5 ;
+        sh:maxInclusive 24.0 ;
+        sh:message      "Заблаговременность SMS-оповещения, часы"@ru
+    ] ;
+    sh:property [
+        sh:path         :smsLeadHoursDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive  6.0
+    ] .

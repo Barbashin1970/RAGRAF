@@ -1,0 +1,153 @@
+{
+  "rule_id": "rule_dormitory_flood",
+  "regulation_id": "dormitory-flood",
+  "nodes": [
+    {
+      "id": "n_water_in",
+      "type": "input",
+      "label": "Уровень воды",
+      "paramRef": "waterLevel",
+      "position": { "x": 60, "y": 60 }
+    },
+    {
+      "id": "n_water_thr",
+      "type": "threshold",
+      "label": "0 ± 0.5 см",
+      "refValue": 0.0,
+      "deviation": 0.5,
+      "unit": "см",
+      "position": { "x": 320, "y": 60 }
+    },
+    {
+      "id": "n_water_cmp",
+      "type": "compare",
+      "label": "протечка?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 60 }
+    },
+
+    {
+      "id": "n_flow_in",
+      "type": "input",
+      "label": "Расход стояка",
+      "paramRef": "stackFlowRate",
+      "position": { "x": 60, "y": 200 }
+    },
+    {
+      "id": "n_flow_thr",
+      "type": "threshold",
+      "label": "0.5 ± 0.3 м³/ч",
+      "refValue": 0.5,
+      "deviation": 0.3,
+      "unit": "м³/ч",
+      "position": { "x": 320, "y": 200 }
+    },
+    {
+      "id": "n_flow_cmp",
+      "type": "compare",
+      "label": "резкий рост?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 200 }
+    },
+
+    {
+      "id": "n_evac_in",
+      "type": "input",
+      "label": "Уровень эвакуации",
+      "paramRef": "evacuationThresholdLevel",
+      "position": { "x": 60, "y": 340 }
+    },
+    {
+      "id": "n_evac_thr",
+      "type": "threshold",
+      "label": "5.0 ± 1.0 см",
+      "refValue": 5.0,
+      "deviation": 1.0,
+      "unit": "см",
+      "position": { "x": 320, "y": 340 }
+    },
+    {
+      "id": "n_evac_cmp",
+      "type": "compare",
+      "label": "превышен порог?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 340 }
+    },
+
+    {
+      "id": "n_night_mode",
+      "type": "formula",
+      "label": "Ночной режим (22:00–06:00)",
+      "expression": "currentHour >= 22 || currentHour < 6",
+      "position": { "x": 820, "y": 60 }
+    },
+    {
+      "id": "n_severity",
+      "type": "switch",
+      "label": "Маршрут реагирования",
+      "cases": [
+        { "label": "leak_only",        "value": "leak" },
+        { "label": "confirmed_breach", "value": "breach" },
+        { "label": "evacuation",       "value": "evac" }
+      ],
+      "position": { "x": 820, "y": 220 }
+    },
+
+    {
+      "id": "n_commandant",
+      "type": "output",
+      "label": "Вызвать коменданта",
+      "action": "call_commandant",
+      "text": "Поручить коменданту физический осмотр теплового узла и смежных этажей (прибытие 15 ± 5 минут). В ночном режиме (22:00–06:00) минимизировать контакт с жильцами.",
+      "priority": 2,
+      "position": { "x": 1080, "y": 60 }
+    },
+    {
+      "id": "n_stack_valve",
+      "type": "output",
+      "label": "Закрыть стояк",
+      "action": "stack_valve_close",
+      "text": "Отсекатель стояка закрывается АВТОМАТИЧЕСКИ ТОЛЬКО ПОСЛЕ подтверждения коменданта на месте. Параллельно подготовить временное размещение в холле 1-го этажа.",
+      "priority": 1,
+      "position": { "x": 1080, "y": 200 }
+    },
+    {
+      "id": "n_evacuate",
+      "type": "output",
+      "label": "Эвакуация в холл",
+      "action": "evacuate_to_hall",
+      "text": "При уровне воды > 5 ± 1 см — перевод жильцов блока в холл 1-го этажа, эскалация руководителю управления кампуса НГУ.",
+      "priority": 1,
+      "position": { "x": 1080, "y": 340 }
+    },
+
+    {
+      "id": "n_shacl_evac",
+      "type": "shacl_constraint",
+      "label": "SHACL: evacuationThreshold",
+      "constraintRef": "Regulation_evacuationThresholdLevel",
+      "position": { "x": 820, "y": 340 }
+    }
+  ],
+  "edges": [
+    { "source": "n_water_in",  "target": "n_water_thr" },
+    { "source": "n_water_thr", "target": "n_water_cmp" },
+    { "source": "n_water_cmp", "target": "n_severity", "condition": "leak" },
+
+    { "source": "n_flow_in",   "target": "n_flow_thr" },
+    { "source": "n_flow_thr",  "target": "n_flow_cmp" },
+    { "source": "n_flow_cmp",  "target": "n_severity", "condition": "breach" },
+
+    { "source": "n_evac_in",   "target": "n_evac_thr" },
+    { "source": "n_evac_thr",  "target": "n_evac_cmp" },
+    { "source": "n_evac_cmp",  "target": "n_severity", "condition": "evacuation" },
+
+    { "source": "n_night_mode", "target": "n_commandant" },
+
+    { "source": "n_severity",  "target": "n_commandant",  "condition": "leak_only" },
+    { "source": "n_severity",  "target": "n_stack_valve", "condition": "confirmed_breach" },
+    { "source": "n_severity",  "target": "n_evacuate",    "condition": "evacuation" },
+
+    { "source": "n_evac_cmp",  "target": "n_shacl_evac" }
+  ]
+}

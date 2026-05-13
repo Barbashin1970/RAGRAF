@@ -1,0 +1,62 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент ТСЖ: огораживание придомовой территории при риске схода снега / падения сосулек.
+# Триггер — резкий выход температуры с минуса на плюс. До риска: SMS подрядчику и
+# управляющему, монтаж сигнальной ленты, плановая очистка кровли.
+
+:Regulation a owl:Class .
+
+# --- метапроперти регламента ---
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+# --- параметры регламента (плоский scalar + парный *Deviation) ---
+:temperature           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:temperatureDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:temperatureRiseRate           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:temperatureRiseRateDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:snowDepth           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:snowDepthDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:iceLength           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:iceLengthDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:smsLeadHours           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:smsLeadHoursDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# --- инстанс ---
+:RoofSnowFencingRegulation
+    a                            :Regulation ;
+    :name                        "Регламент огораживания придомовой территории и оповещения ответственных при риске падения сосулек и схода снега с кровли (ТСЖ)" ;
+    :date                        "2024-11-15"^^xsd:date ;
+
+    # Температура воздуха: норма зимняя в районе −2 ± 2 °C ([−4, 0]).
+    # Триггер — выход за 0 °C (плюсовая температура).
+    :temperature                 -2.0 ;
+    :temperatureDeviation         2.0 ;
+
+    # Скорость подъёма температуры за окно наблюдения, °C/ч.
+    # Норма ≤ 0.5 ± 0.5 ([0, 1.0]); резкое потепление — выше 1.0 °C/ч.
+    :temperatureRiseRate          0.5 ;
+    :temperatureRiseRateDeviation 0.5 ;
+
+    # Толщина снежного покрова на кровле, см. Норма 3 ± 2 ([1, 5]); алярм > 5.
+    :snowDepth                    3.0 ;
+    :snowDepthDeviation           2.0 ;
+
+    # Длина сосулек на свесах, см. Норма 5 ± 5 ([0, 10]); алярм > 10.
+    :iceLength                    5.0 ;
+    :iceLengthDeviation           5.0 ;
+
+    # Заблаговременность SMS-оповещения, часы. Норматив 4 ± 1.
+    :smsLeadHours                 4.0 ;
+    :smsLeadHoursDeviation        1.0 ;
+
+    :recommendation              "Огородить придомовую территорию сигнальной лентой по периметру свесов кровли; за 4 ± 1 часа до прогнозируемого риска направить SMS-уведомления всем ответственным лицам подрядчика по эксплуатации кровли и управляющему ТСЖ; обеспечить контроль исполнения и подготовить наряд на очистку кровли от снега и сбивание сосулек для снижения массы тающего снега и размера наледи." .

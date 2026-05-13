@@ -1,0 +1,69 @@
+{
+  "rule_id": "rule_pressure_check",
+  "regulation_id": "pressure-diameter",
+  "nodes": [
+    {
+      "id": "n_pressure_in",
+      "type": "input",
+      "label": "Давление",
+      "paramRef": "pressure",
+      "position": { "x": 80, "y": 60 }
+    },
+    {
+      "id": "n_pressure_threshold",
+      "type": "threshold",
+      "label": "20.5 ± 1.5 атм",
+      "refValue": 20.5,
+      "deviation": 1.5,
+      "unit": "атм",
+      "position": { "x": 320, "y": 60 }
+    },
+    {
+      "id": "n_pressure_compare",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 60 }
+    },
+    {
+      "id": "n_diameter_in",
+      "type": "input",
+      "label": "Диаметр",
+      "paramRef": "diameter",
+      "position": { "x": 80, "y": 220 }
+    },
+    {
+      "id": "n_diameter_threshold",
+      "type": "threshold",
+      "label": "5.0 ± 0.2 см",
+      "refValue": 5.0,
+      "deviation": 0.2,
+      "unit": "см",
+      "position": { "x": 320, "y": 220 }
+    },
+    {
+      "id": "n_diameter_compare",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 220 }
+    },
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "action": "recommendation",
+      "text": "Остановите систему, проверьте герметичность трубопровода на наличие утечек и проведите необходимый ремонт.",
+      "priority": 1,
+      "position": { "x": 860, "y": 140 }
+    }
+  ],
+  "edges": [
+    { "source": "n_pressure_in", "target": "n_pressure_threshold" },
+    { "source": "n_pressure_threshold", "target": "n_pressure_compare" },
+    { "source": "n_pressure_compare", "target": "n_output", "condition": "true" },
+    { "source": "n_diameter_in", "target": "n_diameter_threshold" },
+    { "source": "n_diameter_threshold", "target": "n_diameter_compare" },
+    { "source": "n_diameter_compare", "target": "n_output", "condition": "true" }
+  ]
+}

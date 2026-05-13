@@ -1,0 +1,56 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент при прорыве теплового ввода (demo-sigma-main scenario `heat-inlet-breach`).
+# Источник: внутренний регламент инженерной службы (демо). Эскалация:
+#   обходчик подтверждает → smart valve перекрывает → аварийная бригада →
+#   ЕДДС + оповещение смежного медицинского реанимационного блока.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:inletPressure            a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:inletPressureDeviation   a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:inletTemperature           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:inletTemperatureDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:pressureFallRate           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:pressureFallRateDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:walkerConfirmTime          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:walkerConfirmTimeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:medicalAlertWindow         a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:medicalAlertWindowDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:HeatInletBreachRegulation
+    a                              :Regulation ;
+    :name                          "Регламент при прорыве теплового ввода (smart-valve, обходчик, оповещение медблока)" ;
+    :date                          "2024-09-10"^^xsd:date ;
+
+    # Давление в тепловом узле, атм. Норма 4.0 ± 0.5 ([3.5, 4.5]); алярм вне диапазона.
+    :inletPressure                 4.0 ;
+    :inletPressureDeviation        0.5 ;
+
+    # Температура подачи, °C. Норма 70 ± 10 ([60, 80]).
+    :inletTemperature             70.0 ;
+    :inletTemperatureDeviation    10.0 ;
+
+    # Скорость падения давления, атм/мин. Норма 0 ± 0.2; > 0.2 атм/мин — прорыв.
+    :pressureFallRate              0.0 ;
+    :pressureFallRateDeviation     0.2 ;
+
+    # Время до ручного подтверждения обходчиком, минуты. Норматив 7 ± 3.
+    # Это «защитный таймер» против ложного срабатывания smart-valve.
+    :walkerConfirmTime             7.0 ;
+    :walkerConfirmTimeDeviation    3.0 ;
+
+    # Окно оповещения смежного медицинского реанимационного блока, минуты.
+    # Норматив 15 ± 5: за это время бригада переключается на резервный контур.
+    :medicalAlertWindow           15.0 ;
+    :medicalAlertWindowDeviation   5.0 ;
+
+    :recommendation                "При подтверждении утечки в тепловом узле: 1) Уведомить инженерную службу объекта и городские теплосети. 2) Подготовить smart valve к автоматическому перекрытию — ждать подтверждение обходчика (7 ± 3 мин) для исключения ложного срабатывания. 3) При подтверждённом прорыве — вызов аварийной бригады теплосетей, координация с ЕДДС. 4) Оповестить смежный медицинский реанимационный блок в окне 15 ± 5 минут для перевода на резервный контур." .

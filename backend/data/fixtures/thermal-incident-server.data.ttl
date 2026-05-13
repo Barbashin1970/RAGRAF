@@ -1,0 +1,58 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент: термический инцидент в серверной (НГУ).
+# Источник: Инструкция НГУ — Приложение №6 к приказу № 721-3 от 26.03.2024,
+# раздел 1; внутренний регламент ИТ-службы (demo-sigma-main scenario `thermal-incident`).
+# Триггер — перегрев и/или задымление выше нормы. Эскалация:
+#   ИТ-служба → охрана НГУ → дежурный НГУ → 01/101/112 при critical.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:serverTemperature           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:serverTemperatureDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:smokeConcentration           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:smokeConcentrationDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:coolingFlowRate           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:coolingFlowRateDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:confirmTimeMinutes           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:confirmTimeMinutesDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:escalationTimeMinutes           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:escalationTimeMinutesDeviation  a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:ThermalIncidentServerRegulation
+    a                                  :Regulation ;
+    :name                              "Регламент при термическом инциденте в серверной НГУ (перегрев / задымление, эскалация в ЕДДС и 01/101/112)" ;
+    :date                              "2024-03-26"^^xsd:date ;
+
+    # Температура воздуха в холодном коридоре стойки. Норма 22 ± 4 °C ([18, 26]); алярм > 26.
+    :serverTemperature                 22.0 ;
+    :serverTemperatureDeviation         4.0 ;
+
+    # Концентрация дыма (CO эквивалент), ppm. Норма 0 ± 50; алярм > 50; critical > 200.
+    :smokeConcentration                 0.0 ;
+    :smokeConcentrationDeviation       50.0 ;
+
+    # Расход охлаждения через прецизионные кондиционеры, м³/ч. Норма 800 ± 200.
+    # Резкое падение ниже нормы — отдельный сигнал отказа охлаждения.
+    :coolingFlowRate                   800.0 ;
+    :coolingFlowRateDeviation          200.0 ;
+
+    # Допустимое время на подтверждение старшего ИТ-инженера (для авто-действий
+    # отключение питания / пуск тушения), минуты. Норма 5 ± 2.
+    :confirmTimeMinutes                  5.0 ;
+    :confirmTimeMinutesDeviation         2.0 ;
+
+    # Допустимое время до эскалации в 01/101/112 и городской штаб ЕДДС после
+    # подтверждения critical. Норма 10 ± 3 минут.
+    :escalationTimeMinutes              10.0 ;
+    :escalationTimeMinutesDeviation      3.0 ;
+
+    :recommendation                    "При подтверждении перегрева или дыма в серверной: 1) Немедленно оповестить ИТ-службу НГУ и дежурного инженера. 2) Параллельно — охрану НГУ (363-41-23 / 8-961-879-01-95) и дежурного НГУ (363-40-87 / 8-983-301-46-35). 3) Подготовить ограничение доступа в коридор серверной до подтверждения пожарной обстановки. 4) При переходе в critical (T > 35 °C либо дым > 200 ppm) — вызов 01/101/112 и эскалация в городской штаб ЕДДС. 5) Автоматические действия (отключение питания, пуск тушения) выполняются только после подтверждения старшего ИТ-инженера." .

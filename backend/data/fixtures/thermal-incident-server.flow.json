@@ -1,0 +1,144 @@
+{
+  "rule_id": "rule_thermal_incident_server",
+  "regulation_id": "thermal-incident-server",
+  "nodes": [
+    {
+      "id": "n_temp_in",
+      "type": "input",
+      "label": "Температура серверной",
+      "paramRef": "serverTemperature",
+      "position": { "x": 60, "y": 60 }
+    },
+    {
+      "id": "n_temp_thr",
+      "type": "threshold",
+      "label": "22 ± 4 °C",
+      "refValue": 22.0,
+      "deviation": 4.0,
+      "unit": "°C",
+      "position": { "x": 320, "y": 60 }
+    },
+    {
+      "id": "n_temp_cmp",
+      "type": "compare",
+      "label": "перегрев?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 60 }
+    },
+
+    {
+      "id": "n_smoke_in",
+      "type": "input",
+      "label": "Концентрация дыма",
+      "paramRef": "smokeConcentration",
+      "position": { "x": 60, "y": 200 }
+    },
+    {
+      "id": "n_smoke_thr",
+      "type": "threshold",
+      "label": "0 ± 50 ppm",
+      "refValue": 0.0,
+      "deviation": 50.0,
+      "unit": "ppm",
+      "position": { "x": 320, "y": 200 }
+    },
+    {
+      "id": "n_smoke_cmp",
+      "type": "compare",
+      "label": "задымление?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 200 }
+    },
+
+    {
+      "id": "n_cool_in",
+      "type": "input",
+      "label": "Расход охлаждения",
+      "paramRef": "coolingFlowRate",
+      "position": { "x": 60, "y": 340 }
+    },
+    {
+      "id": "n_cool_thr",
+      "type": "threshold",
+      "label": "800 ± 200 м³/ч",
+      "refValue": 800.0,
+      "deviation": 200.0,
+      "unit": "м³/ч",
+      "position": { "x": 320, "y": 340 }
+    },
+    {
+      "id": "n_cool_cmp",
+      "type": "compare",
+      "label": "отказ охлаждения?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 340 }
+    },
+
+    {
+      "id": "n_severity",
+      "type": "switch",
+      "label": "Уровень критичности",
+      "cases": [
+        { "label": "warning",  "value": "warning" },
+        { "label": "elevated", "value": "elevated" },
+        { "label": "critical", "value": "critical" }
+      ],
+      "position": { "x": 820, "y": 200 }
+    },
+
+    {
+      "id": "n_notify_it",
+      "type": "output",
+      "label": "Уведомить ИТ-службу",
+      "action": "notify_it",
+      "text": "Немедленно оповестить ИТ-службу НГУ и дежурного инженера. Подготовить ограничение доступа в коридор серверной до подтверждения пожарной обстановки.",
+      "priority": 2,
+      "position": { "x": 1080, "y": 60 }
+    },
+    {
+      "id": "n_notify_security",
+      "type": "output",
+      "label": "Охрана + дежурный НГУ",
+      "action": "notify_security",
+      "text": "Параллельно уведомить охрану НГУ (363-41-23 / 8-961-879-01-95) и дежурного НГУ (363-40-87 / 8-983-301-46-35). Подготовить ограничение прохода.",
+      "priority": 2,
+      "position": { "x": 1080, "y": 200 }
+    },
+    {
+      "id": "n_call_112",
+      "type": "output",
+      "label": "01 / 101 / 112 + ЕДДС",
+      "action": "emergency_call",
+      "text": "При переходе в critical (T > 35 °C либо дым > 200 ppm) — вызов 01/101/112 и эскалация в городской штаб ЕДДС. Автоматические действия (отключение питания, пуск тушения) — только после подтверждения старшего ИТ-инженера.",
+      "priority": 1,
+      "position": { "x": 1080, "y": 340 }
+    },
+
+    {
+      "id": "n_shacl_temp",
+      "type": "shacl_constraint",
+      "label": "SHACL: serverTemperature",
+      "constraintRef": "Regulation_serverTemperature",
+      "position": { "x": 820, "y": 60 }
+    }
+  ],
+  "edges": [
+    { "source": "n_temp_in",   "target": "n_temp_thr" },
+    { "source": "n_temp_thr",  "target": "n_temp_cmp" },
+    { "source": "n_temp_cmp",  "target": "n_severity",   "condition": "outside" },
+
+    { "source": "n_smoke_in",  "target": "n_smoke_thr" },
+    { "source": "n_smoke_thr", "target": "n_smoke_cmp" },
+    { "source": "n_smoke_cmp", "target": "n_severity",   "condition": "smoke" },
+
+    { "source": "n_cool_in",   "target": "n_cool_thr" },
+    { "source": "n_cool_thr",  "target": "n_cool_cmp" },
+    { "source": "n_cool_cmp",  "target": "n_severity",   "condition": "cooling_lost" },
+
+    { "source": "n_severity",  "target": "n_notify_it",        "condition": "warning" },
+    { "source": "n_severity",  "target": "n_notify_security",  "condition": "elevated" },
+    { "source": "n_severity",  "target": "n_call_112",         "condition": "critical" },
+
+    { "source": "n_temp_cmp",  "target": "n_shacl_temp" }
+  ]
+}

@@ -1,0 +1,44 @@
+@prefix :    <http://regulations.local/ontology#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# Форма валидации Regulation — RegulationShape
+# Источник: Rules-Management.pdf, страница 2
+
+:RegulationShape
+    a sh:NodeShape ;
+    sh:targetClass :Regulation ;
+    sh:property [
+        sh:path     :name ;
+        sh:datatype xsd:string ;
+        sh:minCount 1
+    ] ;
+    sh:property [
+        sh:path     :date ;
+        sh:datatype xsd:date ;
+        sh:minCount 1
+    ] ;
+    sh:property [
+        sh:path         :pressure ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0
+    ] ;
+    sh:property [
+        sh:path         :diameter ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0
+    ] ;
+    sh:property [
+        sh:path         :pressureDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0
+    ] ;
+    sh:property [
+        sh:path         :diameterDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0
+    ] .
