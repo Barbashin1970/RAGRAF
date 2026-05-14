@@ -1,7 +1,26 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, AlertTriangle, Download, Info, Plus, Save, Shield, Trash2, Upload } from 'lucide-react'
+import {
+  AlertCircle,
+  AlertOctagon,
+  AlertTriangle,
+  ArrowDownToLine,
+  ArrowUpToLine,
+  Code2,
+  Download,
+  Hash,
+  Info,
+  MessageSquare,
+  Plus,
+  Regex,
+  Save,
+  Shield,
+  Trash2,
+  Type,
+  Upload,
+  type LucideIcon,
+} from 'lucide-react'
 import { api, type Constraint } from '@/lib/api'
 import { nanoid } from '@/lib/nanoid'
 import { Button } from '@/components/ui'
@@ -22,6 +41,14 @@ const SEVERITY_LABEL: Record<Constraint['severity'], string> = {
   violation: 'нарушение',
   warning: 'предупреждение',
   info: 'информация',
+}
+
+// Тонировка select'а по текущему severity — чтобы строка читалась сразу
+// (нарушение бросается в глаза, info уходит на второй план).
+const SEVERITY_SELECT_TONE: Record<Constraint['severity'], string> = {
+  violation: 'border-rose-300 bg-rose-50 text-rose-800',
+  warning: 'border-amber-300 bg-amber-50 text-amber-800',
+  info: 'border-sky-300 bg-sky-50 text-sky-800',
 }
 
 export function ConstraintEditorScreen() {
@@ -171,16 +198,16 @@ export function ConstraintEditorScreen() {
           <div className="p-4 text-sm text-stone-500">Загрузка…</div>
         ) : (
           <table className="w-full border-separate border-spacing-y-1 px-3 py-3 text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-stone-500">
+            <thead className="text-left text-xs font-medium uppercase tracking-wide text-stone-500">
               <tr>
-                <th className="px-2 py-1">Путь (sh:path)</th>
-                <th className="px-2 py-1">datatype</th>
-                <th className="px-2 py-1">min ⩽</th>
-                <th className="px-2 py-1">⩽ max</th>
-                <th className="px-2 py-1">minCount</th>
-                <th className="px-2 py-1">pattern</th>
-                <th className="px-2 py-1">severity</th>
-                <th className="px-2 py-1">Сообщение</th>
+                <ColHeader icon={Code2} label="путь (sh:path)" />
+                <ColHeader icon={Type} label="datatype" />
+                <ColHeader icon={ArrowDownToLine} label="min" hint="нижняя граница диапазона" />
+                <ColHeader icon={ArrowUpToLine} label="max" hint="верхняя граница диапазона" />
+                <ColHeader icon={Hash} label="minCount" hint="минимальное число значений" />
+                <ColHeader icon={Regex} label="pattern" />
+                <ColHeader icon={AlertOctagon} label="severity" />
+                <ColHeader icon={MessageSquare} label="сообщение" />
                 <th className="px-2 py-1" />
               </tr>
             </thead>
@@ -210,7 +237,7 @@ export function ConstraintEditorScreen() {
                   </td>
                   <td className="px-2 py-1">
                     <select
-                      className={inp}
+                      className={`${inp} font-medium ${SEVERITY_SELECT_TONE[r.severity]}`}
                       value={r.severity}
                       onChange={(e) => patch(i, { severity: e.target.value as Constraint['severity'] })}
                     >
@@ -249,6 +276,17 @@ export function ConstraintEditorScreen() {
 }
 
 const inp = 'w-full rounded border border-stone-200 px-2 py-1 text-sm'
+
+function ColHeader({ icon: Icon, label, hint }: { icon: LucideIcon; label: string; hint?: string }) {
+  return (
+    <th className="px-2 py-1" title={hint}>
+      <span className="inline-flex items-center gap-1.5 text-stone-500">
+        <Icon size={12} className="text-stone-400" />
+        {label}
+      </span>
+    </th>
+  )
+}
 
 function NumberCell({ value, onChange }: { value: number | null | undefined; onChange: (v: number | null) => void }) {
   const [local, setLocal] = useState(value === null || value === undefined ? '' : String(value))
