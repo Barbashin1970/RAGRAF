@@ -124,6 +124,7 @@ import {
   sandboxExtractResponseSchema,
   sandboxSearchResponseSchema,
   sandboxStatusSchema,
+  deleteRegulationResponseSchema,
   saveResponseSchema,
   searchResponseSchema,
   shaclImportResponseSchema,
@@ -190,7 +191,14 @@ export const api = {
         saveResponseSchema,
       ),
     raw: (id: string) => request<string>(`/api/regulations/${encodeURIComponent(id)}/raw`),
-    delete: (id: string) => request<null>(`/api/regulations/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+    /** Удаление регламента. Бэкенд требует ?confirm=true чтобы случайный
+     *  curl/код не сносил данные; UI всегда подтверждает через диалог. */
+    delete: (id: string) =>
+      request(
+        `/api/regulations/${encodeURIComponent(id)}?confirm=true`,
+        { method: 'DELETE' },
+        deleteRegulationResponseSchema,
+      ),
     history: (id: string) =>
       request(
         `/api/regulations/${encodeURIComponent(id)}/regulation-history`,

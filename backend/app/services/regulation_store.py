@@ -371,19 +371,29 @@ def restore(source_id: str, version_id: str) -> Regulation | None:
 
 
 def delete(source_id: str) -> bool:
-    """Полное удаление регламента из store. Возвращает True если был удалён."""
+    """Полное удаление регламента из store.
+
+    Удаляет head-запись, параметры и всю историю версий (иначе при создании
+    регламента с тем же slug-ом старая история «всплывёт»).
+    Возвращает True если был удалён, False если такого регламента не было.
+    """
     with _LOCK:
         c = _connection()
+        existed = c.execute(
+            "SELECT 1 FROM regulations WHERE source_id = ?", [source_id]
+        ).fetchone() is not None
+        if not existed:
+            return False
         c.begin()
         try:
             c.execute("DELETE FROM parameters WHERE source_id = ?", [source_id])
-            res = c.execute("DELETE FROM regulations WHERE source_id = ?", [source_id])
-            deleted = (res.fetchone() is None)  # for DuckDB just check after; simpler:
+            c.execute("DELETE FROM regulation_history WHERE source_id = ?", [source_id])
+            c.execute("DELETE FROM regulations WHERE source_id = ?", [source_id])
             c.commit()
         except Exception:
             c.rollback()
             raise
-    return True if has(source_id) is False else not deleted  # noqa: SIM210
+    return True
 
 
 # ---- Seeding ----------------------------------------------------------

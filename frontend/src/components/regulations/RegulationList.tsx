@@ -1,11 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Activity,
   AlertCircle,
+  AlertTriangle,
   Boxes,
-  ChevronRight,
   FileText,
   Loader2,
   type LucideIcon,
@@ -15,7 +15,9 @@ import {
   Search,
   Shield,
   Sliders,
+  Trash2,
   Workflow,
+  X,
 } from 'lucide-react'
 import { api, type Domain } from '@/lib/api'
 import { cn } from '@/lib/cn'
@@ -236,6 +238,7 @@ function DomainSection({
 }
 
 function RegulationCard({ reg, visual }: { reg: RegRow; visual: DomainVisual }) {
+  const [confirming, setConfirming] = useState(false)
   return (
     <article
       className={cn(
@@ -312,16 +315,109 @@ function RegulationCard({ reg, visual }: { reg: RegRow; visual: DomainVisual }) 
             colorClasses="border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100"
             iconColor="text-emerald-500"
           />
-          <Link
-            to={`/regulations/${reg.id}/edit`}
-            className="hidden h-8 w-8 items-center justify-center rounded-md text-stone-400 transition hover:bg-stone-100 hover:text-stone-700 sm:inline-flex"
-            title="Открыть редактор полей"
-          >
-            <ChevronRight size={16} />
-          </Link>
+          {/* Опасное действие — отдельной красной кнопкой, отбито отступом, чтобы
+              не нажать случайно в стопке action-button'ов соседних типов. */}
+          <div className="ml-1 border-l border-stone-200 pl-1.5">
+            <button
+              onClick={() => setConfirming(true)}
+              title="Удалить регламент"
+              aria-label={`Удалить ${reg.name}`}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-rose-200 bg-rose-50 text-rose-600 transition hover:border-rose-300 hover:bg-rose-100 hover:text-rose-700"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         </div>
       </div>
+
+      {confirming && (
+        <ConfirmDeleteDialog
+          regulationId={reg.id}
+          regulationName={reg.name}
+          onClose={() => setConfirming(false)}
+        />
+      )}
     </article>
+  )
+}
+
+function ConfirmDeleteDialog({
+  regulationId,
+  regulationName,
+  onClose,
+}: {
+  regulationId: string
+  regulationName: string
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const del = useMutation({
+    mutationFn: () => api.regulations.delete(regulationId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['datasets'] })
+      onClose()
+    },
+  })
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/30 backdrop-blur-[1px]"
+      onClick={() => !del.isPending && onClose()}
+    >
+      <div
+        className="w-full max-w-md rounded-lg border border-stone-200 bg-white shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-stone-200 px-5 py-3">
+          <h2 className="flex items-center gap-2 text-base font-semibold text-stone-900">
+            <AlertTriangle size={16} className="text-rose-500" />
+            Удалить регламент?
+          </h2>
+          <button
+            onClick={onClose}
+            disabled={del.isPending}
+            className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-40"
+            aria-label="Закрыть"
+          >
+            <X size={16} />
+          </button>
+        </div>
+        <div className="space-y-2 px-5 py-4 text-sm text-stone-700">
+          <p>
+            Будет удалён регламент <b>«{regulationName}»</b> <code className="rounded bg-stone-100 px-1 text-xs">{regulationId}</code>.
+          </p>
+          <p className="text-xs text-stone-500">
+            Удаляется запись из локального DuckDB, вся история версий, стартовый flow и snapshot'ы версий flow.
+            Действие <b>необратимо</b> — отката через UI нет.
+          </p>
+          <p className="text-xs text-stone-500">
+            Если регламент был засеян из фикстуры, он восстановится после следующего рестарта backend'а
+            (seed повторно создаст его из <code className="rounded bg-stone-100 px-1 text-[11px]">backend/data/fixtures/</code>).
+          </p>
+          {del.isError && (
+            <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+              Не удалось удалить: {(del.error as Error).message}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t border-stone-200 bg-stone-50 px-5 py-3">
+          <button
+            onClick={onClose}
+            disabled={del.isPending}
+            className="rounded-md border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+          >
+            Нет, оставить
+          </button>
+          <button
+            onClick={() => del.mutate()}
+            disabled={del.isPending}
+            className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-rose-700 disabled:opacity-60"
+          >
+            {del.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+            {del.isPending ? 'Удаляю…' : 'Да, удалить'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

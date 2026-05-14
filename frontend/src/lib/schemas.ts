@@ -174,6 +174,16 @@ export const saveResponseSchema = z.object({
   upstream_error: z.string().optional(),
 })
 
+export const deleteRegulationResponseSchema = z.object({
+  ok: z.boolean(),
+  regulation_id: z.string(),
+  deleted_from_store: z.boolean(),
+  deleted_flow_files: z.boolean(),
+  fixture_backed: z.boolean(),
+  upstream_status: z.string().nullable(),
+  note: z.string().nullable(),
+})
+
 export const shaclImportResponseSchema = z.object({
   merged_constraints: z.number(),
   conflicts: z.array(z.unknown()),

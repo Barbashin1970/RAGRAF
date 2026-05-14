@@ -35,6 +35,21 @@ def _versions_dir(regulation_id: str) -> Path:
     return d
 
 
+def delete_flow(regulation_id: str) -> bool:
+    """Удалить flow + всю папку версий регламента. Idempotent — нет файла → ok."""
+    import shutil
+    p = _flow_path(regulation_id)
+    deleted = False
+    if p.exists():
+        p.unlink()
+        deleted = True
+    versions_root = _data_root() / "versions" / regulation_id
+    if versions_root.exists():
+        shutil.rmtree(versions_root, ignore_errors=True)
+        deleted = True
+    return deleted
+
+
 def load_flow(regulation_id: str) -> RuleDSL | None:
     p = _flow_path(regulation_id)
     if not p.exists():

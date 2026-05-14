@@ -64,6 +64,29 @@ React Flow + Cytoscape + rest тянут ~1.05 MB JS-чанк. Сделать la
 ### Регуляторное расширение
 Из существующих NSK_OpenData_Bot YAML-файлов есть черновики на `traffic`, `industrial`, `power` домены. Можно конвертировать в наш формат и расширить покрытие.
 
+### Локальная LLM-интеграция для RAGU (Ollama / llama-server)
+*Complexity: средняя*
+
+Сейчас `RAGU_ENABLED=true` всё ещё требует облачного OpenAI-ключа или совместимого прокси. На M2 16GB можно крутить локально через Ollama без облака:
+
+**Стек:**
+- LLM: `qwen2.5:7b-instruct-q4_K_M` (~4.4 GB, ~20 tok/s на M2, хорошо знает русский)
+- Embedder: `bge-m3` (~1.2 GB, мультиязычный)
+- Runtime: Ollama (нативный Metal-бэкенд, OpenAI-совместимый API на `localhost:11434/v1`)
+
+**Что нужно сделать:**
+1. `docs/LOCAL_LLM.md` со step-by-step (`brew install ollama` → `ollama pull qwen2.5:7b-instruct-q4_K_M` → `ollama pull bge-m3` → правки в `.env`)
+2. `.env.example` — закомментированный ollama-блок: `OPENAI_BASE_URL=http://localhost:11434/v1`, `OPENAI_API_KEY=ollama`
+3. Health-check endpoint `/api/sandbox/llm-status` — пингует настроенную LLM, в шапке Песочницы зелёный/красный индикатор «LLM достижима»
+4. Связать `/api/sandbox/search` с реальным `ragu_service.search()` при `ragu_enabled=true` (сейчас всегда mock, даже при включённом флаге)
+
+**Тайминги (оценка):**
+- первичная индексация 10 регламентов: 1–2 минуты
+- LocalSearch query: ~2–4 сек
+- GlobalSearch query (сравнение, кросс-домены): ~10–20 сек
+
+**Tradeoff:** 16 GB unified memory впритык; параллельно с Claude Code и десятком Chrome-табов может уйти в swap. Перед индексацией стоит закрывать тяжёлое.
+
 ---
 
 ## Документация / DX

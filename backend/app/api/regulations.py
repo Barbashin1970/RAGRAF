@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from app.config import settings
 from app.schemas.domain import Regulation
 from app.services import fixtures, regulation_store, templates
-from app.services.flow_storage import save_flow
+from app.services.flow_storage import delete_flow as save_flow_module_delete, save_flow
 from app.services.regulation_client import client
 from app.services.templates import ensure_unique_source_id, slugify
 from app.services.turtle_bridge import parse_regulation_turtle, regulation_to_turtle
@@ -210,9 +210,57 @@ async def update_regulation_raw(source_id: str, turtle: str):
         raise HTTPException(status_code=502, detail=f"Upstream: {e}") from e
 
 
-@router.delete("/regulations/{source_id}", status_code=204)
-async def delete_regulation(source_id: str):
-    try:
-        await client.delete_data(source_id)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Upstream: {e}") from e
+@router.delete("/regulations/{source_id}")
+async def delete_regulation(source_id: str, confirm: bool = False) -> dict[str, Any]:
+    """Безопасное удаление регламента.
+
+    Защита: требуется явный query-param `?confirm=true`. Без него возвращаем
+    400, чтобы случайный DELETE из кода / curl не сносил данные молча.
+
+    Логика:
+      1. Удаляем из локального DuckDB store (включая историю версий регламента).
+      2. Удаляем `data/flows/{id}.json` + папку `data/versions/{id}/` (flow-история).
+      3. Если `WRITEBACK_UPSTREAM=true` — best-effort удаление из upstream Sigma;
+         если upstream вернул ошибку (нет регламента / сеть) — НЕ валим
+         запрос целиком, локально-то всё уже удалено. Сообщаем в ответе.
+
+    Защита от удаления фикстуры-сидера: если регламент пришёл из фикстуры и
+    в DuckDB ещё не редактировался, удаление снесёт его лишь до следующего
+    рестарта (где seed повторно засеит). Сообщаем об этом честно.
+    """
+    if not confirm:
+        raise HTTPException(
+            status_code=400,
+            detail="Удаление требует подтверждения. Добавь `?confirm=true` к запросу.",
+        )
+
+    local_existed = regulation_store.has(source_id)
+    fixture_backed = fixtures.has_fixture(source_id)
+    if not local_existed and not fixture_backed:
+        raise HTTPException(status_code=404, detail=f"Регламент '{source_id}' не найден")
+
+    deleted_from_store = regulation_store.delete(source_id)
+    deleted_flow = save_flow_module_delete(source_id)
+
+    upstream_status: str | None = None
+    if getattr(settings, "writeback_upstream", False):
+        try:
+            await client.delete_data(source_id)
+            upstream_status = "deleted"
+        except Exception as e:
+            upstream_status = f"error: {e}"
+
+    return {
+        "ok": True,
+        "regulation_id": source_id,
+        "deleted_from_store": deleted_from_store,
+        "deleted_flow_files": deleted_flow,
+        "fixture_backed": fixture_backed,
+        "upstream_status": upstream_status,
+        "note": (
+            "Этот регламент пришёл из фикстуры — после рестарта backend'а seed "
+            "восстановит его. Чтобы убрать навсегда, удали запись из "
+            "backend/app/services/fixtures.py."
+            if fixture_backed else None
+        ),
+    }
