@@ -2,13 +2,17 @@ import { Position, type NodeProps, type NodeTypes } from 'reactflow'
 import type { FlowNode } from '@/lib/api'
 import { BaseNode } from './BaseNode'
 
-// All seven node types share BaseNode chrome; differences are handles + body fields.
+// All seven node types share BaseNode chrome (Node-RED-style split block);
+// они отличаются только handles-конфигурацией и dеталями в body. Стили деталей —
+// через `.rf-node__detail` (см. styles.css → DESIGN_SYSTEM.md «Flow nodes»).
 
 function InputNode(p: NodeProps<FlowNode>) {
   return (
     <BaseNode {...p} outputs={[{ position: Position.Right }]}>
       {p.data.paramRef && (
-        <div className="mt-0.5 text-xs text-stone-600">парам: <b>{p.data.paramRef}</b></div>
+        <div className="rf-node__detail">
+          парам: <b>{p.data.paramRef}</b>
+        </div>
       )}
     </BaseNode>
   )
@@ -18,10 +22,10 @@ function ThresholdNode(p: NodeProps<FlowNode>) {
   return (
     <BaseNode {...p} inputs={[{ position: Position.Left }]} outputs={[{ position: Position.Right }]}>
       {p.data.refValue !== null && p.data.refValue !== undefined && (
-        <div className="mt-0.5 text-xs text-stone-600">
-          {p.data.refValue}{' '}
-          {p.data.deviation !== null && p.data.deviation !== undefined && <>± {p.data.deviation}</>}{' '}
-          {p.data.unit && <span className="text-stone-400">{p.data.unit}</span>}
+        <div className="rf-node__detail font-mono">
+          {p.data.refValue}
+          {p.data.deviation !== null && p.data.deviation !== undefined && <> ± {p.data.deviation}</>}
+          {p.data.unit && <span className="ml-1 text-stone-500">{p.data.unit}</span>}
         </div>
       )}
     </BaseNode>
@@ -41,7 +45,11 @@ function CompareNode(p: NodeProps<FlowNode>) {
         { id: 'false', position: Position.Bottom },
       ]}
     >
-      {p.data.operator && <div className="mt-0.5 text-xs text-stone-600">op: <b>{p.data.operator}</b></div>}
+      {p.data.operator && (
+        <div className="rf-node__detail">
+          op: <b>{p.data.operator}</b>
+        </div>
+      )}
     </BaseNode>
   )
 }
@@ -50,7 +58,7 @@ function FormulaNode(p: NodeProps<FlowNode>) {
   return (
     <BaseNode {...p} inputs={[{ position: Position.Left }]} outputs={[{ position: Position.Right }]}>
       {p.data.expression && (
-        <div className="mt-0.5 truncate font-mono text-[11px] text-stone-600">{p.data.expression}</div>
+        <div className="rf-node__detail truncate font-mono">{p.data.expression}</div>
       )}
     </BaseNode>
   )
@@ -66,7 +74,9 @@ function SwitchNode(p: NodeProps<FlowNode>) {
         ? cases.map((c, i) => ({ id: `case-${i}`, label: c.label, position: Position.Right }))
         : [{ position: Position.Right }]}
     >
-      {cases.length > 0 && <div className="mt-0.5 text-xs text-stone-600">{cases.length} ветв.</div>}
+      {cases.length > 0 && (
+        <div className="rf-node__detail">{cases.length} ветв.</div>
+      )}
     </BaseNode>
   )
 }
@@ -74,8 +84,10 @@ function SwitchNode(p: NodeProps<FlowNode>) {
 function OutputNode(p: NodeProps<FlowNode>) {
   return (
     <BaseNode {...p} inputs={[{ position: Position.Left }]}>
-      {p.data.text && <div className="mt-0.5 line-clamp-2 text-xs text-stone-700">{p.data.text}</div>}
-      {p.data.priority && <div className="mt-0.5 text-[10px] text-stone-500">приоритет {p.data.priority}</div>}
+      {p.data.text && <div className="rf-node__detail line-clamp-2">{p.data.text}</div>}
+      {p.data.priority && (
+        <div className="rf-node__detail text-[10px] text-stone-500">приоритет {p.data.priority}</div>
+      )}
     </BaseNode>
   )
 }
@@ -84,7 +96,7 @@ function ShaclConstraintNode(p: NodeProps<FlowNode>) {
   return (
     <BaseNode {...p} inputs={[{ position: Position.Left }]} outputs={[{ position: Position.Right }]}>
       {p.data.constraintRef && (
-        <div className="mt-0.5 font-mono text-[11px] text-stone-600">{p.data.constraintRef}</div>
+        <div className="rf-node__detail font-mono">{p.data.constraintRef}</div>
       )}
     </BaseNode>
   )

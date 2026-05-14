@@ -30,6 +30,7 @@ import {
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { DOMAIN_VISUALS, getDomainVisual } from '@/lib/domains'
+import { Badge, Button, PageBody, PageHeader, PageShell, Tabs, type TabDef } from '@/components/ui'
 
 type Tab = 'search' | 'extract'
 
@@ -65,104 +66,91 @@ export function SandboxScreen() {
     queryFn: () => api.sandbox.status(),
   })
 
-  const modeBadge =
-    status?.mode === 'real' ? (
-      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-        RAGU подключён
-      </span>
-    ) : (
-      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">
-        mock-режим
-      </span>
-    )
+  const tabs: TabDef<Tab>[] = [
+    { id: 'search', label: 'Диалог с RAGU', icon: MessageSquare },
+    { id: 'extract', label: 'Извлечь параметры', icon: Wand2 },
+  ]
 
   return (
-    <div className="flex h-full flex-col bg-stone-50">
-      <header className="border-b border-stone-200 bg-white px-6 pb-3 pt-5">
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100">
-                <Beaker size={18} className="text-violet-700" />
-              </div>
-              <h1 className="text-2xl font-semibold tracking-tight text-stone-900">
-                Песочница
-              </h1>
-              {modeBadge}
-            </div>
-            <p className="mt-1 text-sm text-stone-500">
-              Демо-сценарии RAGU поверх наших регламентов — изолированно от основного функционала.
-              {status?.mode === 'mock' && (
-                <>
-                  {' '}Сейчас работает <b>mock-режим</b> (keyword scoring + regex) —{' '}
-                  <b>без LLM-ключей и внешних сервисов</b>. Чтобы включить настоящий RAGU,
-                  нужны pip-установка <code className="rounded bg-stone-100 px-1 text-xs">graph_ragu</code>{' '}
-                  и доступ к LLM (облачный ключ или локальный llama-server) — см. справку справа.
-                </>
-              )}
-            </p>
-            <LLMStatusBar />
-          </div>
-          <div className="hidden shrink-0 items-center gap-2 sm:flex">
-            {/* «Что такое RAGU?» — раскрывает подробную справку для руководителя.
-                Раньше блок висел всегда и съедал полстраницы; теперь по требованию. */}
-            <button
+    <PageShell>
+      <PageHeader
+        icon={Beaker}
+        tone="author"
+        title="Студия аналитика"
+        badges={
+          <>
+            {status?.mode === 'real' ? (
+              <Badge tone="success" dot>RAGU подключён</Badge>
+            ) : (
+              <Badge tone="warning">mock-режим</Badge>
+            )}
+            <Badge tone="author" uppercase>Author Layer</Badge>
+          </>
+        }
+        description={
+          <>
+            ИИ-помощник для разбора документов (приказы, СНиПы, регламенты) и сборки
+            структурированных регламентов. Сами регламенты живут в разделе{' '}
+            <Link to="/regulations" className="font-medium text-stone-700 underline-offset-2 hover:underline">
+              «Регламенты»
+            </Link>
+            , исполняются в будущем разделе «Исполнение» (runtime, без ИИ —
+            детерминированно по датчикам).
+            {status?.mode === 'mock' && (
+              <>
+                {' '}Сейчас <b>mock-режим</b> (без LLM-ключей и внешних сервисов) —
+                см. справку справа про переключение на настоящий RAGU.
+              </>
+            )}
+          </>
+        }
+        actions={
+          <div className="hidden items-center gap-2 sm:flex">
+            <Button
+              variant="author"
+              icon={<BookOpen size={14} />}
+              iconRight={
+                <ChevronDown
+                  size={14}
+                  className={cn('transition-transform', showInfo && 'rotate-180')}
+                />
+              }
               onClick={() => setShowInfo((v) => !v)}
-              title="Краткая справка: что такое RAGU и зачем она в связке с RAGRAF"
               aria-expanded={showInfo}
-              className={cn(
-                'group inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium shadow-sm transition',
-                showInfo
-                  ? 'border-violet-300 bg-violet-100 text-violet-900'
-                  : 'border-violet-200 bg-violet-50 text-violet-800 hover:border-violet-300 hover:bg-violet-100 hover:shadow',
-              )}
+              title="Краткая справка: что такое RAGU и зачем она в связке с RAGRAF"
+              className={cn(!showInfo && 'bg-violet-500')}
             >
-              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-violet-200/70 group-hover:bg-violet-200">
-                <BookOpen size={14} className="text-violet-700" />
-              </span>
-              <span className="leading-tight">
-                <span className="block">Что такое RAGU?</span>
-                <span className="block text-[10px] font-normal text-violet-700/80">
-                  {showInfo ? 'скрыть справку' : 'короткое объяснение'}
-                </span>
-              </span>
-              <ChevronDown
-                size={14}
-                className={cn('text-violet-500 transition-transform', showInfo && 'rotate-180')}
-              />
-            </button>
-            <Link
-              to="/sandbox/backlog"
-              title="Бэклог: следующие RAGU-сценарии (Knowledge Graph, сравнение регламентов, авто-классификация, Q&A)"
-              className="group inline-flex shrink-0 items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 shadow-sm transition hover:border-amber-300 hover:bg-amber-100 hover:shadow"
-            >
-              <span className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-200/70 group-hover:bg-amber-200">
-                <Lightbulb size={14} className="text-amber-700" />
-              </span>
-              <span className="leading-tight">
-                <span className="block">Бэклог демо</span>
-                <span className="block text-[10px] font-normal text-amber-700/80">следующие сценарии RAGU</span>
-              </span>
-              <ChevronRight size={14} className="text-amber-500 transition group-hover:translate-x-0.5" />
+              {showInfo ? 'Скрыть' : 'Что такое RAGU?'}
+            </Button>
+            <Link to="/sandbox/backlog" title="Бэклог: следующие RAGU-сценарии">
+              <Button
+                variant="secondary"
+                icon={<Lightbulb size={14} className="text-amber-600" />}
+                iconRight={<ChevronRight size={14} className="text-stone-400" />}
+              >
+                Бэклог демо
+              </Button>
             </Link>
           </div>
-        </div>
-
-        {/* Info-блок: появляется только по клику «Что такое RAGU?». Полная версия
-            справки живёт на странице бэклога — здесь короткая выжимка. */}
+        }
+      >
+        {/* Info-блок: появляется только по клику «Что такое RAGU?» — компактная
+            выжимка, полная версия живёт на странице бэклога. */}
         {showInfo && (
           <div className="mt-3 rounded-md border border-violet-200 bg-gradient-to-br from-violet-50/80 to-white p-3 text-xs text-stone-700 shadow-sm">
             <div className="mb-1 flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-violet-700">
                 <BookOpen size={12} /> RAGU + RAGRAF — что это и зачем
               </div>
-              <button
+              <Button
+                size="sm"
+                variant="ghost"
                 onClick={() => setShowInfo(false)}
                 aria-label="Скрыть справку"
-                className="rounded p-0.5 text-violet-400 hover:bg-violet-100 hover:text-violet-700"
+                className="h-6 w-6 p-0 text-violet-400 hover:text-violet-700"
               >
                 <X size={12} />
-              </button>
+              </Button>
             </div>
             <p className="leading-relaxed">
               <b>RAGU</b> — движок <i>GraphRAG</i>, который понимает технические тексты:
@@ -203,44 +191,22 @@ export function SandboxScreen() {
           </div>
         )}
 
-        <div className="mt-4 inline-flex rounded-md border border-stone-200 bg-white p-0.5">
-          <TabButton active={tab === 'search'} onClick={() => setTab('search')} icon={MessageSquare} label="Диалог с RAGU" />
-          <TabButton active={tab === 'extract'} onClick={() => setTab('extract')} icon={Wand2} label="Извлечь параметры" />
-        </div>
-      </header>
+        <LLMStatusBar />
 
-      <div className="min-h-0 flex-1 overflow-auto p-6">
+        <div className="mt-4">
+          <Tabs tabs={tabs} active={tab} onChange={setTab} tone="author" />
+        </div>
+      </PageHeader>
+
+      <PageBody>
         {tab === 'search' && <SearchDemo />}
         {tab === 'extract' && <ExtractDemo />}
-      </div>
-    </div>
+      </PageBody>
+    </PageShell>
   )
 }
 
-function TabButton({
-  active,
-  onClick,
-  icon: Icon,
-  label,
-}: {
-  active: boolean
-  onClick: () => void
-  icon: typeof Beaker
-  label: string
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded px-3 py-1.5 text-sm font-medium transition',
-        active ? 'bg-violet-100 text-violet-800' : 'text-stone-600 hover:bg-stone-50',
-      )}
-    >
-      <Icon size={13} />
-      {label}
-    </button>
-  )
-}
+// TabButton удалён — замещён `<Tabs>` из @/components/ui (DESIGN_SYSTEM.md §2).
 
 // ── LLM Status Bar ─────────────────────────────────────────────────────
 //
@@ -417,10 +383,12 @@ function SearchDemo() {
   return (
     <div className="mx-auto flex h-full max-w-3xl flex-col">
       <div className="mb-3 rounded-md border border-blue-100 bg-blue-50/40 px-4 py-3 text-xs text-blue-900">
-        Диалог с RAGU поверх корпуса регламентов. Каждый вопрос → retrieval релевантных
-        регламентов (TF-IDF + русский стем) → ответ от локальной LLM (Ollama / phi3) с
-        опорой ТОЛЬКО на найденные документы. История разговора держится в памяти — можно
-        задавать follow-up'ы вроде «а ночью?» после «куда звонить при пожаре?».
+        Диалог с RAGU поверх корпуса регламентов. Каждый вопрос → семантический retrieval
+        через embedding-модель (cosine similarity на bge-m3) → ответ от локальной LLM
+        с опорой ТОЛЬКО на найденные документы. История разговора держится в памяти —
+        follow-up'ы вроде «а ночью?» после «куда звонить при пожаре?» работают.
+        Конкретная модель и состояние стека — в полоске под заголовком; параметры
+        генерации (temperature, top-k, лимит длины) — за шестерёнкой справа от «Отправить».
       </div>
 
       {/* Лента сообщений */}

@@ -16,21 +16,97 @@ body { font-family: 'Inter', system-ui, sans-serif; }
 /* Cytoscape container default */
 .cy-canvas { width: 100%; height: 100%; }
 
-/* React Flow node-type colors — see regulation-viz-skill.md § Design System */
+/* ── React Flow nodes — Node-RED-style split blocks ──────────────────────
+ *
+ * Шаблон визуала заимствован из Node-RED Designer: каждая нода — это узкая
+ * двух-секционная плашка с тёмной icon-секцией слева (где иконка типа белым)
+ * и светлой body-секцией справа (где текст). Это классический enterprise-flow
+ * стиль (Camunda, Node-RED, n8n) — узнаваемый и читаемый на canvas'е.
+ *
+ * Структура DOM:
+ *   .rf-node
+ *     .rf-node__icon  (slot 0, ~32px wide, dark accent)
+ *     .rf-node__body  (slot 1, flex-1, label + optional details)
+ *
+ * Цвет задаётся модификатором .rf-node--<kind>: tone-700 для icon-секции,
+ * tone-50/100 для body. Через `currentColor` и CSS-переменные не идём — простой
+ * @apply из tailwind-палитры достаточно и предсказуем при отладке.
+ */
 .rf-node {
-  @apply rounded-md border bg-white px-3 py-2 text-sm shadow-sm transition;
-  min-width: 140px;
+  @apply flex overflow-hidden rounded-md border text-sm shadow-sm transition;
+  min-width: 170px;
+  font-family: 'Inter', system-ui, sans-serif;
 }
-.rf-node--input       { @apply bg-accent-success-highlight   border-accent-success; }
-.rf-node--threshold   { @apply bg-accent-blue-highlight      border-accent-blue; }
-.rf-node--compare     { @apply bg-accent-gold-highlight      border-accent-gold; }
-.rf-node--formula     { @apply bg-accent-purple-highlight    border-accent-purple; }
-.rf-node--switch      { @apply bg-accent-orange-highlight    border-accent-orange; }
-.rf-node--output      { @apply bg-accent-notification-highlight border-accent-notification; }
-.rf-node--shacl_constraint { @apply bg-surface-offset border-stone-300 border-dashed; }
+.rf-node__icon {
+  @apply flex h-full w-10 shrink-0 items-center justify-center text-white;
+}
+.rf-node__body {
+  @apply min-w-0 flex-1 px-3 py-2;
+}
+.rf-node__kind {
+  @apply text-[9px] font-medium uppercase tracking-wide opacity-70;
+}
+.rf-node__label {
+  @apply truncate text-sm font-semibold text-stone-900;
+}
+.rf-node__detail {
+  @apply mt-0.5 text-xs leading-snug text-stone-700;
+}
 
-.rf-node--error { @apply ring-2 ring-accent-notification; }
-.rf-node--selected { @apply ring-2 ring-primary; }
+/* ── Tone modifiers (per node kind) — Node-RED palette inspirations ─────
+ * input    = green  (sensor in)
+ * threshold= blue   (range / scale)
+ * compare  = amber  (decision)
+ * formula  = purple (compute)
+ * switch   = orange (route)
+ * output   = red    (action out / notify)
+ * shacl    = stone  (constraint, dashed border)
+ */
+.rf-node--input       { @apply border-emerald-400 bg-emerald-50; }
+.rf-node--input       .rf-node__icon { @apply bg-emerald-600; }
+
+.rf-node--threshold   { @apply border-sky-400 bg-sky-50; }
+.rf-node--threshold   .rf-node__icon { @apply bg-sky-600; }
+
+.rf-node--compare     { @apply border-amber-400 bg-amber-50; }
+.rf-node--compare     .rf-node__icon { @apply bg-amber-600; }
+
+.rf-node--formula     { @apply border-violet-400 bg-violet-50; }
+.rf-node--formula     .rf-node__icon { @apply bg-violet-600; }
+
+.rf-node--switch      { @apply border-orange-400 bg-orange-50; }
+.rf-node--switch      .rf-node__icon { @apply bg-orange-600; }
+
+.rf-node--output      { @apply border-rose-400 bg-rose-50; }
+.rf-node--output      .rf-node__icon { @apply bg-rose-600; }
+
+.rf-node--shacl_constraint              { @apply border-dashed border-stone-400 bg-stone-50; }
+.rf-node--shacl_constraint .rf-node__icon { @apply bg-stone-500; }
+
+.rf-node--error    { @apply ring-2 ring-rose-500 ring-offset-1; }
+.rf-node--selected { @apply ring-2 ring-primary ring-offset-1; }
+
+/* ── Handles (порт-точки) — visually small, on the edge ─────────────────
+ * React Flow по умолчанию рисует крупные круги; уменьшаем до 8px и красим
+ * под тон ноды — это node-red-look (порты-«полусферы»). */
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  border: 2px solid white;
+  background: #475569;
+}
+
+/* ── Status-bar под нодой (мини-индикатор валидации, аналог Node-RED ────
+ *    "connected"/"error" дотов).
+ *    Используется через дочерний элемент .rf-node-status в BaseNode. */
+.rf-node-status {
+  @apply mt-1 inline-flex items-center gap-1 rounded-full bg-white/80 px-1.5 py-0.5 text-[9px] font-medium shadow-sm;
+}
+.rf-node-status--ok    { @apply text-emerald-700; }
+.rf-node-status--error { @apply text-rose-700; }
+.rf-node-status__dot   { @apply h-1.5 w-1.5 rounded-full; }
+.rf-node-status--ok    .rf-node-status__dot { @apply bg-emerald-500; }
+.rf-node-status--error .rf-node-status__dot { @apply bg-rose-500; }
 
 /* ── Softer slider track (используется в Regulation Editor → Слайдеры) ──
  * Стандартный <input type="range"> в WebKit/Firefox рисует track в тёмно-сером

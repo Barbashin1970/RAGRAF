@@ -4,6 +4,119 @@
 
 ---
 
+## 🏛️ Архитектурная программа: Author / Execute split
+
+**Идея.** В RAGRAF два разных типа ИИ с разными ролями: **ИИ-аналитик** (LLM+RAGU, работает редко, разбирает документы) и **ИИ-исполнитель** (детерминированные Rule DSL Flow + параметры, работает на каждое событие, без LLM). UI должен это явно отражать — иначе руководитель видит «непредсказуемая AI-игрушка» вместо «enterprise-tool с понятной экономикой».
+
+**Прецеденты в индустрии:** Camunda (Modeler/Cockpit/Tasklist), Node-RED (Designer/Runtime/Dashboard), Power Automate, Siemens TIA Portal. Везде — раздельные интерфейсы для **дизайна** и **исполнения**.
+
+### Phase 1 · Переименование + субшапка (быстро, ~30 мин)
+*Complexity: низкая*
+
+- «Песочница» → «Студия аналитика» в навигации (`App.tsx`, текущая `/sandbox` route)
+- В шапке Песочницы — короткое позиционирование: «здесь ИИ помогает аналитику разобрать документы и собрать структурированные регламенты. Сами регламенты живут и исполняются в разделе „Регламенты"»
+- Добавить заглушку-таб «Исполнение» (disabled, tooltip «coming soon — симулятор событий, привязка датчиков, webhooks»)
+
+**Цель:** через 5 секунд глядя на UI пользователь понимает что есть **студия** (Author) и **исполнение** (Execute).
+
+### Phase 1.5 · Design System (необходимая основа для Phase 2)
+*Complexity: средняя*
+
+Сейчас каждый экран в своём стиле — разные шапки, разные цвета кнопок, разные отступы. Перед тем как делать левый sidebar (Phase 2), фиксируем единый визуальный язык.
+
+**Идея цветовой роли (соответствует Author/Execute split):**
+- Author Layer (Студия аналитика) → `accent.purple` (#6B46C1, violet) — «здесь работает ИИ»
+- Model Layer (Регламенты) → `primary` (#2C7A7B, teal) — «структурированные данные»
+- Execute Layer (Исполнение, в будущем) → `accent.blue` (#3182CE, blue) — «runtime, поток сигналов»
+- Domain-цвета на карточках регламентов остаются (heating=orange, housing=blue, safety=rose, environment=emerald) — у них семантика
+
+**Что делаем:**
+
+1. **Tokens — уже есть в `tailwind.config.js` (Nexus-палитра)**, но используются хаотично. Фиксируем дисциплину: никаких прямых `bg-violet-*` / `bg-stone-*` в продуктовом коде, только через семантические токены или ui-примитивы.
+
+2. **Базовые примитивы в `src/components/ui/`:**
+   - `<PageShell>` — внешний контейнер (bg, padding, scroll)
+   - `<PageHeader>` — иконка + title + бейджи + хлебные крошки + actions-slot справа
+   - `<Section>` — bordered-card area с опциональным заголовком
+   - `<Button>` — варианты `primary | secondary | ghost | danger`, размеры `sm | md`
+   - `<Badge>` — тона `info | success | warning | danger | neutral | author | execute`
+   - `<Tabs>` — горизонтальные табы
+   - `<EmptyState>` — для «нет данных»
+   - `<KeyValue>` — inspector-row (`label : value`)
+   - `<Toolbar>` — bordered bar для action-кнопок (используется в editor'ах)
+
+3. **Reference screen:** SandboxScreen — рефакторим первым, показывает все паттерны.
+
+4. **Документ** `frontend/DESIGN_SYSTEM.md` — конвенции, примеры, do/don't.
+
+5. **Migration queue (последующие сессии, по одному экрану в раз):**
+   - RegulationList (приоритет: самая видимая страница)
+   - RegulationEditorScreen + RegulationHeader
+   - FlowEditorScreen
+   - ConstraintEditorScreen
+   - GraphView
+   - SandboxBacklog
+
+**Принципы:**
+- Не ломаем функциональность — только визуал
+- Каждый экран мигрируется атомарно, в одном коммите
+- После миграции — обновляем DESIGN_SYSTEM.md если паттерн уточнился
+
+### Phase 2 · Левый sidebar с тремя разделами (средне, ~2-3 ч)
+*Complexity: средняя*
+
+Переделать навигацию из плоских табов в шапке на левый sidebar (как Camunda Cockpit / Node-RED / TIA):
+
+```
+RAGRAF
+├─ 🧠 СТУДИЯ АНАЛИТИКА           (Author Layer, "ИИ-помощник")
+│  ├─ Диалог с базой           ← /sandbox?tab=search (chat)
+│  ├─ Извлечь из документа     ← /sandbox?tab=extract
+│  ├─ Поиск по корпусу         ← (будущее, отделить от чата)
+│  └─ Сравнение регламентов    ← (бэклог: #4 compare)
+│
+├─ 📚 РЕГЛАМЕНТЫ                 (Model Layer, "Структура")
+│  ├─ Список / по доменам      ← /regulations
+│  ├─ Карта связей             ← /graph
+│  └─ <Регламент>              ← редактор с табами Поля/Поток/Ограничения
+│
+└─ ⚙️ ИСПОЛНЕНИЕ                  (Execute Layer, "Runtime") — заглушка с roadmap
+   ├─ Симулятор события        ← coming-soon (Phase 3 ниже)
+   ├─ Привязка датчиков        ← coming-soon
+   ├─ Действия / Webhooks      ← coming-soon
+   ├─ Журнал срабатываний      ← coming-soon
+   └─ Мониторинг порогов       ← coming-soon
+```
+
+Шапка остаётся для проекта/пользователя/глобального поиска (Cmd-K в будущем). Чек-боксы из доменов / фильтры — в самом разделе «Регламенты».
+
+### Phase 3 · Execute Layer (большая работа, неделя+)
+*Complexity: высокая*
+
+См. отдельный пункт ниже «Event-driven execution» — это и есть Phase 3, но детально расписанный по компонентам.
+
+**Заимствуем из Node-RED:**
+- Палитра датчиков слева (как drag-and-drop nodes в Node-RED Designer): MQTT, HTTP webhook, OPC-UA, Modbus
+- При drag на INPUT-узел регламента — авто-сопоставление по типу (давление → датчики типа `pressure`)
+- Цветовая кодировка: input=зелёный (есть сейчас), processing=жёлтый, output=красный, sensor binding=голубой
+- Status badge на узлах: ✓ connected / ⚠ no signal / ⛔ error
+
+**Заимствуем из Camunda Cockpit:**
+- **Process instance view** — каждое сработавшее правило = «инстанс», с историей шагов
+- **Incidents list** — список текущих отклонений, отсортированный по `level`
+- **Heatmap** на Flow — какие узлы срабатывают чаще, где задержки
+- **Audit log** — кто, когда, какой регламент, какие данные, какое решение
+
+### Phase 4 · Enterprise polish (после Phase 3)
+*Complexity: средняя*
+
+- Status bar внизу (БД, время отклика, режим mock/real, текущий пользователь) — есть частично в LLMStatusBar, поднять на уровень приложения
+- User menu (профиль, роль, выйти) — нет
+- Глобальный поиск Cmd-K (как Linear, Notion) — нет
+- Role-based UI: «Аналитик» видит только Студию, «Оператор» только Исполнение, «Методист» всё — нет
+
+---
+
 ## RAGU-песочница: следующие демо
 
 ### #3 · Knowledge Graph всех регламентов
@@ -63,6 +176,58 @@ React Flow + Cytoscape + rest тянут ~1.05 MB JS-чанк. Сделать la
 
 ### Регуляторное расширение
 Из существующих NSK_OpenData_Bot YAML-файлов есть черновики на `traffic`, `industrial`, `power` домены. Можно конвертировать в наш формат и расширить покрытие.
+
+### Event-driven execution (Sigma-style) + датчики на INPUT + API на OUTPUT
+*Complexity: средняя–высокая*
+
+Описано в Rules-Management.pdf, раздел «Исполнение регламента»: Sigma принимает sensor-события через ETL, делает SPARQL-запрос к онтологии, возвращает обогащённое событие с `level` критичности и `recommendation`.
+
+У нас вся структура для этого УЖЕ есть (Regulation + Parameter + Rule DSL Flow + Recommendation), но не хватает runtime-слоя. Без SPARQL — через DuckDB SQL + Python-thresholding (нам так проще и быстрее, ~10мс vs RDF/SPARQL).
+
+**Что добавить:**
+
+1. **Sensor binding на узлах INPUT** во Flow Editor. Сейчас INPUT-нода только мапит на `paramRef` (имя параметра). Добавить поле `sensor_binding`:
+   ```
+   {
+     "kind": "ollama" | "mqtt" | "http_poll" | "webhook",
+     "endpoint": "http://...",
+     "topic": "sensors/teploset/edge-1/pressure",
+     "polling_interval_sec": 5
+   }
+   ```
+   В property-panel правого сайдбара — селект `kind` + URL/topic.
+
+2. **Action на узлах OUTPUT.** Сейчас output только возвращает текст рекомендации. Добавить `api_action`:
+   ```
+   {
+     "method": "POST",
+     "url": "https://operator.local/notify",
+     "headers": { "Authorization": "Bearer ..." },
+     "body_template": {
+       "level": "{{level}}",
+       "recommendation": "{{recommendation}}",
+       "edge_id": "{{context.edge_id}}"
+     }
+   }
+   ```
+   Jinja-like templating с контекстом события.
+
+3. **Engine `/api/sandbox/match-event`** (без LLM):
+   - Вход: `{ type, value, reference?, context? }`
+   - Lookup регламент(ов) с этим параметром через DuckDB
+   - Применить threshold-логику (`level = 1 if |Δ| ≤ dev else 2 if |Δ| ≤ 2*dev else 3`)
+   - Вернуть enriched event с регламентом, level, рекомендацией
+   - Опционально: если у output-ноды задан `api_action`, выполнить webhook (sandbox-режим: только preview, в проде — реально вызывать)
+
+4. **UI: вкладка «Симулятор события»** в Песочнице — форма с input'ами type/value/reference, превью enriched event с подсветкой какие узлы Flow сработали, dry-run webhook'а.
+
+5. **Production mode (бэклог-уровень-2): live-stream listener** — backend держит постоянное соединение по MQTT/SSE к ETL Sigmы, обрабатывает поток событий, эскалирует через webhooks.
+
+**Архитектурная ценность:** показывает «Sigma делает то же самое, но через SPARQL и RDF-store; у нас типизированные Pydantic-регламенты + DuckDB → ровно та же семантика без онтологического оверхеда». Это **наш ключевой архитектурный аргумент** против полного RDF-стека.
+
+**Tradeoff:** webhook'и из chat-режима — security risk если не контролировать URL'ы. В sandbox-режиме делать только dry-run + явный allowlist на проде.
+
+---
 
 ### Локальная LLM-интеграция для RAGU (Ollama / llama-server)
 *Complexity: средняя*

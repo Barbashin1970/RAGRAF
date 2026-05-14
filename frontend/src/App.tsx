@@ -1,5 +1,5 @@
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { Activity, Beaker, BookOpen, ExternalLink, FileJson, ListTree } from 'lucide-react'
+import { Activity, Beaker, BookOpen, ExternalLink, FileJson, ListTree, PlayCircle } from 'lucide-react'
 import { GraphView } from '@/components/graph/GraphView'
 import { RegulationList } from '@/components/regulations/RegulationList'
 import { RegulationEditorScreen } from '@/components/regulations/RegulationEditorScreen'
@@ -25,6 +25,39 @@ function NavLink({ to, icon: Icon, label }: { to: string; icon: typeof Activity;
       <Icon size={16} />
       {label}
     </Link>
+  )
+}
+
+/**
+ * Заглушка для будущего раздела «Исполнение» (Phase 3 архитектурной программы):
+ * симулятор событий, привязка датчиков (Node-RED-style), webhooks на OUTPUT,
+ * журнал срабатываний, мониторинг порогов. Сейчас disabled-кнопка с tooltip'ом —
+ * показывает roadmap. См. BACKLOG.md → «Event-driven execution».
+ */
+function ExecutionPlaceholder() {
+  return (
+    <div className="group relative">
+      <button
+        disabled
+        className="inline-flex cursor-not-allowed items-center gap-2 rounded-md px-3 py-1.5 text-sm text-stone-400 opacity-70"
+        type="button"
+      >
+        <PlayCircle size={16} />
+        Исполнение
+        <span className="rounded-full bg-stone-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-stone-500">
+          скоро
+        </span>
+      </button>
+      <div className="pointer-events-none invisible absolute left-0 top-full z-50 mt-1 w-72 rounded-md border border-stone-200 bg-white p-3 text-xs text-stone-700 shadow-lg opacity-0 transition group-hover:visible group-hover:opacity-100">
+        <div className="mb-1.5 font-semibold text-stone-900">Runtime для регламентов</div>
+        <p className="leading-relaxed text-stone-600">
+          Симулятор событий, привязка датчиков (как в Node-RED), webhook-действия на
+          OUTPUT, журнал срабатываний и мониторинг порогов. Здесь регламенты работают{' '}
+          <b>детерминированно, без LLM</b> — на каждое сообщение от датчика.
+        </p>
+        <div className="mt-2 text-[10px] text-stone-400">Архитектурная программа: см. BACKLOG.md → Author/Execute split</div>
+      </div>
+    </div>
   )
 }
 
@@ -93,10 +126,15 @@ export default function App() {
     <div className="flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-stone-200 bg-white px-4 py-2">
         <div className="mr-2 text-lg font-semibold text-primary">RAGRAF</div>
-        <nav className="flex gap-1">
+        {/* Навигация отражает Author/Execute split (см. BACKLOG → Phase 1).
+            «Студия аналитика» — где LLM/RAGU помогают разобрать документы;
+            «Регламенты» — структурированные модели (data layer);
+            «Исполнение» — runtime (event-mode), пока заглушка с roadmap. */}
+        <nav className="flex items-center gap-1">
+          <NavLink to="/sandbox" icon={Beaker} label="Студия аналитика" />
           <NavLink to="/regulations" icon={ListTree} label="Регламенты" />
-          <NavLink to="/graph" icon={Activity} label="Граф" />
-          <NavLink to="/sandbox" icon={Beaker} label="Песочница" />
+          <NavLink to="/graph" icon={Activity} label="Граф связей" />
+          <ExecutionPlaceholder />
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden text-xs text-stone-500 lg:inline">

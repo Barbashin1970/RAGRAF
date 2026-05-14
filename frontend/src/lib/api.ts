@@ -331,12 +331,29 @@ export const api = {
   },
 }
 
-export const NODE_KIND_META: Record<NodeKind, { label: string; className: string; description: string }> = {
-  input:             { label: 'Вход',         className: 'rf-node--input',     description: 'Параметр на вход' },
-  threshold:         { label: 'Порог',        className: 'rf-node--threshold', description: 'Эталон ± отклонение' },
-  compare:           { label: 'Сравнить',     className: 'rf-node--compare',   description: 'Сравнение со значением' },
-  formula:           { label: 'Формула',      className: 'rf-node--formula',   description: 'Выражение JS-like' },
-  switch:            { label: 'Развилка',     className: 'rf-node--switch',    description: 'Маршрут по значениям' },
-  output:            { label: 'Выход',        className: 'rf-node--output',    description: 'Действие / рекомендация' },
-  shacl_constraint:  { label: 'SHACL',        className: 'rf-node--shacl_constraint', description: 'Внешнее ограничение SHACL' },
+// Node-RED-style: каждый тип узла имеет свою иконку. В palette (Toolbox) и на
+// canvas (FlowEditor) рисуется как split-block: тёмная иконка-секция слева +
+// светлая label-секция справа. Точная семантика выбора см. NODE_KIND_META.
+import type { LucideIcon } from 'lucide-react'
+import {
+  ArrowDownToLine,
+  Calculator,
+  GitBranch,
+  LogIn,
+  ScanLine,
+  Send,
+  Shield,
+} from 'lucide-react'
+
+export const NODE_KIND_META: Record<
+  NodeKind,
+  { label: string; className: string; description: string; icon: LucideIcon }
+> = {
+  input:             { label: 'Вход',     className: 'rf-node--input',     description: 'Параметр на вход',           icon: LogIn },
+  threshold:         { label: 'Порог',    className: 'rf-node--threshold', description: 'Эталон ± отклонение',         icon: ScanLine },
+  compare:           { label: 'Сравнить', className: 'rf-node--compare',   description: 'Сравнение со значением',      icon: ArrowDownToLine },
+  formula:           { label: 'Формула',  className: 'rf-node--formula',   description: 'Выражение JS-like',           icon: Calculator },
+  switch:            { label: 'Развилка', className: 'rf-node--switch',    description: 'Маршрут по значениям',        icon: GitBranch },
+  output:            { label: 'Выход',    className: 'rf-node--output',    description: 'Действие / рекомендация',     icon: Send },
+  shacl_constraint:  { label: 'SHACL',    className: 'rf-node--shacl_constraint', description: 'Внешнее ограничение SHACL', icon: Shield },
 }
