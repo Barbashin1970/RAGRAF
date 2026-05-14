@@ -170,11 +170,15 @@ Inline-бейдж для статусов / тегов / мета-инфо. То
 
 | Экран | Статус | Заметка |
 |---|---|---|
-| SandboxScreen | ✅ migrated | Reference |
-| RegulationList | ⏳ pending | Phase 1.5 |
-| RegulationEditorScreen | ⏳ pending | Phase 1.5 |
-| FlowEditorScreen | ⏳ pending | Phase 1.5 |
-| ConstraintEditorScreen | ⏳ pending | Phase 1.5 |
-| GraphView | ⏳ pending | Phase 1.5 |
-| SandboxBacklog | ⏳ pending | Phase 1.5 |
-| CreateRegulationDialog | ⏳ pending | Phase 1.5 |
+| SandboxScreen | ✅ migrated | Reference screen: PageHeader+PageBody+Tabs+Badge+Button |
+| RegulationList | ✅ migrated | PageHeader (Model Layer), EmptyState, Stat-helper, Button+confirm dialog |
+| RegulationHeader (shared) | ✅ migrated | TabSwitcher → Tabs primitive (tone=primary) |
+| RegulationEditorScreen | ✅ migrated | Action-toolbar через Button-варианты, sub-tabs (Поля/Слайдеры/Turtle) → Tabs |
+| CreateRegulationDialog | ✅ migrated | Footer-кнопки через Button (включая «Извлечь из текста» — variant=author) |
+| FlowEditorScreen | ✅ migrated (actions) | Toolbar (Проверить/Сохранить/История) через Button. Node-RED split-блоки в canvas — отдельно (см. ниже). |
+| ConstraintEditorScreen | ✅ migrated (actions) | Импорт/Экспорт/Сохранить через Button. Import — спецслучай через `<label>` для file-input'а. |
+| GraphView | ✅ migrated (partial) | Domain-tabs → Tabs primitive. Full-bleed canvas сохранён (без PageHeader — специализированный экран). |
+| SandboxBacklog | ✅ migrated | PageShell + PageHeader (tone=author) + Button («Назад в студию»). |
+
+**Дополнительно:**
+- Flow nodes (`.rf-node` в `styles.css`) — собственный Node-RED-style паттерн (split icon-секция + body). Не относится к шапкам, отдельный domain UI-language.

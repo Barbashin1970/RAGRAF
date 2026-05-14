@@ -4,8 +4,8 @@ import { useSearchParams } from 'react-router-dom'
 import cytoscape, { type Core, type ElementDefinition, type NodeSingular } from 'cytoscape'
 import cola from 'cytoscape-cola'
 import { api, type CyNode } from '@/lib/api'
-import { cn } from '@/lib/cn'
 import { asCytoscapeLayout } from '@/lib/cytoscape-cola-types'
+import { Tabs, type TabDef } from '@/components/ui'
 
 cytoscape.use(cola)
 
@@ -127,37 +127,25 @@ export function GraphView() {
     }
   }
 
+  // Tabs primitive не умеет null-id, поэтому виртуальный '__all__' для опции «все».
+  const ALL_KEY = '__all__'
+  const domainTabs: TabDef<string>[] = [
+    ...domains.map((d) => ({ id: d.id, label: d.label })),
+    { id: ALL_KEY, label: 'все' },
+  ]
+
   return (
     <div className="flex h-full flex-col">
-      {/* Domain tabs */}
-      <div className="flex items-center gap-1 border-b border-stone-200 bg-white px-4 py-2 text-sm">
-        <span className="mr-2 text-xs uppercase tracking-wide text-stone-500">Домен</span>
-        {domains.map((d) => (
-          <button
-            key={d.id}
-            onClick={() => switchDomain(d.id)}
-            className={cn(
-              'rounded-md px-3 py-1.5 text-sm transition',
-              activeDomain === d.id
-                ? 'bg-primary text-white'
-                : 'text-stone-700 hover:bg-surface-offset',
-            )}
-          >
-            {d.label}
-          </button>
-        ))}
-        <button
-          onClick={() => switchDomain(null)}
-          className={cn(
-            'ml-1 rounded-md px-3 py-1.5 text-sm transition',
-            !activeDomain
-              ? 'bg-stone-700 text-white'
-              : 'text-stone-500 hover:bg-surface-offset',
-          )}
-          title="Показать все домены сразу"
-        >
-          все
-        </button>
+      {/* Domain-навигация. Не PageHeader — GraphView это full-bleed canvas-экран,
+          без title/description. Только сам переключатель доменов сверху. */}
+      <div className="flex items-center gap-3 border-b border-stone-200 bg-white px-4 py-2 text-sm">
+        <span className="text-xs uppercase tracking-wide text-stone-500">Домен</span>
+        <Tabs
+          tabs={domainTabs}
+          active={activeDomain ?? ALL_KEY}
+          onChange={(id) => switchDomain(id === ALL_KEY ? null : id)}
+          tone="primary"
+        />
       </div>
 
       <div className="flex min-h-0 flex-1">

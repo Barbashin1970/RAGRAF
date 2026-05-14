@@ -63,14 +63,20 @@ class EmbeddingIndex:
         return ". ".join(parts)
 
     async def rebuild(self) -> None:
-        """Пере-эмбеддит все регламенты. Зовётся когда signature не совпадает."""
+        """Пере-эмбеддит все регламенты. Зовётся когда signature не совпадает.
+
+        Sigma-audit P8: батчим все тексты в один embeddings.create(input=[...])
+        вместо N последовательных await'ов. Ollama батчит на сервере → 1 HTTP
+        round-trip вместо N. Для N>5 заметно быстрее, для N=1 эквивалентно.
+        """
         from openai import AsyncOpenAI
         client = AsyncOpenAI(
             base_url=settings.openai_base_url or None,
             api_key=settings.openai_api_key or "ollama",
             timeout=60.0,
         )
-        new_vectors: dict[str, list[float]] = {}
+        ids: list[str] = []
+        texts: list[str] = []
         for it in regulation_store.list_all():
             reg = regulation_store.get(it["id"])
             if reg is None:
@@ -78,12 +84,17 @@ class EmbeddingIndex:
             text = self._doc_text(reg)
             if not text.strip():
                 continue
+            ids.append(reg.id)
+            texts.append(text)
+
+        if texts:
             resp = await client.embeddings.create(
                 model=settings.ragu_embed_model,
-                input=text,
+                input=texts,
             )
-            new_vectors[reg.id] = list(resp.data[0].embedding)
-        self._vectors = new_vectors
+            self._vectors = {rid: list(d.embedding) for rid, d in zip(ids, resp.data)}
+        else:
+            self._vectors = {}
         self._signature = self.signature()
 
     async def search(self, query: str, top_k: int = 5) -> list[tuple[str, float]]:
@@ -103,9 +114,9 @@ class EmbeddingIndex:
             input=query,
         )
         qvec = list(resp.data[0].embedding)
-        scored: list[tuple[str, float]] = []
-        for rid, vec in self._vectors.items():
-            scored.append((rid, _cosine(qvec, vec)))
+        scored: list[tuple[str, float]] = [
+            (rid, _cosine(qvec, vec)) for rid, vec in self._vectors.items()
+        ]
         scored.sort(key=lambda x: x[1], reverse=True)
         return scored[:top_k]
 

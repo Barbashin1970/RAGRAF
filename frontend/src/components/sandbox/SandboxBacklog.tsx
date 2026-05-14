@@ -5,10 +5,12 @@ import {
   Brain,
   GitCompare,
   Layers,
+  Lightbulb,
   Network,
   ScanText,
   Search,
 } from 'lucide-react'
+import { Badge, Button, PageBody, PageHeader, PageShell } from '@/components/ui'
 
 interface BacklogItem {
   id: string
@@ -66,16 +68,23 @@ const COMPLEXITY_COLOR: Record<BacklogItem['complexity'], string> = {
 
 export function SandboxBacklog() {
   return (
-    <div className="h-full overflow-auto bg-stone-50 p-6">
-      <div className="mx-auto max-w-3xl">
-        <Link to="/sandbox" className="mb-3 inline-flex items-center gap-1 text-xs text-stone-500 hover:text-stone-800">
-          <ArrowLeft size={12} /> Назад в песочницу
-        </Link>
-        <h1 className="text-2xl font-semibold text-stone-900">Бэклог RAGU-сценариев</h1>
-        <p className="mt-1 text-sm text-stone-500">
-          Идеи которые можно быстро поставить рядом с текущими демо. Не обязательно делать все —
-          реализуем когда станет ясно что нужно.
-        </p>
+    <PageShell>
+      <PageHeader
+        icon={Lightbulb}
+        tone="author"
+        title="Бэклог RAGU-сценариев"
+        badges={<Badge tone="author" uppercase>Author Layer · roadmap</Badge>}
+        description="Идеи которые можно быстро поставить рядом с текущими демо. Не обязательно делать все — реализуем когда станет ясно что нужно."
+        actions={
+          <Link to="/sandbox" title="Вернуться в Студию аналитика">
+            <Button variant="secondary" size="sm" icon={<ArrowLeft size={12} />}>
+              Назад в студию
+            </Button>
+          </Link>
+        }
+      />
+      <PageBody contained>
+        {/* Контент бэклога, оставлен внутри одной max-w-3xl колонки для читаемости. */}
 
         {/* Развёрнутое описание системы для руководителя — простой язык, конкретные value-prop'ы,
             без жаргона про embeddings и community detection. Они есть в карточках ниже. */}
@@ -245,7 +254,7 @@ export function SandboxBacklog() {
             )
           })}
         </div>
-      </div>
-    </div>
+      </PageBody>
+    </PageShell>
   )
 }

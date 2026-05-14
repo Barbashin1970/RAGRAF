@@ -1,9 +1,18 @@
-import { Link } from 'react-router-dom'
-import { ChevronRight, ListTree, Pencil, type LucideIcon } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import {
+  ChevronRight,
+  ListTree,
+  type LucideIcon,
+  Network,
+  Pencil,
+  Shield,
+  Workflow,
+} from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { api, type Domain, type Regulation } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { getDomainVisual } from '@/lib/domains'
+import { Tabs, type TabDef } from '@/components/ui'
 
 interface Stat {
   icon: LucideIcon
@@ -158,6 +167,12 @@ export function RegulationHeader({
   )
 }
 
+/**
+ * Локальная навигация между экранами регламента — поверх ui `<Tabs>` с
+ * react-router'ом. Используем `tone='primary'` (Model Layer, teal акцент);
+ * domain-specific цвет уже передан через accent-stripe и domain icon выше —
+ * двойной акцент в табах перегрузил бы UI.
+ */
 function TabSwitcher({
   sourceId,
   active,
@@ -168,34 +183,28 @@ function TabSwitcher({
   domain: string | null | undefined
 }) {
   type TabId = 'edit' | 'flow' | 'constraints' | 'graph'
-  const tabs: Array<{ id: TabId; label: string; to: string; icon?: LucideIcon }> = [
-    { id: 'edit',        label: 'Редактировать', to: `/regulations/${sourceId}/edit`,        icon: Pencil },
-    { id: 'flow',        label: 'Поток',         to: `/regulations/${sourceId}/flow` },
-    { id: 'constraints', label: 'Ограничения',   to: `/regulations/${sourceId}/constraints` },
-    { id: 'graph',       label: 'Граф',          to: domain ? `/graph?domain=${domain}` : '/graph' },
+  const navigate = useNavigate()
+
+  const tabs: TabDef<TabId>[] = [
+    { id: 'edit',        label: 'Редактировать', icon: Pencil   },
+    { id: 'flow',        label: 'Поток',         icon: Workflow },
+    { id: 'constraints', label: 'Ограничения',   icon: Shield   },
+    { id: 'graph',       label: 'Граф',          icon: Network  },
   ]
-  const v = getDomainVisual(domain)
+
+  const routes: Record<TabId, string> = {
+    edit:        `/regulations/${sourceId}/edit`,
+    flow:        `/regulations/${sourceId}/flow`,
+    constraints: `/regulations/${sourceId}/constraints`,
+    graph:       domain ? `/graph?domain=${domain}` : '/graph',
+  }
 
   return (
-    <div className="inline-flex rounded-md border border-stone-200 bg-white p-0.5">
-      {tabs.map((t) => {
-        const TIcon = t.icon
-        return (
-          <Link
-            key={t.id}
-            to={t.to}
-            className={cn(
-              'inline-flex items-center gap-1 rounded px-2.5 py-1 text-xs font-medium transition',
-              t.id === active
-                ? cn(v.chipBg, v.chipFg)
-                : 'text-stone-600 hover:bg-stone-50',
-            )}
-          >
-            {TIcon && <TIcon size={11} />}
-            {t.label}
-          </Link>
-        )
-      })}
-    </div>
+    <Tabs
+      tabs={tabs}
+      active={active}
+      onChange={(id) => navigate(routes[id])}
+      tone="primary"
+    />
   )
 }

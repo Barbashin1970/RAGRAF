@@ -1,46 +1,132 @@
 import { useEffect, useState } from 'react'
+import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import type { Node } from 'reactflow'
-import type { FlowNode, NodeKind, Parameter } from '@/lib/api'
+import { NODE_KIND_META, type FlowNode, type NodeKind, type Parameter } from '@/lib/api'
 import { nanoid } from '@/lib/nanoid'
+import { Button } from '@/components/ui'
+import { cn } from '@/lib/cn'
 
 interface Props {
   node: Node<FlowNode> | null
   parameters: Parameter[]
   onChange: (id: string, patch: Partial<FlowNode>) => void
   onDelete: (id: string) => void
+  collapsed: boolean
+  onToggleCollapsed: () => void
 }
 
-export function PropertyPanel({ node, parameters, onChange, onDelete }: Props) {
+/**
+ * Node-RED-style collapsible inspector. По умолчанию — раскрытая панель с
+ * полями текущего узла; сворачивается в узкую полосу (40px) с иконкой
+ * выбранного типа. На canvas-блоках имена не отображаются — пользователь
+ * читает label здесь, в Метке.
+ */
+export function PropertyPanel({
+  node,
+  parameters,
+  onChange,
+  onDelete,
+  collapsed,
+  onToggleCollapsed,
+}: Props) {
+  if (collapsed) {
+    const Icon = node ? NODE_KIND_META[node.type as NodeKind]?.icon : null
+    const meta = node ? NODE_KIND_META[node.type as NodeKind] : null
+    return (
+      <aside className="flex w-10 shrink-0 flex-col items-center border-l border-stone-200 bg-white py-2">
+        <button
+          onClick={onToggleCollapsed}
+          className="rounded-md p-1 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+          title="Развернуть панель свойств"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        {Icon && meta && (
+          <div
+            className={cn('mt-3 rf-node', meta.className)}
+            style={{ minWidth: 0 }}
+            title={node?.data.label || meta.label}
+          >
+            <div className="rf-node__icon !w-7">
+              <Icon size={14} />
+            </div>
+          </div>
+        )}
+      </aside>
+    )
+  }
+
   if (!node) {
     return (
-      <aside className="w-72 shrink-0 border-l border-stone-200 bg-white p-3 text-sm text-stone-500">
-        Выберите узел для редактирования свойств.
+      <aside className="flex w-72 shrink-0 flex-col border-l border-stone-200 bg-white text-sm">
+        <PanelHeader title="Свойства" onToggleCollapsed={onToggleCollapsed} />
+        <div className="flex-1 p-3 text-stone-500">
+          Выберите узел для редактирования свойств.
+        </div>
       </aside>
     )
   }
   const d = node.data
   const set = (patch: Partial<FlowNode>) => onChange(node.id, patch)
+  const meta = NODE_KIND_META[node.type as NodeKind]
 
   return (
-    <aside className="w-72 shrink-0 overflow-y-auto border-l border-stone-200 bg-white p-3 text-sm">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="text-xs uppercase tracking-wide text-stone-500">{node.type}</div>
-        <button
-          onClick={() => onDelete(node.id)}
-          className="rounded-md border border-accent-notification px-1.5 py-0.5 text-[10px] text-accent-notification hover:bg-accent-notification-highlight"
-        >
-          удалить
-        </button>
-      </div>
-
-      <FieldText label="Метка" value={d.label ?? ''} onChange={(v) => set({ label: v })} />
-
-      <ByType type={node.type as NodeKind} data={d} parameters={parameters} set={set} />
-
-      <div className="mt-3 border-t border-stone-100 pt-2 font-mono text-[10px] text-stone-400">
-        id: {node.id}
+    <aside className="flex w-72 shrink-0 flex-col border-l border-stone-200 bg-white text-sm">
+      <PanelHeader
+        title={meta?.label ?? node.type ?? ''}
+        kind={node.type as NodeKind}
+        onToggleCollapsed={onToggleCollapsed}
+      />
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+        <FieldText label="Метка" value={d.label ?? ''} onChange={(v) => set({ label: v })} />
+        <ByType type={node.type as NodeKind} data={d} parameters={parameters} set={set} />
+        <div className="mt-3 border-t border-stone-100 pt-2 font-mono text-[10px] text-stone-400">
+          id: {node.id}
+        </div>
+        <div className="mt-3">
+          <Button
+            variant="danger"
+            size="sm"
+            icon={<Trash2 size={13} />}
+            onClick={() => onDelete(node.id)}
+          >
+            Удалить узел
+          </Button>
+        </div>
       </div>
     </aside>
+  )
+}
+
+function PanelHeader({
+  title,
+  kind,
+  onToggleCollapsed,
+}: {
+  title: string
+  kind?: NodeKind
+  onToggleCollapsed: () => void
+}) {
+  const meta = kind ? NODE_KIND_META[kind] : null
+  const Icon = meta?.icon
+  return (
+    <div className="flex items-center gap-2 border-b border-stone-200 px-3 py-2">
+      <button
+        onClick={onToggleCollapsed}
+        className="rounded-md p-1 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
+        title="Свернуть панель свойств"
+      >
+        <ChevronRight size={16} />
+      </button>
+      {Icon && meta && (
+        <div className={cn('rf-node', meta.className)} style={{ minWidth: 0, minHeight: 0 }}>
+          <div className="rf-node__icon !w-6">
+            <Icon size={12} />
+          </div>
+        </div>
+      )}
+      <div className="text-xs font-semibold uppercase tracking-wide text-stone-700">{title}</div>
+    </div>
   )
 }
 

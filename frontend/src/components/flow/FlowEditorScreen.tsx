@@ -16,6 +16,7 @@ import { api, type FlowNode, type RuleDSL } from '@/lib/api'
 import { dslToFlow, flowToDsl } from '@/lib/rulesDsl'
 import { useFlowStore } from '@/store/flowStore'
 import { cn } from '@/lib/cn'
+import { Button } from '@/components/ui'
 import { RegulationHeader } from '../regulations/RegulationHeader'
 import { FlowCanvas } from './FlowCanvas'
 import { NodePalette } from './NodePalette'
@@ -38,6 +39,7 @@ export function FlowEditorScreen() {
   const [edges, setEdges] = useState<Edge[]>([])
   const [selected, setSelected] = useState<Node | null>(null)
   const [showHistory, setShowHistory] = useState(false)
+  const [panelCollapsed, setPanelCollapsed] = useState(false)
 
   useEffect(() => {
     if (!dsl) return
@@ -89,37 +91,37 @@ export function FlowEditorScreen() {
 
   const actions = (
     <>
-      <button
+      <Button
+        size="sm"
+        variant="secondary"
+        icon={<CheckCircle2 size={13} className="text-amber-600" />}
         onClick={() => validateMutation.mutate(currentDsl)}
-        disabled={validating}
-        className="inline-flex items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800 transition hover:border-amber-300 hover:bg-amber-100 disabled:opacity-60"
+        loading={validating}
       >
-        <CheckCircle2 size={13} className="text-amber-500" />
         {validating ? 'Проверка…' : 'Проверить'}
-      </button>
-      <button
+      </Button>
+      <Button
+        size="sm"
+        variant="primary"
+        icon={<Save size={13} />}
+        loading={saving}
         onClick={() => {
           clearErrors()
           saveMutation.mutate(currentDsl)
         }}
-        disabled={saving}
-        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
       >
-        <Save size={13} />
         {saving ? 'Сохраняю…' : 'Сохранить'}
-      </button>
-      <button
+      </Button>
+      <Button
+        size="sm"
+        variant={showHistory ? 'secondary' : 'ghost'}
+        icon={<History size={13} />}
         onClick={() => setShowHistory((x) => !x)}
-        className={cn(
-          'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition',
-          showHistory
-            ? 'border-stone-300 bg-stone-100 text-stone-800'
-            : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50',
-        )}
+        aria-pressed={showHistory}
+        className={cn(showHistory && 'border-stone-300 bg-stone-100 text-stone-800')}
       >
-        <History size={13} className="text-stone-500" />
         История
-      </button>
+      </Button>
     </>
   )
 
@@ -175,6 +177,8 @@ export function FlowEditorScreen() {
             parameters={regulation?.parameters ?? []}
             onChange={updateNodeData}
             onDelete={deleteNode}
+            collapsed={panelCollapsed}
+            onToggleCollapsed={() => setPanelCollapsed((x) => !x)}
           />
         )}
       </div>

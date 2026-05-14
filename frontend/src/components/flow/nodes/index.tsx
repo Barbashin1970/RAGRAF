@@ -2,34 +2,16 @@ import { Position, type NodeProps, type NodeTypes } from 'reactflow'
 import type { FlowNode } from '@/lib/api'
 import { BaseNode } from './BaseNode'
 
-// All seven node types share BaseNode chrome (Node-RED-style split block);
-// они отличаются только handles-конфигурацией и dеталями в body. Стили деталей —
-// через `.rf-node__detail` (см. styles.css → DESIGN_SYSTEM.md «Flow nodes»).
+// Все семь типов используют одинаковый BaseNode-chrome (icon-pill, kind only).
+// Отличия только в handles. User-label и параметры — только в правой
+// PropertyPanel (Node-RED-style: канвас = структура, панель = детали).
 
 function InputNode(p: NodeProps<FlowNode>) {
-  return (
-    <BaseNode {...p} outputs={[{ position: Position.Right }]}>
-      {p.data.paramRef && (
-        <div className="rf-node__detail">
-          парам: <b>{p.data.paramRef}</b>
-        </div>
-      )}
-    </BaseNode>
-  )
+  return <BaseNode {...p} outputs={[{ position: Position.Right }]} />
 }
 
 function ThresholdNode(p: NodeProps<FlowNode>) {
-  return (
-    <BaseNode {...p} inputs={[{ position: Position.Left }]} outputs={[{ position: Position.Right }]}>
-      {p.data.refValue !== null && p.data.refValue !== undefined && (
-        <div className="rf-node__detail font-mono">
-          {p.data.refValue}
-          {p.data.deviation !== null && p.data.deviation !== undefined && <> ± {p.data.deviation}</>}
-          {p.data.unit && <span className="ml-1 text-stone-500">{p.data.unit}</span>}
-        </div>
-      )}
-    </BaseNode>
-  )
+  return <BaseNode {...p} inputs={[{ position: Position.Left }]} outputs={[{ position: Position.Right }]} />
 }
 
 function CompareNode(p: NodeProps<FlowNode>) {
@@ -44,24 +26,12 @@ function CompareNode(p: NodeProps<FlowNode>) {
         { id: 'true', position: Position.Right },
         { id: 'false', position: Position.Bottom },
       ]}
-    >
-      {p.data.operator && (
-        <div className="rf-node__detail">
-          op: <b>{p.data.operator}</b>
-        </div>
-      )}
-    </BaseNode>
+    />
   )
 }
 
 function FormulaNode(p: NodeProps<FlowNode>) {
-  return (
-    <BaseNode {...p} inputs={[{ position: Position.Left }]} outputs={[{ position: Position.Right }]}>
-      {p.data.expression && (
-        <div className="rf-node__detail truncate font-mono">{p.data.expression}</div>
-      )}
-    </BaseNode>
-  )
+  return <BaseNode {...p} inputs={[{ position: Position.Left }]} outputs={[{ position: Position.Right }]} />
 }
 
 function SwitchNode(p: NodeProps<FlowNode>) {
@@ -73,33 +43,16 @@ function SwitchNode(p: NodeProps<FlowNode>) {
       outputs={cases.length > 0
         ? cases.map((c, i) => ({ id: `case-${i}`, label: c.label, position: Position.Right }))
         : [{ position: Position.Right }]}
-    >
-      {cases.length > 0 && (
-        <div className="rf-node__detail">{cases.length} ветв.</div>
-      )}
-    </BaseNode>
+    />
   )
 }
 
 function OutputNode(p: NodeProps<FlowNode>) {
-  return (
-    <BaseNode {...p} inputs={[{ position: Position.Left }]}>
-      {p.data.text && <div className="rf-node__detail line-clamp-2">{p.data.text}</div>}
-      {p.data.priority && (
-        <div className="rf-node__detail text-[10px] text-stone-500">приоритет {p.data.priority}</div>
-      )}
-    </BaseNode>
-  )
+  return <BaseNode {...p} inputs={[{ position: Position.Left }]} />
 }
 
 function ShaclConstraintNode(p: NodeProps<FlowNode>) {
-  return (
-    <BaseNode {...p} inputs={[{ position: Position.Left }]} outputs={[{ position: Position.Right }]}>
-      {p.data.constraintRef && (
-        <div className="rf-node__detail font-mono">{p.data.constraintRef}</div>
-      )}
-    </BaseNode>
-  )
+  return <BaseNode {...p} inputs={[{ position: Position.Left }]} outputs={[{ position: Position.Right }]} />
 }
 
 export const nodeTypes: NodeTypes = {

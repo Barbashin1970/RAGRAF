@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, AlertTriangle, Download, Info, Plus, Save, Shield, Trash2, Upload } from 'lucide-react'
 import { api, type Constraint } from '@/lib/api'
 import { nanoid } from '@/lib/nanoid'
+import { Button } from '@/components/ui'
 import { RegulationHeader } from '../regulations/RegulationHeader'
 
 type EditableConstraint = Constraint & { _new?: boolean }
@@ -82,10 +83,13 @@ export function ConstraintEditorScreen() {
 
   const actions = (
     <>
+      {/* Import — file-input спрятан в <label>; кастомное поведение нельзя
+          целиком отдать <Button>. Используем тот же класс что и secondary, плюс
+          синий tint иконки чтобы отличить от "Сохранить" / "Создать". */}
       <label
-        className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700 transition hover:border-blue-300 hover:bg-blue-100 ${importing ? 'opacity-60' : ''}`}
+        className={`inline-flex h-7 cursor-pointer items-center gap-1 rounded-md border border-stone-200 bg-white px-2 text-xs font-medium text-stone-700 transition hover:bg-stone-50 ${importing ? 'opacity-60' : ''}`}
       >
-        <Upload size={13} className="text-blue-500" />
+        <Upload size={13} className="text-blue-600" />
         {importing ? 'Импорт…' : 'Импорт SHACL'}
         <input
           type="file"
@@ -98,28 +102,32 @@ export function ConstraintEditorScreen() {
           }}
         />
       </label>
-      <button
+      <Button
+        size="sm"
+        variant="secondary"
+        icon={<Download size={13} className="text-emerald-600" />}
         onClick={() => exportShacl.mutate()}
-        disabled={exportShacl.isPending}
-        className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:opacity-60"
+        loading={exportShacl.isPending}
       >
-        <Download size={13} className="text-emerald-500" />
         {exportShacl.isPending ? 'Экспорт…' : 'Экспорт SHACL'}
-      </button>
-      <button
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        icon={<Plus size={13} />}
         onClick={() => setRows((rs) => [...rs, EMPTY_ROW()])}
-        className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-stone-50"
       >
-        <Plus size={13} className="text-stone-500" /> Добавить
-      </button>
-      <button
+        Добавить
+      </Button>
+      <Button
+        size="sm"
+        variant="primary"
+        icon={<Save size={13} />}
+        loading={saving}
         onClick={() => save.mutate(rows.map(({ _new, ...c }) => c))}
-        disabled={saving}
-        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
       >
-        <Save size={13} />
         {saving ? 'Сохраняю…' : 'Сохранить'}
-      </button>
+      </Button>
     </>
   )
 

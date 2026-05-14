@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Plus, Wand2, X } from 'lucide-react'
+import { Plus, Wand2, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { getDomainVisual } from '@/lib/domains'
+import { Button } from '@/components/ui'
 
 interface Props {
   open: boolean
@@ -82,13 +83,9 @@ export function CreateRegulationDialog({ open, onClose }: Props) {
       >
         <div className="flex items-center justify-between border-b border-stone-200 px-5 py-3">
           <h2 className="text-base font-semibold text-stone-900">Новый регламент</h2>
-          <button
-            onClick={onClose}
-            className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
-            aria-label="Закрыть"
-          >
-            <X size={16} />
-          </button>
+          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Закрыть" className="h-7 w-7 p-0">
+            <X size={14} />
+          </Button>
         </div>
 
         <div className="space-y-4 px-5 py-4">
@@ -171,37 +168,34 @@ export function CreateRegulationDialog({ open, onClose }: Props) {
 
         <div className="flex items-center justify-between gap-2 border-t border-stone-200 bg-stone-50 px-5 py-3">
           {/* Альтернативный entry-point: «текст → параметры → регламент» через песочницу.
-              Не отменяет шаблонный сценарий, а даёт второй маршрут когда у юзера на руках
-              уже есть Постановление / приказ — не нужно вручную набивать параметры. */}
-          <button
+              Author-вариант кнопки (violet) — визуально подсказывает что переход в
+              Author Layer (Студию аналитика). */}
+          <Button
+            variant="author"
+            icon={<Wand2 size={14} />}
             onClick={() => {
               onClose()
               navigate('/sandbox?tab=extract')
             }}
             disabled={create.isPending}
             title="Открыть песочницу с примерами регламентов — extractor предложит параметры из текста"
-            className="inline-flex items-center gap-1.5 rounded-md border border-violet-200 bg-white px-3 py-1.5 text-sm font-medium text-violet-700 hover:border-violet-300 hover:bg-violet-50 disabled:opacity-40"
           >
-            <Wand2 size={14} />
             Извлечь из текста
-          </button>
+          </Button>
 
           <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              disabled={create.isPending}
-              className="rounded-md border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-40"
-            >
+            <Button variant="secondary" onClick={onClose} disabled={create.isPending}>
               Отмена
-            </button>
-            <button
-              onClick={() => create.mutate()}
+            </Button>
+            <Button
+              variant="primary"
+              icon={<Plus size={14} />}
+              loading={create.isPending}
               disabled={!canSubmit}
-              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-60"
+              onClick={() => create.mutate()}
             >
-              {create.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
               {create.isPending ? 'Создаю…' : 'Создать'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

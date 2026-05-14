@@ -22,6 +22,7 @@ import { api, type Parameter, type Regulation } from '@/lib/api'
 import { nanoid } from '@/lib/nanoid'
 import { cn } from '@/lib/cn'
 import { deriveSliderRange, fillPercent as computeFillPercent } from '@/lib/sliderDomain'
+import { Button, Tabs, type TabDef } from '@/components/ui'
 import { RegulationHeader } from './RegulationHeader'
 
 type Tab = 'form' | 'sliders' | 'source'
@@ -90,78 +91,73 @@ export function RegulationEditorScreen() {
   const currentStatus = regulation?.status ?? 'draft'
   const actions = (
     <>
-      {/* Approval workflow */}
+      {/* Approval workflow: Опубликовать → Архивировать (зависит от статуса).
+          Стили через ui Button: 'secondary' с success/neutral иконкой — не делаем
+          их primary, чтобы основная primary-кнопка (Сохранить) визуально доминировала. */}
       {currentStatus !== 'active' && (
-        <button
+        <Button
+          size="sm"
+          variant="secondary"
+          icon={<Send size={13} className="text-emerald-600" />}
           onClick={() => publish.mutate()}
+          loading={publish.isPending}
           disabled={publish.isPending || dirty}
           title={dirty ? 'Сначала сохраните черновик' : 'Перевести в статус active'}
-          className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:opacity-50"
         >
-          <Send size={13} className="text-emerald-500" />
           {publish.isPending ? 'Публикую…' : 'Опубликовать'}
-        </button>
+        </Button>
       )}
       {currentStatus === 'active' && (
-        <button
+        <Button
+          size="sm"
+          variant="secondary"
+          icon={<Archive size={13} />}
           onClick={() => archive.mutate()}
-          disabled={archive.isPending}
-          className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-600 transition hover:bg-stone-50 disabled:opacity-50"
+          loading={archive.isPending}
         >
-          <Archive size={13} className="text-stone-500" />
           {archive.isPending ? 'Архивирую…' : 'Архивировать'}
-        </button>
+        </Button>
       )}
-      <button
+      <Button
+        size="sm"
+        variant={showHistory ? 'secondary' : 'ghost'}
+        icon={<History size={13} />}
         onClick={() => setShowHistory((x) => !x)}
-        className={cn(
-          'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition',
-          showHistory
-            ? 'border-stone-300 bg-stone-100 text-stone-800'
-            : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50',
-        )}
+        aria-pressed={showHistory}
+        className={cn(showHistory && 'border-stone-300 bg-stone-100 text-stone-800')}
       >
-        <History size={13} className="text-stone-500" />
         История
-      </button>
-      <button
+      </Button>
+      <Button
+        size="sm"
+        variant="secondary"
+        icon={<CircleSlash size={13} />}
         onClick={() => regulation && setDraft(structuredClone(regulation) as Regulation)}
         disabled={!dirty}
-        className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-stone-50 disabled:opacity-40"
       >
-        <CircleSlash size={13} className="text-stone-500" /> Отменить
-      </button>
-      <button
+        Отменить
+      </Button>
+      <Button
+        size="sm"
+        variant="primary"
+        icon={<Save size={13} />}
         onClick={() => draft && save.mutate(draft)}
+        loading={save.isPending}
         disabled={!dirty || save.isPending}
-        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-2.5 py-1.5 text-xs font-medium text-white shadow-sm transition hover:opacity-90 disabled:opacity-60"
       >
-        <Save size={13} />
         {save.isPending ? 'Сохраняю…' : 'Сохранить'}
-      </button>
+      </Button>
     </>
   )
+
+  // Sub-табы режима редактора (Поля / Слайдеры / Turtle) — внутри Model Layer
+  // (regulation), поэтому tone='primary'. См. DESIGN_SYSTEM.md §1.
+  const editorTabs: TabDef<Tab>[] = TABS.map((t) => ({ id: t.id, label: t.label, icon: t.icon }))
 
   const subHeader = (
     <>
       <div className="border-t border-stone-200 bg-white/60 px-5 py-1.5">
-        <div className="flex items-center gap-1 rounded-md border border-stone-200 bg-white p-0.5 w-fit">
-          {TABS.map((t) => {
-            const TIcon = t.icon
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition',
-                  t.id === tab ? 'bg-primary/10 text-primary' : 'text-stone-600 hover:bg-stone-50',
-                )}
-              >
-                <TIcon size={12} /> {t.label}
-              </button>
-            )
-          })}
-        </div>
+        <Tabs tabs={editorTabs} active={tab} onChange={setTab} tone="primary" />
       </div>
       {save.data?.upstream_error && (
         <div className="border-t border-amber-200 bg-amber-50 px-5 py-1.5 text-xs text-amber-800">

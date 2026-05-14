@@ -18,39 +18,63 @@ body { font-family: 'Inter', system-ui, sans-serif; }
 
 /* ── React Flow nodes — Node-RED-style split blocks ──────────────────────
  *
- * Шаблон визуала заимствован из Node-RED Designer: каждая нода — это узкая
- * двух-секционная плашка с тёмной icon-секцией слева (где иконка типа белым)
- * и светлой body-секцией справа (где текст). Это классический enterprise-flow
- * стиль (Camunda, Node-RED, n8n) — узнаваемый и читаемый на canvas'е.
+ * Шаблон визуала заимствован из Node-RED Designer: каждая нода — компактный
+ * pill с цветной icon-секцией слева и светлой body справа. Имена / детали
+ * параметров не пихаем в блок — они в правой PropertyPanel (как в Node-RED).
+ * На canvas остаётся только тип (kind) — этого достаточно чтобы «прочитать»
+ * структуру flow визуально; длинные русские лейблы перестают резаться.
  *
  * Структура DOM:
  *   .rf-node
- *     .rf-node__icon  (slot 0, ~32px wide, dark accent)
- *     .rf-node__body  (slot 1, flex-1, label + optional details)
+ *     .rf-node__icon  (slot 0, цветная icon-секция)
+ *     .rf-node__body  (slot 1, kind-label)
  *
- * Цвет задаётся модификатором .rf-node--<kind>: tone-700 для icon-секции,
- * tone-50/100 для body. Через `currentColor` и CSS-переменные не идём — простой
- * @apply из tailwind-палитры достаточно и предсказуем при отладке.
+ * ВАЖНО: React Flow ships defaults для типов "input"/"output"/"default"/"group"
+ * (.react-flow__node-input и т.д. с padding:10/border/width:150/text-align:center).
+ * Наши кастомные ноды используют те же имена → дефолтный chrome ломает наш
+ * flex-row (иконка съезжает в угол, body-текст труcится). Сбрасываем ниже.
  */
+.react-flow__node {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  width: auto;
+  font-size: inherit;
+  color: inherit;
+  text-align: left;
+}
+
 .rf-node {
-  @apply flex overflow-hidden rounded-md border text-sm shadow-sm transition;
-  min-width: 170px;
+  @apply inline-flex items-stretch overflow-hidden rounded-md border text-sm shadow-sm transition;
+  min-width: 116px;
+  min-height: 36px;
   font-family: 'Inter', system-ui, sans-serif;
 }
 .rf-node__icon {
-  @apply flex h-full w-10 shrink-0 items-center justify-center text-white;
+  @apply flex w-9 shrink-0 items-center justify-center text-white;
 }
 .rf-node__body {
-  @apply min-w-0 flex-1 px-3 py-2;
+  @apply flex min-w-0 flex-1 items-center px-3 py-1.5;
 }
 .rf-node__kind {
-  @apply text-[9px] font-medium uppercase tracking-wide opacity-70;
+  @apply text-[11px] font-semibold uppercase tracking-wide text-stone-800;
 }
-.rf-node__label {
+/* Палитра слева — там нужен полный читаемый label с человеческим именем
+   (пользователь должен понимать что он перетаскивает на canvas). */
+.rf-node--palette {
+  @apply w-full;
+  min-width: 0;
+  min-height: 0;
+}
+.rf-node--palette .rf-node__body {
+  @apply flex-col items-start justify-center gap-0 px-2.5 py-1.5;
+}
+.rf-node--palette .rf-node__kind {
+  @apply text-[9px] font-medium opacity-70;
+}
+.rf-node--palette .rf-node__label {
   @apply truncate text-sm font-semibold text-stone-900;
-}
-.rf-node__detail {
-  @apply mt-0.5 text-xs leading-snug text-stone-700;
 }
 
 /* ── Tone modifiers (per node kind) — Node-RED palette inspirations ─────

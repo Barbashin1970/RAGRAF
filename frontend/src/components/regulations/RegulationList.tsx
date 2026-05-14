@@ -2,11 +2,11 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Activity,
   AlertCircle,
   AlertTriangle,
   Boxes,
   FileText,
+  ListTree,
   Loader2,
   type LucideIcon,
   Network,
@@ -22,6 +22,14 @@ import {
 import { api, type Domain } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { type DomainVisual, FALLBACK_VISUAL, getDomainVisual } from '@/lib/domains'
+import {
+  Badge,
+  Button,
+  EmptyState as EmptyStateBlock,
+  PageBody,
+  PageHeader,
+  PageShell,
+} from '@/components/ui'
 import { CreateRegulationDialog } from './CreateRegulationDialog'
 
 interface RegRow {
@@ -114,24 +122,24 @@ export function RegulationList() {
   }, [items])
 
   return (
-    <div className="flex h-full flex-col bg-stone-50">
-      {/* Page header */}
-      <div className="border-b border-stone-200 bg-white px-6 pb-4 pt-5">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-stone-900">Регламенты</h1>
-            <p className="mt-1 text-sm text-stone-500">
-              Карта регламентов по доменам — правила, ограничения SHACL и потоки реагирования
-            </p>
+    <PageShell>
+      <PageHeader
+        icon={ListTree}
+        tone="model"
+        title="Регламенты"
+        badges={<Badge tone="info" uppercase>Model Layer</Badge>}
+        description="Карта регламентов по доменам — правила, ограничения SHACL и потоки реагирования."
+        actions={
+          <div className="hidden flex-wrap items-center gap-2 sm:flex">
+            <Stat icon={FileText} value={totals.regs}        label="регл." />
+            <Stat icon={Boxes}    value={domains.length}     label="дом." />
+            <Stat icon={Sliders}  value={totals.params}      label="парам." />
+            <Stat icon={Shield}   value={totals.constraints} label="огр." />
           </div>
-          <div className="flex flex-wrap items-center gap-3 text-sm">
-            <Stat icon={FileText}   value={totals.regs}        label="регламентов" tone="primary" />
-            <Stat icon={Boxes}      value={domains.length}     label="доменов"     tone="indigo"  />
-            <Stat icon={Sliders}    value={totals.params}      label="параметров"  tone="emerald" />
-            <Stat icon={Shield}     value={totals.constraints} label="ограничений" tone="amber"   />
-          </div>
-        </div>
-
+        }
+      >
+        {/* Тулбар: поиск + primary-кнопка создания. Под header'ом, в той же
+            белой плашке — на одной визуальной плоскости с метриками выше. */}
         <div className="mt-4 flex items-center gap-3">
           <div className="relative max-w-md flex-1">
             <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -142,19 +150,15 @@ export function RegulationList() {
               className="w-full rounded-md border border-stone-200 bg-white py-1.5 pl-8 pr-3 text-sm placeholder:text-stone-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
             />
           </div>
-          <button
-            onClick={() => setShowCreate(true)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:opacity-90"
-          >
-            <Plus size={14} /> Создать регламент
-          </button>
+          <Button variant="primary" icon={<Plus size={14} />} onClick={() => setShowCreate(true)}>
+            Создать регламент
+          </Button>
         </div>
-      </div>
+      </PageHeader>
 
       <CreateRegulationDialog open={showCreate} onClose={() => setShowCreate(false)} />
 
-      {/* Body */}
-      <div className="min-h-0 flex-1 overflow-auto px-6 py-5">
+      <PageBody>
         {isLoading && (
           <div className="flex items-center gap-2 text-sm text-stone-500">
             <Loader2 size={14} className="animate-spin" /> Загрузка регламентов…
@@ -170,7 +174,20 @@ export function RegulationList() {
         )}
 
         {!isLoading && items.length === 0 && !error && (
-          <EmptyState />
+          <EmptyStateBlock
+            icon={FileText}
+            title="Регламентов пока нет"
+            description={
+              <>
+                Создай первый регламент из шаблона домена, или импортируй через upstream API.
+              </>
+            }
+            action={
+              <Button variant="primary" icon={<Plus size={14} />} onClick={() => setShowCreate(true)}>
+                Создать регламент
+              </Button>
+            }
+          />
         )}
 
         {!isLoading && items.length > 0 && filtered.length === 0 && (
@@ -191,8 +208,8 @@ export function RegulationList() {
             />
           )
         })}
-      </div>
-    </div>
+      </PageBody>
+    </PageShell>
   )
 }
 
@@ -221,6 +238,8 @@ function DomainSection({
             <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', v.chipBg, v.chipFg)}>
               {items.length}
             </span>
+            {/* domain-цвет сохраняем — это семантика (heating=orange, housing=blue
+                и т.д.). См. DESIGN_SYSTEM.md → §1 «domain-цвета не унифицируем». */}
           </div>
           {domain?.hint && (
             <div className="mt-0.5 text-xs text-stone-500">{domain.hint}</div>
@@ -372,14 +391,16 @@ function ConfirmDeleteDialog({
             <AlertTriangle size={16} className="text-rose-500" />
             Удалить регламент?
           </h2>
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={onClose}
             disabled={del.isPending}
-            className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 disabled:opacity-40"
             aria-label="Закрыть"
+            className="h-7 w-7 p-0"
           >
-            <X size={16} />
-          </button>
+            <X size={14} />
+          </Button>
         </div>
         <div className="space-y-2 px-5 py-4 text-sm text-stone-700">
           <p>
@@ -400,21 +421,17 @@ function ConfirmDeleteDialog({
           )}
         </div>
         <div className="flex items-center justify-end gap-2 border-t border-stone-200 bg-stone-50 px-5 py-3">
-          <button
-            onClick={onClose}
-            disabled={del.isPending}
-            className="rounded-md border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-40"
-          >
+          <Button variant="secondary" onClick={onClose} disabled={del.isPending}>
             Нет, оставить
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="danger"
+            icon={<Trash2 size={14} />}
+            loading={del.isPending}
             onClick={() => del.mutate()}
-            disabled={del.isPending}
-            className="inline-flex items-center gap-1.5 rounded-md bg-rose-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-rose-700 disabled:opacity-60"
           >
-            {del.isPending ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
             {del.isPending ? 'Удаляю…' : 'Да, удалить'}
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -448,53 +465,17 @@ function ActionButton({
   )
 }
 
-const STAT_TONES: Record<string, { bg: string; fg: string; icon: string }> = {
-  primary: { bg: 'bg-primary/10',    fg: 'text-primary',     icon: 'text-primary' },
-  indigo:  { bg: 'bg-indigo-50',     fg: 'text-indigo-700',  icon: 'text-indigo-500' },
-  emerald: { bg: 'bg-emerald-50',    fg: 'text-emerald-700', icon: 'text-emerald-500' },
-  amber:   { bg: 'bg-amber-50',      fg: 'text-amber-700',   icon: 'text-amber-500' },
-}
-
-function Stat({
-  icon: Icon,
-  value,
-  label,
-  tone = 'primary',
-}: {
-  icon: LucideIcon
-  value: number
-  label: string
-  tone?: keyof typeof STAT_TONES
-}) {
-  const t = STAT_TONES[tone] ?? STAT_TONES.primary
+/**
+ * Inline-метрика в шапке списка: иконка + число + подпись. Нейтральный стиль
+ * чтобы 4 метрики в ряд не превращались в светофор. Если в будущем понадобится
+ * акцентная метрика (KPI с цветом по статусу) — отдельный вариант, не общий.
+ */
+function Stat({ icon: Icon, value, label }: { icon: LucideIcon; value: number; label: string }) {
   return (
-    <div className={cn('inline-flex items-center gap-2 rounded-md px-2.5 py-1', t.bg)}>
-      <Icon size={14} className={t.icon} />
-      <span className={cn('font-semibold tabular-nums', t.fg)}>{value}</span>
-      <span className="text-xs text-stone-500">{label}</span>
-    </div>
-  )
-}
-
-function EmptyState() {
-  return (
-    <div className="mx-auto max-w-md rounded-lg border border-dashed border-stone-300 bg-white p-8 text-center">
-      <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-stone-100">
-        <FileText size={20} className="text-stone-400" />
-      </div>
-      <h3 className="text-base font-medium text-stone-800">Нет регламентов</h3>
-      <p className="mt-1 text-sm text-stone-500">
-        Создайте dataset через upstream API:
-      </p>
-      <code className="mt-2 inline-block rounded bg-stone-100 px-2 py-1 text-xs text-stone-700">
-        POST /api/v1/regulations/admin/datasets/&#123;app_id&#125;
-      </code>
-      <Link
-        to="/graph"
-        className="mt-4 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm text-white hover:opacity-90"
-      >
-        <Activity size={14} /> Перейти к графу
-      </Link>
+    <div className="inline-flex items-center gap-1.5 rounded-md bg-stone-100 px-2 py-1 text-xs">
+      <Icon size={12} className="text-stone-500" />
+      <span className="font-semibold tabular-nums text-stone-800">{value}</span>
+      <span className="text-stone-500">{label}</span>
     </div>
   )
 }

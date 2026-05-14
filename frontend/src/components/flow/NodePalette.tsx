@@ -48,7 +48,10 @@ export function NodePalette() {
                   e.dataTransfer.effectAllowed = 'move'
                 }}
                 title={meta.description}
-                className={cn('rf-node cursor-grab active:cursor-grabbing', meta.className)}
+                className={cn(
+                  'rf-node rf-node--palette cursor-grab active:cursor-grabbing',
+                  meta.className,
+                )}
               >
                 <div className="rf-node__icon">
                   {Icon && <Icon size={14} />}
