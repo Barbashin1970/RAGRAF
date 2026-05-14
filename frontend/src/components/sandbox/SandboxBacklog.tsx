@@ -171,14 +171,40 @@ export function SandboxBacklog() {
               даёт сильно меньше пользы.
             </p>
 
-            <p className="text-xs text-stone-500">
-              Сейчас в репозитории работает <b>mock-режим</b> (regex + keyword scoring), он
-              показывает 80% функциональности без LLM-ключей. Полный RAGU — это
-              <code className="mx-1 rounded bg-stone-100 px-1 text-xs">pip install -e external/RAGU</code>
-              {' '}+ <code className="mx-1 rounded bg-stone-100 px-1 text-xs">RAGU_ENABLED=true</code>:
-              качество поиска и извлечения растёт за счёт LLM-индексации и community detection,
-              интерфейсы и API остаются те же.
-            </p>
+            <div className="rounded-md border border-stone-200 bg-stone-50/60 p-3 text-xs text-stone-600">
+              <div className="mb-1.5 font-semibold uppercase tracking-wide text-stone-500">
+                Где мы сейчас и что нужно для следующего шага
+              </div>
+              <p className="leading-relaxed">
+                Сейчас в коде работает <b>mock-режим</b> — regex по числам + keyword scoring
+                по словарю. Он покрывает оба текущих демо (поиск по регламентам, извлечение
+                параметров) <b>без внешних зависимостей</b>: ни LLM-ключей, ни GPU, ни
+                сторонних серверов. Этого достаточно для презентации идеи и тестирования
+                UX-цикла «текст → параметры → регламент».
+              </p>
+              <p className="mt-1.5 leading-relaxed">
+                Чтобы включить <b>настоящий RAGU</b>, помимо{' '}
+                <code className="rounded bg-stone-100 px-1">pip install -e external/RAGU</code>
+                {' '}и{' '}
+                <code className="rounded bg-stone-100 px-1">RAGU_ENABLED=true</code>
+                {' '}нужен <b>доступ к LLM</b> и <b>embedding-модели</b>: extractor сущностей и
+                community-summarization вызывают модель. Варианты:
+              </p>
+              <ul className="mt-1 space-y-0.5 pl-4 text-[11px]">
+                <li>· OpenAI / Anthropic / Mistral — облачный ключ в{' '}
+                  <code className="rounded bg-stone-100 px-1">OPENAI_API_KEY</code></li>
+                <li>· OpenRouter / Together / Fireworks — те же ключи + кастомный{' '}
+                  <code className="rounded bg-stone-100 px-1">OPENAI_BASE_URL</code></li>
+                <li>· локально: <code className="rounded bg-stone-100 px-1">llama-server</code> /
+                  vLLM / ollama (без облака, но нужны GPU)</li>
+              </ul>
+              <p className="mt-1.5 leading-relaxed">
+                Интерфейсы и API при переключении остаются те же — меняется только
+                <code className="mx-1 rounded bg-stone-100 px-1">backend_mode()</code>: бейдж в шапке
+                становится <span className="rounded bg-emerald-100 px-1 text-emerald-700">RAGU подключён</span>{' '}
+                вместо <span className="rounded bg-amber-100 px-1 text-amber-800">mock-режим</span>.
+              </p>
+            </div>
           </div>
         </section>
 
