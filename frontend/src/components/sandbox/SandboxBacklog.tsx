@@ -1,5 +1,14 @@
 import { Link } from 'react-router-dom'
-import { ArrowLeft, BookText, GitCompare, Network } from 'lucide-react'
+import {
+  ArrowLeft,
+  BookText,
+  Brain,
+  GitCompare,
+  Layers,
+  Network,
+  ScanText,
+  Search,
+} from 'lucide-react'
 
 interface BacklogItem {
   id: string
@@ -68,7 +77,118 @@ export function SandboxBacklog() {
           реализуем когда станет ясно что нужно.
         </p>
 
-        <div className="mt-5 space-y-3">
+        {/* Развёрнутое описание системы для руководителя — простой язык, конкретные value-prop'ы,
+            без жаргона про embeddings и community detection. Они есть в карточках ниже. */}
+        <section className="mt-5 rounded-lg border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-white p-5 shadow-sm">
+          <div className="mb-3 flex items-center gap-2">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-600/90 text-white">
+              <Brain size={18} />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-stone-900">О связке RAGU + RAGRAF</h2>
+              <p className="text-xs text-stone-500">
+                Почему имеет смысл рассматривать их вместе при планировании разработки
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3 text-sm leading-relaxed text-stone-700">
+            <p>
+              <b>Проблема.</b> В любом крупном объекте — ВУЗ, ТЭЦ, ЖКХ, кампус — накопились
+              сотни регламентов, приказов, СНиПов и инструкций. Они в Word и PDF, написаны
+              разными авторами в разные годы. Найти что-то конкретное — долго; понять{' '}
+              <i>какой параметр в каком документе фигурирует</i> — почти невозможно;
+              согласовать новый приказ со старыми — это часы ручного сличения.
+            </p>
+
+            <p>
+              <b>RAGU</b> <span className="text-xs text-stone-500">(Retrieval-Augmented Graph Utility)</span> —
+              открытый движок <i>GraphRAG</i>. На входе — массив технических текстов; на выходе —
+              <b> связная база знаний</b>, где каждый параметр, действие, ссылка на нормативку и
+              сценарий реагирования превращается в узел графа, связанный с другими. Это уже не
+              «поиск по словам», а понимание <i>что с чем связано</i>.
+            </p>
+
+            <p>
+              <b>RAGRAF</b> — визуальный слой над этими данными: карта регламентов по доменам,
+              редактор с слайдерами для калибровки уставок, Rule DSL Flow для моделирования
+              сценариев реагирования, SHACL-ограничения для валидации, версионирование с
+              историей. То, что обычно делают в Excel + Word + почте, здесь делается в одном
+              месте — и с проверкой консистентности.
+            </p>
+
+            <div className="rounded-md border border-stone-200 bg-white p-3">
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500">
+                Что это даёт в практике
+              </div>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-start gap-2">
+                  <ScanText size={14} className="mt-0.5 shrink-0 text-violet-600" />
+                  <span>
+                    <b>Новый приказ — за минуты, не за часы.</b> Загружаешь текст постановления
+                    или фрагмент СНиПа — RAGU предлагает 5-10 параметров (диаметр, давление,
+                    температура, время реакции и т.п.) с уставками и допусками. Эксперт правит
+                    очевидное и публикует — рутинного ввода нет.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Search size={14} className="mt-0.5 shrink-0 text-violet-600" />
+                  <span>
+                    <b>Поиск по смыслу, а не по словам.</b> Запрос «куда звонить при пожаре в
+                    серверной?» находит нужный регламент, даже если внутри нет слова «пожар»
+                    (есть «термический инцидент», «задымление», «эскалация ЕДДС»). Сотрудник
+                    в стрессе получает ответ за секунды.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Network size={14} className="mt-0.5 shrink-0 text-violet-600" />
+                  <span>
+                    <b>Карта связей между документами.</b> Видно где один параметр (например
+                    температура) участвует в 4 регламентах разных доменов; где два регламента
+                    дают <i>противоречащие</i> допуски; где новый приказ перекрывает старый.
+                    Это база для аудита и унификации.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Layers size={14} className="mt-0.5 shrink-0 text-violet-600" />
+                  <span>
+                    <b>От документа — к управляемым данным.</b> «Температура должна быть 70 ± 10 °C»
+                    в тексте превращается в узел графа: его можно мониторить, сравнивать с
+                    реальными показаниями, моделировать «что если допуск 5°C вместо 10°C».
+                    Регламенты становятся <b>исполняемой</b> частью системы, а не PDF в архиве.
+                  </span>
+                </li>
+              </ul>
+            </div>
+
+            <p className="text-stone-600">
+              <b>Почему вместе.</b> RAGU без RAGRAF — это API, в которое нечем кликать и нет
+              визуальной обратной связи: данные есть, человек их не видит. RAGRAF без RAGU —
+              это красивый редактор регламентов-«островов», без понимания связей и без
+              авто-извлечения. Связка покрывает обе стороны: <b>интеллект</b> разбора и поиска
+              даёт RAGU, <b>UX</b> работы с этими знаниями и экспертная калибровка — RAGRAF.
+              Поэтому в плане развития имеет смысл закладывать оба сразу: один без другого
+              даёт сильно меньше пользы.
+            </p>
+
+            <p className="text-xs text-stone-500">
+              Сейчас в репозитории работает <b>mock-режим</b> (regex + keyword scoring), он
+              показывает 80% функциональности без LLM-ключей. Полный RAGU — это
+              <code className="mx-1 rounded bg-stone-100 px-1 text-xs">pip install -e external/RAGU</code>
+              {' '}+ <code className="mx-1 rounded bg-stone-100 px-1 text-xs">RAGU_ENABLED=true</code>:
+              качество поиска и извлечения растёт за счёт LLM-индексации и community detection,
+              интерфейсы и API остаются те же.
+            </p>
+          </div>
+        </section>
+
+        <h2 className="mt-8 text-lg font-semibold text-stone-900">Сценарии в очереди</h2>
+        <p className="mt-1 text-sm text-stone-500">
+          Конкретные демо которые ставятся рядом с текущими (поиск + extractor) и постепенно
+          раскрывают возможности связки.
+        </p>
+
+        <div className="mt-3 space-y-3">
           {BACKLOG.map((it) => {
             const Icon = it.icon
             return (

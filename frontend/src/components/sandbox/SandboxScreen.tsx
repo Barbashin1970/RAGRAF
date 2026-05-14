@@ -1,14 +1,17 @@
-import { useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   Beaker,
+  BookOpen,
   Check,
   ChevronRight,
   FileSearch,
   Lightbulb,
   Loader2,
+  Network,
   PackagePlus,
+  ScanText,
   Search,
   SearchCheck,
   Sparkles,
@@ -20,8 +23,29 @@ import { DOMAIN_VISUALS, getDomainVisual } from '@/lib/domains'
 
 type Tab = 'search' | 'extract'
 
+function isTab(value: string | null): value is Tab {
+  return value === 'search' || value === 'extract'
+}
+
 export function SandboxScreen() {
-  const [tab, setTab] = useState<Tab>('search')
+  // ?tab=extract в URL открывает сразу нужную вкладку — используется
+  // «Извлечь из текста» из CreateRegulationDialog и можно шарить ссылкой.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const initialTab: Tab = isTab(searchParams.get('tab')) ? (searchParams.get('tab') as Tab) : 'search'
+  const [tab, setTab] = useState<Tab>(initialTab)
+
+  // Если юзер кликает по табу — обновляем query string. Это даёт честный back-button
+  // и копируемые ссылки. replace=true чтобы не засорять history стек переключениями.
+  useEffect(() => {
+    const current = searchParams.get('tab')
+    if (current !== tab) {
+      const next = new URLSearchParams(searchParams)
+      next.set('tab', tab)
+      setSearchParams(next, { replace: true })
+    }
+    // searchParams не включаем в deps чтобы не циклить при setSearchParams
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
 
   const { data: status } = useQuery({
     queryKey: ['sandbox-status'],
@@ -63,6 +87,44 @@ export function SandboxScreen() {
                 </>
               )}
             </p>
+
+            {/* Краткий info-блок для руководителя: что такое RAGU и почему он
+                идёт в связке с RAGRAF. Конкретные value-prop'ы а не маркетинг. */}
+            <div className="mt-3 max-w-3xl rounded-md border border-violet-100 bg-gradient-to-br from-violet-50/60 to-white p-3 text-xs text-stone-700">
+              <div className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-violet-700">
+                <BookOpen size={12} /> RAGU + RAGRAF — что это и зачем
+              </div>
+              <p className="leading-relaxed">
+                <b>RAGU</b> — движок <i>GraphRAG</i>, который понимает технические тексты:
+                приказы, регламенты, СНиПы, ГОСТы. Из произвольного документа он вытаскивает
+                <b> параметры с диапазонами</b>, ищет похожие документы <b>по смыслу запроса</b>{' '}
+                (а не по совпадению слов), и связывает регламенты в <b>граф знаний</b> — где
+                видно, что один параметр (скажем <code className="rounded bg-stone-100 px-1">temperature</code>)
+                живёт в 4 регламентах разных ведомств.
+              </p>
+              <p className="mt-1.5 leading-relaxed">
+                <b>RAGRAF</b> — визуальный редактор и виз-карта поверх этих данных: слайдеры,
+                Rule DSL Flow, SHACL-ограничения, версионирование. В связке получается переход{' '}
+                <b>«текст → структурированные данные → калибровка → проверка»</b>:
+                новый приказ разбирается за минуты, противоречия между регламентами видны на
+                графе, ответ на «что делать если давление упало?» приходит из всей базы, а не
+                из одного документа.
+              </p>
+              <ul className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+                <li className="flex items-start gap-1.5">
+                  <ScanText size={11} className="mt-0.5 shrink-0 text-violet-600" />
+                  <span><b>Разбор за минуты:</b> extractor из приказа предлагает 5-10 параметров с уставками и допусками — не нужно вбивать руками.</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <Search size={11} className="mt-0.5 shrink-0 text-violet-600" />
+                  <span><b>Поиск по смыслу:</b> «куда звонить при пожаре в серверной?» находит регламент даже без слова «пожар» в тексте.</span>
+                </li>
+                <li className="flex items-start gap-1.5">
+                  <Network size={11} className="mt-0.5 shrink-0 text-violet-600" />
+                  <span><b>Связи между документами:</b> унификация регуляторной базы, поиск противоречий, кросс-доменные параметры.</span>
+                </li>
+              </ul>
+            </div>
           </div>
           <Link
             to="/sandbox/backlog"
@@ -295,12 +357,94 @@ function Highlight({ text, terms }: { text: string; terms: string[] }) {
 
 // ── Demo 2: Extract parameters ─────────────────────────────────────────
 
-const EXTRACT_SAMPLE = `Регламент устанавливает: номинальный диаметр 5.0 см с максимальным
+// Галерея текстов-примеров для прогонки экстрактора. Каждый пресет несёт:
+//  - text: что подложить в textarea;
+//  - suggestedDomain / suggestedName: что предложить в шаге «Сборка» —
+//    чтобы при кликe «Газ · SMS-оповещение» сразу появились environment-домен
+//    и осмысленное имя регламента, и юзер мог просто нажать «Создать».
+// Тэги газ/уголь/mix окрашены, чтобы визуально различать типы станций.
+interface ExtractPreset {
+  id: string
+  label: string
+  tag: 'mix' | 'газ' | 'уголь'
+  suggestedDomain: string
+  suggestedName: string
+  text: string
+}
+
+const TAG_COLORS: Record<ExtractPreset['tag'], { bg: string; fg: string }> = {
+  mix:   { bg: 'bg-violet-100', fg: 'text-violet-700' },
+  'газ': { bg: 'bg-orange-100', fg: 'text-orange-700' },
+  'уголь': { bg: 'bg-stone-200', fg: 'text-stone-800' },
+}
+
+const EXTRACT_PRESETS: ExtractPreset[] = [
+  {
+    id: 'default',
+    label: 'Базовый набор параметров',
+    tag: 'mix',
+    suggestedDomain: 'heating',
+    suggestedName: 'Регламент трубопровода теплоносителя',
+    text: `Регламент устанавливает: номинальный диаметр 5.0 см с максимальным
 отклонением 0.2 см. Давление в трубопроводе поддерживается на уровне
 20.5 атм при допустимом отклонении 1.5 атм.
 
 Температура подачи теплоносителя — 70 ± 10 °C, расход 1.5 м³/ч.
-SMS уведомления уязвимым группам отправляются за 6 ± 2 часа до пика.`
+SMS уведомления уязвимым группам отправляются за 6 ± 2 часа до пика.`,
+  },
+  {
+    id: 'gas-hydraulic',
+    label: 'Газ · гидравлический режим',
+    tag: 'газ',
+    suggestedDomain: 'heating',
+    suggestedName: 'Газовая станция · гидравлический режим трубопровода',
+    text: `Регламент устанавливает: номинальный диаметр трубопровода теплоносителя 5.0 см с максимальным отклонением 0.2 см. Давление в подающем трубопроводе поддерживается на уровне 20.5 атм при допустимом отклонении 1.5 атм.
+
+Температура подачи теплоносителя устанавливается на уровне 70 ± 10 °C, расход теплоносителя — 1.5 м³/ч. Поддержание давления и температуры должно обеспечиваться средствами автоматического регулирования, а контроль параметров — датчиками, манометрами и средствами диспетчеризации.`,
+  },
+  {
+    id: 'gas-notification',
+    label: 'Газ · SMS-оповещение',
+    tag: 'газ',
+    suggestedDomain: 'environment',
+    suggestedName: 'Газовая станция · оповещение уязвимых групп',
+    text: `Регламент устанавливает: SMS-уведомления уязвимым группам потребителей, а также ответственным лицам объектов социальной инфраструктуры отправляются за 6 ± 2 часа до прогнозируемого пика нагрузки, планового ограничения или риска аварийного снижения параметров теплоснабжения.
+
+Текст уведомления должен содержать время ожидаемого события, территорию действия и рекомендуемые меры. Для критически важных объектов допускается повторное сообщение не менее одного раза при изменении прогноза.`,
+  },
+  {
+    id: 'coal-params',
+    label: 'Уголь · параметры теплоносителя',
+    tag: 'уголь',
+    suggestedDomain: 'heating',
+    suggestedName: 'Угольная станция · параметры теплоносителя',
+    text: `Регламент устанавливает: номинальный диаметр трубопровода подачи теплоносителя 5.0 см с максимальным отклонением 0.2 см. Давление в трубопроводе поддерживается на уровне 20.5 атм при допустимом отклонении 1.5 атм, температура подачи теплоносителя — 70 ± 10 °C, расход — 1.5 м³/ч.
+
+При эксплуатации печей и котлоагрегатов на угольном топливе параметры теплоносителя контролируются по утверждённому графику, а отклонения от уставок фиксируются в оперативном журнале. При выходе параметров за допустимые пределы подача топлива и режим горения корректируются немедленно.`,
+  },
+  {
+    id: 'coal-fuel-feed',
+    label: 'Уголь · подача топлива',
+    tag: 'уголь',
+    suggestedDomain: 'safety',
+    suggestedName: 'Угольная станция · дробление и подача топлива',
+    text: `Регламент устанавливает: устройства подготовки и транспортирования твердого топлива должны обеспечивать подачу в топочную часть дробленого и очищенного от посторонних предметов топлива.
+
+Все виды угля и сланца подлежат дроблению до кусков размером до 25 мм, при этом остаток на сите 25 мм не должен превышать 5%. Подача топлива по тракту должна быть равномерной, а оборудование топливоподачи не допускается к работе при неисправных ограждающих или тормозных устройствах.`,
+  },
+  {
+    id: 'coal-storage',
+    label: 'Уголь · хранение и пожарная профилактика',
+    tag: 'уголь',
+    suggestedDomain: 'safety',
+    suggestedName: 'Угольная станция · хранение и пожарная профилактика',
+    text: `Регламент устанавливает: склады угля должны обеспечивать раздельное хранение топлива, механизированную разгрузку и укладку в штабеля, контроль температуры в штабелях и защиту от подтопления.
+
+На оборудовании и конструкциях системы топливоподачи не допускается скопление угольной пыли; помещения должны убираться механизированно по утвержденному графику. При использовании влажного топлива бункеры должны полностью опорожняться и очищаться не реже одного раза в 10 дней.`,
+  },
+]
+
+const DEFAULT_PRESET = EXTRACT_PRESETS[0]
 
 type ExtractedParam = {
   id: string
@@ -314,15 +458,16 @@ type ExtractedParam = {
 
 function ExtractDemo() {
   const navigate = useNavigate()
-  const [text, setText] = useState(EXTRACT_SAMPLE)
+  const [text, setText] = useState(DEFAULT_PRESET.text)
+  const [activePresetId, setActivePresetId] = useState<string>(DEFAULT_PRESET.id)
   // По одному chosen-варианту на suggested_name (по умолчанию — первый из группы).
   // Хранение по ключу id извлечения позволяет надёжно отдиффить
   // выбранные при перезапуске extract.
   const [picked, setPicked] = useState<Record<string, string>>({})
   // suggested_name → включён ли в сборку (по умолчанию все включены).
   const [included, setIncluded] = useState<Record<string, boolean>>({})
-  const [regName, setRegName] = useState('Новый регламент из песочницы')
-  const [domain, setDomain] = useState<string>('heating')
+  const [regName, setRegName] = useState(DEFAULT_PRESET.suggestedName)
+  const [domain, setDomain] = useState<string>(DEFAULT_PRESET.suggestedDomain)
 
   const extract = useMutation({
     mutationFn: () => api.sandbox.extractParameters(text),
@@ -349,6 +494,18 @@ function ExtractDemo() {
 
   const submit = () => {
     if (text.trim()) extract.mutate()
+  }
+
+  // При выборе пресета: подкладываем текст, предлагаем доменное имя/категорию,
+  // сбрасываем результат предыдущего извлечения чтобы не путать.
+  const applyPreset = (p: ExtractPreset) => {
+    setText(p.text)
+    setActivePresetId(p.id)
+    setRegName(p.suggestedName)
+    setDomain(p.suggestedDomain)
+    setPicked({})
+    setIncluded({})
+    extract.reset()
   }
 
   const grouped = useMemo(() => {
@@ -398,15 +555,23 @@ function ExtractDemo() {
         с отсечением по `,;.\\n`. Хорошо работает на формулировках вида «параметр N ± M ед».
       </div>
 
-      {/* Шаг 1 — текст */}
-      <StepHeader n={1} title="Вставь текст регламента" />
-      <textarea
-        rows={9}
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        className="w-full rounded-md border border-stone-200 bg-white px-3 py-2 font-mono text-xs leading-relaxed focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300"
-        placeholder="Вставь сюда фрагмент Постановления или регламентного текста…"
-      />
+      {/* Шаг 1 — текст + галерея примеров справа */}
+      <StepHeader n={1} title="Вставь текст регламента или выбери пример справа" />
+      <div className="flex flex-col gap-3 md:flex-row">
+        <textarea
+          rows={11}
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value)
+            // Юзер начал редактировать вручную — пресет «отвязывается»
+            // (визуально на сайдбаре пропадёт выделение active).
+            if (activePresetId !== '__custom__') setActivePresetId('__custom__')
+          }}
+          className="min-h-[220px] flex-1 rounded-md border border-stone-200 bg-white px-3 py-2 font-mono text-xs leading-relaxed focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300"
+          placeholder="Вставь сюда фрагмент Постановления или регламентного текста…"
+        />
+        <PresetGallery activeId={activePresetId} onPick={applyPreset} />
+      </div>
 
       <div className="flex items-center gap-2">
         <button
@@ -416,12 +581,6 @@ function ExtractDemo() {
         >
           {extract.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileSearch size={14} />}
           Извлечь параметры
-        </button>
-        <button
-          onClick={() => setText(EXTRACT_SAMPLE)}
-          className="text-xs text-stone-500 hover:text-stone-700 underline"
-        >
-          Восстановить пример
         </button>
         {extract.data && (
           <div className="ml-auto text-xs text-stone-500">
@@ -484,6 +643,50 @@ function ExtractDemo() {
           Ошибка: {(extract.error as Error).message}
         </div>
       )}
+    </div>
+  )
+}
+
+function PresetGallery({
+  activeId,
+  onPick,
+}: {
+  activeId: string
+  onPick: (p: ExtractPreset) => void
+}) {
+  return (
+    <div className="w-full shrink-0 md:w-60">
+      <div className="mb-1.5 flex items-center justify-between">
+        <span className="text-xs font-medium text-stone-600">Примеры регламентов</span>
+        <span className="text-[10px] text-stone-400">{EXTRACT_PRESETS.length} шт.</span>
+      </div>
+      <div className="space-y-1">
+        {EXTRACT_PRESETS.map((p) => {
+          const active = activeId === p.id
+          const tag = TAG_COLORS[p.tag]
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onPick(p)}
+              title={p.suggestedName}
+              className={cn(
+                'group flex w-full items-start gap-1.5 rounded-md border px-2 py-1.5 text-left text-xs transition',
+                active
+                  ? 'border-violet-300 bg-violet-50 shadow-sm'
+                  : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50',
+              )}
+            >
+              <span className={cn('mt-0.5 shrink-0 rounded px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide', tag.bg, tag.fg)}>
+                {p.tag}
+              </span>
+              <span className={cn('min-w-0 flex-1 leading-snug', active ? 'font-semibold text-violet-900' : 'text-stone-700')}>
+                {p.label}
+              </span>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 }

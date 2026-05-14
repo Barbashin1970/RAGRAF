@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Loader2, Plus, X } from 'lucide-react'
+import { Loader2, Plus, Wand2, X } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { getDomainVisual } from '@/lib/domains'
@@ -169,22 +169,40 @@ export function CreateRegulationDialog({ open, onClose }: Props) {
           )}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-stone-200 bg-stone-50 px-5 py-3">
+        <div className="flex items-center justify-between gap-2 border-t border-stone-200 bg-stone-50 px-5 py-3">
+          {/* Альтернативный entry-point: «текст → параметры → регламент» через песочницу.
+              Не отменяет шаблонный сценарий, а даёт второй маршрут когда у юзера на руках
+              уже есть Постановление / приказ — не нужно вручную набивать параметры. */}
           <button
-            onClick={onClose}
+            onClick={() => {
+              onClose()
+              navigate('/sandbox?tab=extract')
+            }}
             disabled={create.isPending}
-            className="rounded-md border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+            title="Открыть песочницу с примерами регламентов — extractor предложит параметры из текста"
+            className="inline-flex items-center gap-1.5 rounded-md border border-violet-200 bg-white px-3 py-1.5 text-sm font-medium text-violet-700 hover:border-violet-300 hover:bg-violet-50 disabled:opacity-40"
           >
-            Отмена
+            <Wand2 size={14} />
+            Извлечь из текста
           </button>
-          <button
-            onClick={() => create.mutate()}
-            disabled={!canSubmit}
-            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-60"
-          >
-            {create.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-            {create.isPending ? 'Создаю…' : 'Создать'}
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onClose}
+              disabled={create.isPending}
+              className="rounded-md border border-stone-200 bg-white px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+            >
+              Отмена
+            </button>
+            <button
+              onClick={() => create.mutate()}
+              disabled={!canSubmit}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:opacity-90 disabled:opacity-60"
+            >
+              {create.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+              {create.isPending ? 'Создаю…' : 'Создать'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
