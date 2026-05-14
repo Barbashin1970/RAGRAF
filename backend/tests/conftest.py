@@ -19,6 +19,10 @@ def isolated_data_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
     monkeypatch.setenv("USE_FIXTURES", "true")
     monkeypatch.setenv("WRITEBACK_UPSTREAM", "false")
+    # Принудительно mock-режим для воспроизводимости тестов: реальный RAGU
+    # требует поднятой локальной Ollama, что неприемлемо в CI и не нужно
+    # для проверки фичей не относящихся к LLM.
+    monkeypatch.setenv("RAGU_ENABLED", "false")
 
     # сбрасываем кешированные модуль-уровень глобалы
     import importlib

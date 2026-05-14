@@ -1,23 +1,31 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   Beaker,
   BookOpen,
+  Bot,
   Check,
   ChevronDown,
   ChevronRight,
+  Circle,
+  Cpu,
   FileSearch,
   Lightbulb,
   Loader2,
+  MessageSquare,
   Network,
   PackagePlus,
+  RotateCcw,
   ScanText,
   Search,
-  SearchCheck,
+  Send,
+  Settings2,
   Sparkles,
+  User,
   Wand2,
   X,
+  Zap,
 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
@@ -93,6 +101,7 @@ export function SandboxScreen() {
                 </>
               )}
             </p>
+            <LLMStatusBar />
           </div>
           <div className="hidden shrink-0 items-center gap-2 sm:flex">
             {/* «Что такое RAGU?» — раскрывает подробную справку для руководителя.
@@ -195,7 +204,7 @@ export function SandboxScreen() {
         )}
 
         <div className="mt-4 inline-flex rounded-md border border-stone-200 bg-white p-0.5">
-          <TabButton active={tab === 'search'} onClick={() => setTab('search')} icon={SearchCheck} label="Поиск регламентов" />
+          <TabButton active={tab === 'search'} onClick={() => setTab('search')} icon={MessageSquare} label="Диалог с RAGU" />
           <TabButton active={tab === 'extract'} onClick={() => setTab('extract')} icon={Wand2} label="Извлечь параметры" />
         </div>
       </header>
@@ -233,94 +242,484 @@ function TabButton({
   )
 }
 
-// ── Demo 1: Semantic search ────────────────────────────────────────────
+// ── LLM Status Bar ─────────────────────────────────────────────────────
+//
+// Короткая полоска с самыми важными фактами про работающий LLM-стек:
+// какая модель, достижима ли Ollama, сколько регламентов проиндексировано.
+// Тёмная side — в шапке Песочницы постоянно на виду; обеспечивает доверие
+// «я знаю что под капотом, ничего не отправляется наружу».
 
-const SEARCH_EXAMPLES = [
-  'куда звонить при пожаре в серверной',
-  'параметры зимней нормы давления',
-  'что делать при штиле и pm2.5',
-  'регламент протечки в общежитии',
-]
-
-function SearchDemo() {
-  const [query, setQuery] = useState('')
-
-  const search = useMutation({
-    mutationFn: () => api.sandbox.search(query, 5),
+function LLMStatusBar() {
+  const { data, isError } = useQuery({
+    queryKey: ['sandbox-llm-info'],
+    queryFn: () => api.sandbox.llmInfo(),
+    // Поллим раз в 10 сек чтобы реагировать на загрузку модели в RAM,
+    // ручное переключение модели в .env, разрыв связи с Ollama.
+    refetchInterval: 10_000,
   })
 
-  const submit = () => {
-    if (query.trim()) search.mutate()
+  if (isError || !data) return null
+
+  // В mock-режиме показываем кратко: «нет LLM, всё локально».
+  if (data.mode === 'mock') {
+    return (
+      <div className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-2.5 py-1.5 text-[11px] text-amber-900">
+        <Cpu size={12} className="text-amber-600" />
+        <span><b>Mock-режим</b>: TF-IDF без LLM, ключи и сети не нужны</span>
+        <span className="text-amber-700/60">·</span>
+        <span>индекс: {data.index_size > 0 ? `${data.index_size} рег.` : 'не построен'}</span>
+      </div>
+    )
+  }
+
+  const reachable = data.llm_reachable
+  const loaded = data.llm_loaded_in_memory
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-stone-200 bg-white px-3 py-1.5 text-[11px] text-stone-700">
+      {/* Ollama reachability */}
+      <span className="inline-flex items-center gap-1">
+        <Circle
+          size={8}
+          className={cn(
+            'fill-current',
+            reachable ? 'text-emerald-500' : 'text-rose-500',
+          )}
+        />
+        <span className="text-stone-500">Ollama:</span>
+        <b className={reachable ? 'text-emerald-700' : 'text-rose-700'}>
+          {reachable ? 'на связи' : 'не отвечает'}
+        </b>
+      </span>
+      <span className="text-stone-300">·</span>
+
+      {/* LLM модель */}
+      <span className="inline-flex items-center gap-1" title="LLM модель в Ollama">
+        <Cpu size={11} className="text-violet-500" />
+        <span className="text-stone-500">LLM:</span>
+        <code className="rounded bg-violet-50 px-1 font-mono text-[10px] text-violet-800">
+          {data.llm_model}
+        </code>
+        {loaded && (
+          <span title="модель уже загружена в RAM — следующий запрос будет быстрым">
+            <Zap size={10} className="text-amber-500" />
+          </span>
+        )}
+      </span>
+      <span className="text-stone-300">·</span>
+
+      {/* Embedding модель */}
+      <span className="inline-flex items-center gap-1" title="Embedding модель для retrieval">
+        <span className="text-stone-500">Embed:</span>
+        <code className="rounded bg-stone-100 px-1 font-mono text-[10px] text-stone-700">
+          {data.embed_model}
+        </code>
+      </span>
+      <span className="text-stone-300">·</span>
+
+      {/* Index size */}
+      <span className="inline-flex items-center gap-1" title="Сколько регламентов проиндексировано">
+        <span className="text-stone-500">Индекс:</span>
+        <b className="text-stone-800">{data.index_size}</b>
+        <span className="text-stone-500">рег.</span>
+        {data.index_size > 0 && !data.index_fresh && (
+          <span title="индекс устарел — пересоберётся при следующем запросе">
+            <RotateCcw size={10} className="text-amber-500" />
+          </span>
+        )}
+      </span>
+    </div>
+  )
+}
+
+// ── Demo 1: Conversational Q&A над регламентами ──────────────────────
+
+const CHAT_EXAMPLES = [
+  'куда звонить при пожаре в серверной?',
+  'какие параметры зимней нормы давления?',
+  'что делать при штиле и pm2.5 одновременно?',
+  'регламент при ночной протечке в общежитии',
+]
+
+type ChatTurn = {
+  role: 'user' | 'assistant'
+  content: string
+  sources?: Array<{
+    regulation_id: string
+    regulation_name: string
+    domain?: string | null
+    score: number
+    matched_terms: string[]
+    snippet: string
+    parameters_count: number
+  }>
+  /** mode полученного ответа — на ассистенте; mock vs real */
+  mode?: 'mock' | 'real'
+}
+
+function SearchDemo() {
+  // ChatDemo: переименован остался — роутится из тaba 'search'. Внутри полный
+  // chat с историей: каждый user-турн → API возвращает answer+sources; в UI
+  // показываем как пузырьки, под ответом ассистента — карточки источников.
+  const [turns, setTurns] = useState<ChatTurn[]>([])
+  const [input, setInput] = useState('')
+  const [showSettings, setShowSettings] = useState(false)
+  // Параметры генерации. null = «использовать дефолт сервера»; число = override.
+  const [temperature, setTemperature] = useState<number>(0.1)
+  const [topK, setTopK] = useState<number>(4)
+  const [maxTokens, setMaxTokens] = useState<number>(600)
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+
+  const chat = useMutation({
+    mutationFn: (history: Array<{ role: 'user' | 'assistant'; content: string }>) =>
+      api.sandbox.chat(history, { top_k: topK, temperature, max_tokens: maxTokens }),
+    onSuccess: (data) => {
+      setTurns((t) => [
+        ...t,
+        { role: 'assistant', content: data.answer, sources: data.sources, mode: data.mode },
+      ])
+    },
+    onError: (err) => {
+      setTurns((t) => [
+        ...t,
+        {
+          role: 'assistant',
+          content: `❌ Ошибка: ${(err as Error).message}`,
+          sources: [],
+          mode: 'mock',
+        },
+      ])
+    },
+  })
+
+  // Авто-скролл вниз при появлении нового сообщения.
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [turns, chat.isPending])
+
+  const send = (text?: string) => {
+    const content = (text ?? input).trim()
+    if (!content || chat.isPending) return
+    const next: ChatTurn[] = [...turns, { role: 'user', content }]
+    setTurns(next)
+    setInput('')
+    // Передаём в API только plain {role, content} — без sources/mode.
+    chat.mutate(next.map((m) => ({ role: m.role, content: m.content })))
+  }
+
+  const reset = () => {
+    setTurns([])
+    setInput('')
+    chat.reset()
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4">
-      <div className="rounded-md border border-blue-100 bg-blue-50/40 px-4 py-3 text-xs text-blue-900">
-        Поиск регламентов на естественном языке. Mock-скоринг: совпадение по имени (×3),
-        домену (×2), параметрам (×2), тексту рекомендации (×1) с простой русско-морфологической
-        нормализацией (стем-префикс). Подсветка matched terms в snippet'е.
+    <div className="mx-auto flex h-full max-w-3xl flex-col">
+      <div className="mb-3 rounded-md border border-blue-100 bg-blue-50/40 px-4 py-3 text-xs text-blue-900">
+        Диалог с RAGU поверх корпуса регламентов. Каждый вопрос → retrieval релевантных
+        регламентов (TF-IDF + русский стем) → ответ от локальной LLM (Ollama / phi3) с
+        опорой ТОЛЬКО на найденные документы. История разговора держится в памяти — можно
+        задавать follow-up'ы вроде «а ночью?» после «куда звонить при пожаре?».
       </div>
 
-      <div className="flex gap-2">
-        <div className="relative flex-1">
-          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submit()}
-            placeholder="Спроси на естественном языке…"
-            className="w-full rounded-md border border-stone-200 bg-white py-2 pl-9 pr-3 text-sm focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300"
-          />
+      {/* Лента сообщений */}
+      <div
+        ref={scrollRef}
+        className="min-h-[300px] flex-1 space-y-3 overflow-y-auto rounded-md border border-stone-200 bg-stone-50/40 p-4"
+      >
+        {turns.length === 0 && !chat.isPending && (
+          <EmptyChatHint onPick={send} examples={CHAT_EXAMPLES} />
+        )}
+        {turns.map((t, i) => (
+          <ChatBubble key={i} turn={t} />
+        ))}
+        {chat.isPending && <TypingIndicator />}
+      </div>
+
+      {/* Панель параметров генерации — свернута по умолчанию.
+          Не загромождает основной поток, но всегда доступна одним кликом. */}
+      {showSettings && (
+        <ChatSettings
+          temperature={temperature}
+          topK={topK}
+          maxTokens={maxTokens}
+          onChange={(p) => {
+            if (p.temperature !== undefined) setTemperature(p.temperature)
+            if (p.topK !== undefined) setTopK(p.topK)
+            if (p.maxTokens !== undefined) setMaxTokens(p.maxTokens)
+          }}
+          onReset={() => {
+            setTemperature(0.1)
+            setTopK(4)
+            setMaxTokens(600)
+          }}
+        />
+      )}
+
+      {/* Input bar */}
+      <div className="mt-3 flex items-end gap-2">
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter без Shift = отправить; Shift+Enter = перенос строки.
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              send()
+            }
+          }}
+          rows={1}
+          placeholder={chat.isPending ? 'Жду ответ от LLM…' : 'Задай вопрос про регламенты (Enter — отправить, Shift+Enter — перенос строки)'}
+          disabled={chat.isPending}
+          className="min-h-[42px] max-h-32 flex-1 resize-none rounded-md border border-stone-200 bg-white px-3 py-2 text-sm focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300 disabled:opacity-60"
+        />
+        <button
+          onClick={() => send()}
+          disabled={!input.trim() || chat.isPending}
+          className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700 disabled:opacity-60"
+        >
+          {chat.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+          Отправить
+        </button>
+        <button
+          onClick={() => setShowSettings((v) => !v)}
+          title={showSettings ? 'Скрыть параметры' : 'Параметры генерации (temperature, top-k, max-tokens)'}
+          aria-expanded={showSettings}
+          className={cn(
+            'inline-flex items-center justify-center rounded-md border p-2 transition',
+            showSettings
+              ? 'border-violet-300 bg-violet-50 text-violet-700'
+              : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50',
+          )}
+        >
+          <Settings2 size={14} />
+        </button>
+        {turns.length > 0 && (
+          <button
+            onClick={reset}
+            disabled={chat.isPending}
+            title="Очистить разговор"
+            className="inline-flex items-center justify-center rounded-md border border-stone-200 bg-white p-2 text-stone-600 hover:bg-stone-50 disabled:opacity-40"
+          >
+            <RotateCcw size={14} />
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ChatSettings({
+  temperature,
+  topK,
+  maxTokens,
+  onChange,
+  onReset,
+}: {
+  temperature: number
+  topK: number
+  maxTokens: number
+  onChange: (p: { temperature?: number; topK?: number; maxTokens?: number }) => void
+  onReset: () => void
+}) {
+  return (
+    <div className="mt-3 rounded-md border border-violet-200 bg-violet-50/40 p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-violet-900">
+          <Settings2 size={12} />
+          Параметры генерации
         </div>
         <button
-          onClick={submit}
-          disabled={!query.trim() || search.isPending}
-          className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700 disabled:opacity-60"
+          onClick={onReset}
+          className="text-[10px] text-violet-700 underline hover:text-violet-900"
+          title="Вернуть к дефолтам (temp=0.1, top-k=4, max-tokens=600)"
         >
-          {search.isPending ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-          Найти
+          Сбросить
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        <span className="text-xs text-stone-500">Примеры:</span>
-        {SEARCH_EXAMPLES.map((q) => (
+      <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
+        <ParamSlider
+          label="temperature"
+          value={temperature}
+          min={0}
+          max={1.5}
+          step={0.05}
+          format={(v) => v.toFixed(2)}
+          hint="0 = детерминированно (одинаковые ответы), 1+ = креативно/рискованно"
+          onChange={(v) => onChange({ temperature: v })}
+        />
+        <ParamSlider
+          label="top-k regulations"
+          value={topK}
+          min={1}
+          max={10}
+          step={1}
+          format={(v) => `${v}`}
+          hint="Сколько регламентов кладём в контекст. Меньше = точнее, больше = шире покрытие"
+          onChange={(v) => onChange({ topK: v })}
+        />
+        <ParamSlider
+          label="max tokens"
+          value={maxTokens}
+          min={50}
+          max={2000}
+          step={50}
+          format={(v) => `${v}`}
+          hint="Лимит длины ответа. 600 ≈ 3–5 пунктов структурированного ответа"
+          onChange={(v) => onChange({ maxTokens: v })}
+        />
+      </div>
+      <div className="mt-2 text-[10px] text-violet-700/70">
+        Изменения применяются к следующему сообщению; на текущий разговор уже отправленные не влияют.
+      </div>
+    </div>
+  )
+}
+
+function ParamSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  format,
+  hint,
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  onChange: (v: number) => void
+  format: (v: number) => string
+  hint: string
+}) {
+  return (
+    <label className="block">
+      <div className="mb-0.5 flex items-baseline justify-between">
+        <span className="font-medium text-violet-900">{label}</span>
+        <span className="font-mono text-violet-700">{format(value)}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-violet-600"
+      />
+      <div className="mt-0.5 text-[10px] leading-tight text-violet-700/70">{hint}</div>
+    </label>
+  )
+}
+
+function EmptyChatHint({
+  onPick,
+  examples,
+}: {
+  onPick: (text: string) => void
+  examples: string[]
+}) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center py-8 text-center">
+      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-violet-100">
+        <Bot size={22} className="text-violet-700" />
+      </div>
+      <div className="mb-1 text-sm font-medium text-stone-800">Диалог пуст</div>
+      <div className="mb-4 text-xs text-stone-500">
+        Задай вопрос про регламенты — или начни с примера ниже.
+      </div>
+      <div className="flex max-w-md flex-wrap justify-center gap-1.5">
+        {examples.map((q) => (
           <button
             key={q}
-            onClick={() => {
-              setQuery(q)
-            }}
-            className="rounded-full border border-stone-200 bg-white px-2.5 py-0.5 text-xs text-stone-600 transition hover:border-violet-300 hover:bg-violet-50"
+            onClick={() => onPick(q)}
+            className="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs text-violet-700 transition hover:border-violet-300 hover:bg-violet-50"
           >
             {q}
           </button>
         ))}
       </div>
+    </div>
+  )
+}
 
-      {search.data && (
-        <div>
-          <div className="mb-2 text-xs text-stone-500">
-            Найдено <b className="text-stone-800">{search.data.results.length}</b> релевантных регламентов
+function TypingIndicator() {
+  return (
+    <div className="flex items-start gap-2">
+      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100">
+        <Bot size={14} className="text-violet-700" />
+      </div>
+      <div className="rounded-2xl rounded-tl-sm border border-stone-200 bg-white px-4 py-2.5">
+        <div className="flex gap-1">
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-400 [animation-delay:-0.3s]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-400 [animation-delay:-0.15s]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-400" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ChatBubble({ turn }: { turn: ChatTurn }) {
+  const isUser = turn.role === 'user'
+  return (
+    <div className={cn('flex items-start gap-2', isUser && 'flex-row-reverse')}>
+      <div
+        className={cn(
+          'flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
+          isUser ? 'bg-stone-200' : 'bg-violet-100',
+        )}
+      >
+        {isUser ? (
+          <User size={14} className="text-stone-700" />
+        ) : (
+          <Bot size={14} className="text-violet-700" />
+        )}
+      </div>
+      <div className={cn('max-w-[80%] space-y-2', isUser && 'items-end')}>
+        <div
+          className={cn(
+            'whitespace-pre-wrap break-words rounded-2xl px-4 py-2.5 text-sm',
+            isUser
+              ? 'rounded-tr-sm bg-violet-600 text-white'
+              : 'rounded-tl-sm border border-stone-200 bg-white text-stone-800',
+          )}
+        >
+          {turn.content}
+        </div>
+        {!isUser && turn.mode && (
+          <div className="text-[10px] text-stone-400">
+            {turn.mode === 'real' ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-emerald-700">
+                <Sparkles size={9} /> ответ от локальной LLM (Ollama)
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-amber-700">
+                mock-режим: без LLM
+              </span>
+            )}
           </div>
-          {search.data.results.length === 0 ? (
-            <div className="rounded-md border border-dashed border-stone-300 bg-white p-8 text-center text-sm text-stone-500">
-              По запросу «{query}» ничего не нашлось. Попробуй переформулировать.
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {search.data.results.map((r) => (
-                <SearchResultCard key={r.regulation_id} result={r} matchedTerms={r.matched_terms} />
+        )}
+        {!isUser && turn.sources && turn.sources.length > 0 && (
+          <details className="rounded-md border border-stone-200 bg-white/60">
+            <summary className="cursor-pointer select-none px-3 py-1.5 text-[11px] font-medium text-stone-600 hover:text-stone-800">
+              📎 Источники ({turn.sources.length})
+            </summary>
+            <ul className="space-y-1.5 px-3 pb-2 pt-1">
+              {turn.sources.map((r) => (
+                <li key={r.regulation_id}>
+                  <SearchResultCard result={r} matchedTerms={r.matched_terms} />
+                </li>
               ))}
             </ul>
-          )}
-        </div>
-      )}
-
-      {search.isError && (
-        <div className="rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
-          Ошибка: {(search.error as Error).message}
-        </div>
-      )}
+          </details>
+        )}
+      </div>
     </div>
   )
 }

@@ -22,8 +22,31 @@ def _ensure_enabled() -> None:
 _kg: Any | None = None
 
 
+# Размерности embedding-моделей (выход — вектор фиксированной длины).
+# Используется для конфигурации EmbedderOpenAI и vector-store.
+_EMBED_DIMS: dict[str, int] = {
+    "bge-m3": 1024,
+    "nomic-embed-text": 768,
+    "mxbai-embed-large": 1024,
+    "snowflake-arctic-embed": 1024,
+    "all-minilm": 384,
+}
+
+
+def _embed_dim(model_name: str) -> int:
+    """Размерность embedding-вектора по имени модели. Дефолт 1024 — самый распространённый."""
+    base = model_name.split(":")[0].lower()
+    return _EMBED_DIMS.get(base, 1024)
+
+
 def get_knowledge_graph() -> Any:
-    """Lazy singleton — initialises RAGU on first call."""
+    """Lazy singleton — initialises RAGU on first call.
+
+    Новый API (graph_ragu 0.0.2+): сначала общий CachedAsyncOpenAI клиент,
+    потом LLMOpenAI(client=..., model_name=...) и EmbedderOpenAI(client=..., model_name=..., dim=...).
+    Раньше клиент пробрасывался кусками в каждый wrapper — отказались в пользу
+    единого клиента с rate-limit/retry/cache shared.
+    """
     global _kg
     _ensure_enabled()
     if _kg is not None:
@@ -32,21 +55,22 @@ def get_knowledge_graph() -> Any:
         from ragu import BuilderArguments, KnowledgeGraph, Settings as RaguSettings  # type: ignore
         from ragu.models.embedder import EmbedderOpenAI  # type: ignore
         from ragu.models.llm import LLMOpenAI  # type: ignore
+        from ragu.models.openai import CachedAsyncOpenAI  # type: ignore
     except ImportError as e:
         raise RaguDisabled(f"RAGU не установлен: {e}") from e
 
     RaguSettings.language = "russian"
     RaguSettings.storage_folder = settings.ragu_storage_folder
 
-    llm = LLMOpenAI(
-        model=settings.ragu_llm_model,
+    client = CachedAsyncOpenAI(
         base_url=settings.openai_base_url or None,
         api_key=settings.openai_api_key or None,
     )
+    llm = LLMOpenAI(client=client, model_name=settings.ragu_llm_model)
     embedder = EmbedderOpenAI(
-        model=settings.ragu_embed_model,
-        base_url=settings.openai_base_url or None,
-        api_key=settings.openai_api_key or None,
+        client=client,
+        model_name=settings.ragu_embed_model,
+        dim=_embed_dim(settings.ragu_embed_model),
     )
 
     builder = BuilderArguments(
@@ -54,7 +78,16 @@ def get_knowledge_graph() -> Any:
         make_community_summary=True,
         remove_isolated_nodes=True,
     )
-    _kg = KnowledgeGraph(llm=llm, embedder=embedder, builder_args=builder)
+    # graph_ragu 0.0.2+: builder_settings (раньше builder_args); language прокидываем
+    # отдельным kwarg; tokenizer-имена оставляем gpt-4o / text-embedding-3-large для
+    # tiktoken-подсчёта — это безопасный fallback и под Ollama-модели подойдёт
+    # (мы не используем точный token-budget, а только индикативно ограничиваем chunk).
+    _kg = KnowledgeGraph(
+        llm=llm,
+        embedder=embedder,
+        builder_settings=builder,
+        language="russian",
+    )
     return _kg
 
 

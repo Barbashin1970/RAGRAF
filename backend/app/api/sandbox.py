@@ -18,6 +18,25 @@ class SearchRequest(BaseModel):
     top_k: int = Field(5, ge=1, le=20)
 
 
+class ChatMessage(BaseModel):
+    role: str = Field(..., pattern="^(user|assistant|system)$")
+    content: str
+
+
+class ChatRequest(BaseModel):
+    """Тело /sandbox/chat.
+
+    `temperature` и `max_tokens` опциональны — если не заданы, используем
+    серверные дефолты (0.1 и 600). Клампы здесь и есть линия защиты —
+    клиенту не доверяем, потому что temperature > 1.5 даёт неконтролируемые
+    бредовые ответы, а max_tokens > 4000 может на phi3 уронить контекст.
+    """
+    messages: list[ChatMessage] = Field(..., min_length=1)
+    top_k: int = Field(4, ge=1, le=10)
+    temperature: float | None = Field(None, ge=0.0, le=1.5)
+    max_tokens: int | None = Field(None, ge=50, le=4000)
+
+
 class ExtractRequest(BaseModel):
     text: str = Field(..., description="Сырой текст регламента (фрагмент Постановления, описание и т.п.)")
 
@@ -49,6 +68,87 @@ def sandbox_status() -> dict[str, Any]:
         "demos": ["semantic-search", "extract-parameters"],
         "backlog": ["knowledge-graph", "compare-regulations"],
     }
+
+
+@router.post("/sandbox/chat")
+async def sandbox_chat(req: ChatRequest) -> dict[str, Any]:
+    """Conversational Q&A над регламентами.
+
+    Принимает историю чата (user/assistant turns), возвращает следующий ответ
+    ассистента + список регламентов-источников (sources). При `RAGU_ENABLED=true`
+    и достижимой Ollama — ответ генерирует LLM с retrieved-регламентами в
+    system-prompt'е. В mock-режиме возвращает шаблонный ответ со списком найденного.
+
+    Семантика follow-up'ов: LLM видит всю историю, так что вопрос «а ночью?» после
+    «куда звонить при пожаре?» интерпретируется в контексте предыдущего ответа.
+    """
+    return await sandbox.chat(
+        [m.model_dump() for m in req.messages],
+        top_k=req.top_k,
+        temperature=req.temperature,
+        max_tokens=req.max_tokens,
+    )
+
+
+@router.get("/sandbox/llm-info")
+async def sandbox_llm_info() -> dict[str, Any]:
+    """Подробная информация о LLM-стеке: текущие модели, доступность Ollama,
+    список установленных моделей, размер семантического индекса, дефолты
+    параметров генерации. Используется UI для отображения «состояние» в шапке
+    Песочницы и в панели управления генерацией.
+    """
+    from app.services import embedding_index
+    from app.config import settings as cfg
+
+    info: dict[str, Any] = {
+        "mode": sandbox.backend_mode(),
+        "ragu_enabled": cfg.ragu_enabled,
+        "llm_model": cfg.ragu_llm_model,
+        "embed_model": cfg.ragu_embed_model,
+        "base_url": cfg.openai_base_url or None,
+        "defaults": {"temperature": 0.1, "top_k": 4, "max_tokens": 600},
+        "limits": {
+            "temperature": [0.0, 1.5],
+            "top_k": [1, 10],
+            "max_tokens": [50, 4000],
+        },
+        "llm_reachable": False,
+        "llm_loaded_in_memory": False,
+        "available_models": [],
+        "index_size": 0,
+    }
+
+    # Пингуем Ollama без падения если её нет.
+    if cfg.openai_base_url:
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=2.0) as client:
+                # /api/tags — список всех скачанных моделей
+                tags_url = cfg.openai_base_url.rstrip("/").rstrip("/v1") + "/api/tags"
+                resp = await client.get(tags_url)
+                if resp.status_code == 200:
+                    info["llm_reachable"] = True
+                    data = resp.json()
+                    info["available_models"] = [m["name"] for m in data.get("models", [])]
+                # /api/ps — модели, загруженные в RAM прямо сейчас
+                ps_url = cfg.openai_base_url.rstrip("/").rstrip("/v1") + "/api/ps"
+                resp = await client.get(ps_url)
+                if resp.status_code == 200:
+                    loaded = [m["name"] for m in resp.json().get("models", [])]
+                    info["llm_loaded_in_memory"] = cfg.ragu_llm_model in loaded
+                    info["loaded_models"] = loaded
+        except Exception:
+            pass
+
+    # Размер embedding-индекса — без побочных эффектов (если ещё не построен, не строим).
+    try:
+        idx = embedding_index.get_index()
+        info["index_size"] = len(idx._vectors)
+        info["index_fresh"] = idx.is_fresh()
+    except Exception:
+        pass
+
+    return info
 
 
 @router.post("/sandbox/search")

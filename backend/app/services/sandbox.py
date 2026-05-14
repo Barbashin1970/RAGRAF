@@ -322,3 +322,149 @@ def is_real_ragu_available() -> bool:
 def backend_mode() -> str:
     """`real` / `mock` — для UI индикатора."""
     return "real" if is_real_ragu_available() else "mock"
+
+
+# ── Conversational Q&A над регламентами ──────────────────────────────
+
+
+def _build_regulation_context(hits: list[dict[str, Any]], max_regs: int = 4) -> str:
+    """Собрать компактный контекст из top-N регламентов для LLM-prompt'а.
+
+    Каждый регламент даёт: имя, ID, домен, параметры (name=ref±dev unit) и текст
+    рекомендации. Этого хватает чтобы phi3-class модель сгенерировала осмысленный
+    ответ с цитатами, не уходя в галлюцинации.
+    """
+    parts: list[str] = []
+    for h in hits[:max_regs]:
+        reg = regulation_store.get(h["regulation_id"])
+        if reg is None:
+            continue
+        params_str = ", ".join(
+            f"{p.name}={p.referenceValue}±{p.deviationAllowed or 0}{(' ' + p.unit) if p.unit else ''}"
+            for p in reg.parameters
+        ) if reg.parameters else "(параметры не заданы)"
+        rec_text = reg.recommendations[0].text if reg.recommendations else "(рекомендация не задана)"
+        parts.append(
+            f"### {reg.name}\n"
+            f"ID: {reg.id} · Домен: {reg.domain or '—'}\n"
+            f"Параметры: {params_str}\n"
+            f"Рекомендация: {rec_text}"
+        )
+    return "\n\n".join(parts)
+
+
+def _mock_chat_answer(question: str, hits: list[dict[str, Any]]) -> str:
+    """Fallback-ответ без LLM — просто компонуем найденные регламенты."""
+    if not hits:
+        return (
+            f"По запросу «{question}» подходящих регламентов не нашлось. "
+            "Попробуй переформулировать или уточнить домен (теплоснабжение / ЖКХ / безопасность / экология)."
+        )
+    lines = [f"По запросу «{question}» нашлось {len(hits)} релевантных регламентов:\n"]
+    for h in hits[:4]:
+        lines.append(f"• **{h['regulation_name']}** (`{h['regulation_id']}`)")
+        if h.get("snippet"):
+            lines.append(f"  {h['snippet']}")
+    lines.append(
+        "\n_Это mock-режим: совпадение по ключевым словам. Включи RAGU_ENABLED=true "
+        "+ локальную Ollama для генеративного ответа._"
+    )
+    return "\n".join(lines)
+
+
+async def chat(
+    messages: list[dict[str, str]],
+    top_k: int = 4,
+    temperature: float | None = None,
+    max_tokens: int | None = None,
+) -> dict[str, Any]:
+    """Conversational Q&A: retrieval (mock TF-IDF) → LLM-grounded answer (Ollama).
+
+    Логика:
+      1. Берём последнее user-сообщение как retrieval query.
+      2. semantic_search ищет top-N релевантных регламентов.
+      3. Если RAGU включён И Ollama достижима → инжектируем регламенты в
+         system-prompt и зовём LLM с полной историей (поддерживает follow-up'ы).
+      4. Иначе — текстовый fallback со списком найденного (mock-режим).
+    """
+    if not messages:
+        return {"answer": "Нет сообщений в истории.", "sources": [], "mode": backend_mode()}
+
+    last_user = next((m for m in reversed(messages) if m.get("role") == "user"), None)
+    if not last_user or not (last_user.get("content") or "").strip():
+        return {"answer": "Пустой запрос. Задай вопрос про регламенты.", "sources": [], "mode": backend_mode()}
+
+    query = last_user["content"].strip()
+
+    if not is_real_ragu_available():
+        # Mock-режим — используем TF-IDF, embeddings требуют Ollama.
+        hits = semantic_search(query, top_k=top_k)
+        return {"answer": _mock_chat_answer(query, hits), "sources": hits, "mode": "mock"}
+
+    # Real-режим: семантический retrieval через bge-m3 embeddings. Это
+    # принципиально лучше TF-IDF на русских формулировках с синонимами
+    # («наводнение» ↔ «протечка» ↔ «вода»), и не ловит общие предлоги
+    # вроде «при» / «и» / «в» которые TF-IDF матчит на каждом регламенте.
+    try:
+        from app.services.embedding_index import semantic_search_embeddings
+        hits = await semantic_search_embeddings(query, top_k=top_k)
+    except Exception:
+        # Если embeddings отвалились (Ollama офлайн) — fallback на TF-IDF.
+        hits = semantic_search(query, top_k=top_k)
+
+    context = _build_regulation_context(hits) if hits else "(подходящих регламентов в базе не найдено)"
+    # Усиленный промпт: явный антигаллюцинационный режим, структура, чёткий
+    # анти-template отказ ("в базе нет такого регламента"). phi3:mini слабо
+    # следует инструкциям — поэтому повторяем правило дважды.
+    system_prompt = f"""Ты — ассистент по техническим регламентам ВУЗа, ТЭЦ и городской инфраструктуры.
+
+СТРОГИЕ ПРАВИЛА:
+1. Используй ТОЛЬКО регламенты из контекста ниже. Не подмешивай знания из тренировки.
+2. Если в предоставленных регламентах нет ответа на вопрос — ответь дословно: «В базе нет регламента, описывающего этот сценарий. Доступные темы: <перечисли названия имеющихся регламентов>.»
+3. НЕ повторяй ответ предыдущего сообщения если вопрос другой — каждый запрос разбирай заново.
+4. Не выдумывай числовые параметры. Цитируй только те значения, что явно перечислены в разделе «Параметры:» регламента.
+5. Структурируй ответ: 1-3 коротких пункта с действиями + одна строка «Источник: <имя регламента> ({{regulation_id}})».
+
+=== ДОСТУПНЫЕ РЕГЛАМЕНТЫ ===
+{context}
+=== КОНЕЦ КОНТЕКСТА ==="""
+
+    llm_messages: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
+    for m in messages:
+        role = m.get("role")
+        if role not in ("user", "assistant"):
+            continue
+        content = (m.get("content") or "").strip()
+        if not content:
+            continue
+        llm_messages.append({"role": role, "content": content})
+
+    try:
+        from openai import AsyncOpenAI
+        client = AsyncOpenAI(
+            base_url=settings.openai_base_url or None,
+            api_key=settings.openai_api_key or "ollama",
+            timeout=60.0,
+        )
+        # Дефолты подобраны под технические Q&A: temp=0.1 минимизирует галлюцинации,
+        # 600 токенов хватает на структурированный ответ из 3-5 пунктов.
+        # Клиент может переопределить через UI-слайдеры — клампы уже валидированы
+        # в API-схеме (sandbox.py ChatRequest).
+        resp = await client.chat.completions.create(
+            model=settings.ragu_llm_model,
+            messages=llm_messages,
+            max_tokens=max_tokens if max_tokens is not None else 600,
+            temperature=temperature if temperature is not None else 0.1,
+        )
+        answer = (resp.choices[0].message.content or "").strip()
+        if not answer:
+            answer = "(LLM вернула пустой ответ — попробуй переформулировать)"
+        return {"answer": answer, "sources": hits, "mode": "real"}
+    except Exception as e:
+        # Fallback на mock при любом сбое LLM-вызова (Ollama офлайн, модель не загружена и т.п.)
+        fallback = _mock_chat_answer(query, hits)
+        return {
+            "answer": f"_⚠️ LLM недоступна ({type(e).__name__}: {str(e)[:120]}), показываю mock-ответ._\n\n{fallback}",
+            "sources": hits,
+            "mode": "mock",
+        }

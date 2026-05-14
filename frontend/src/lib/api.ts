@@ -125,6 +125,8 @@ import {
   sandboxSearchResponseSchema,
   sandboxStatusSchema,
   deleteRegulationResponseSchema,
+  sandboxChatResponseSchema,
+  sandboxLlmInfoSchema,
   saveResponseSchema,
   searchResponseSchema,
   shaclImportResponseSchema,
@@ -300,6 +302,16 @@ export const api = {
         { method: 'POST', body: JSON.stringify({ query, top_k }) },
         sandboxSearchResponseSchema,
       ),
+    chat: (
+      messages: Array<{ role: 'user' | 'assistant'; content: string }>,
+      params: { top_k?: number; temperature?: number; max_tokens?: number } = {},
+    ) =>
+      request(
+        `/api/sandbox/chat`,
+        { method: 'POST', body: JSON.stringify({ messages, ...params }) },
+        sandboxChatResponseSchema,
+      ),
+    llmInfo: () => request(`/api/sandbox/llm-info`, undefined, sandboxLlmInfoSchema),
     extractParameters: (text: string) =>
       request(
         `/api/sandbox/extract-parameters`,

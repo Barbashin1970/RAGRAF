@@ -253,6 +253,36 @@ export const sandboxSearchResponseSchema = z.object({
   results: z.array(sandboxSearchResultSchema),
 })
 
+export const sandboxChatResponseSchema = z.object({
+  answer: z.string(),
+  sources: z.array(sandboxSearchResultSchema),
+  mode: z.enum(['mock', 'real']),
+})
+
+export const sandboxLlmInfoSchema = z.object({
+  mode: z.enum(['mock', 'real']),
+  ragu_enabled: z.boolean(),
+  llm_model: z.string(),
+  embed_model: z.string(),
+  base_url: z.string().nullable(),
+  defaults: z.object({
+    temperature: z.number(),
+    top_k: z.number(),
+    max_tokens: z.number(),
+  }),
+  limits: z.object({
+    temperature: z.tuple([z.number(), z.number()]),
+    top_k: z.tuple([z.number(), z.number()]),
+    max_tokens: z.tuple([z.number(), z.number()]),
+  }),
+  llm_reachable: z.boolean(),
+  llm_loaded_in_memory: z.boolean(),
+  available_models: z.array(z.string()),
+  loaded_models: z.array(z.string()).optional(),
+  index_size: z.number(),
+  index_fresh: z.boolean().optional(),
+})
+
 export const sandboxExtractedParamSchema = z.object({
   id: z.string(),
   suggested_name: z.string(),
