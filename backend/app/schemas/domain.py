@@ -61,6 +61,17 @@ class Regulation(BaseModel):
     parameters: list[Parameter] = Field(default_factory=list)
     constraints: list[Constraint] = Field(default_factory=list)
     recommendations: list[Recommendation] = Field(default_factory=list)
+    # SIGMA-compliance (ТЗ §4.1.3 «каждое правило связано с источником,
+    # периодом действия и историей изменений»):
+    # - source_document: название нормативного акта («СП 124.13330.2012»)
+    # - source_clause:   пункт / раздел внутри документа («§5.10», «п. 7.2.3»)
+    # - valid_from / valid_to: ISO-даты периода действия (опционально)
+    # Нужно для объяснимости решений (§4.2.2 #3) и применения «тех правил,
+    # которые действовали на момент возникновения события» (§4.1.3).
+    source_document: str | None = None
+    source_clause: str | None = None
+    valid_from: str | None = None
+    valid_to: str | None = None
 
 
 # --- Rule DSL -----------------------------------------------------------

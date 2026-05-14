@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
   AlertTriangle,
+  BookOpen,
   Boxes,
   FileText,
   ListTree,
@@ -39,6 +40,10 @@ interface RegRow {
   parameters_count?: number
   constraints_count?: number
   recommendations_count?: number
+  // SIGMA-compliance: критичность (priority 1/2/3) + срок + норматив.
+  priority?: 1 | 2 | 3 | null
+  valid_to?: string | null
+  source_document?: string | null
 }
 
 function extractRow(d: unknown): RegRow | null {
@@ -49,6 +54,9 @@ function extractRow(d: unknown): RegRow | null {
     if (typeof id !== 'string') return null
     const name = typeof o.name === 'string' ? o.name : id
     const domain = typeof o.domain === 'string' ? o.domain : null
+    const pr = typeof o.priority === 'number' && [1, 2, 3].includes(o.priority)
+      ? (o.priority as 1 | 2 | 3)
+      : null
     return {
       id,
       name,
@@ -56,8 +64,28 @@ function extractRow(d: unknown): RegRow | null {
       parameters_count: typeof o.parameters_count === 'number' ? o.parameters_count : undefined,
       constraints_count: typeof o.constraints_count === 'number' ? o.constraints_count : undefined,
       recommendations_count: typeof o.recommendations_count === 'number' ? o.recommendations_count : undefined,
+      priority: pr,
+      valid_to: typeof o.valid_to === 'string' ? o.valid_to : null,
+      source_document: typeof o.source_document === 'string' ? o.source_document : null,
     }
   }
+  return null
+}
+
+const PRIORITY_META: Record<1 | 2 | 3, { label: string; tone: 'danger' | 'warning' | 'neutral' }> = {
+  1: { label: 'критический', tone: 'danger' },
+  2: { label: 'важный', tone: 'warning' },
+  3: { label: 'обычный', tone: 'neutral' },
+}
+
+function expirationBadge(valid_to: string | null | undefined): { label: string; tone: 'danger' | 'warning' } | null {
+  if (!valid_to) return null
+  const exp = new Date(valid_to + 'T00:00:00')
+  if (isNaN(exp.getTime())) return null
+  const now = new Date()
+  const days = Math.floor((exp.getTime() - now.getTime()) / 86_400_000)
+  if (days < 0) return { label: `истёк ${valid_to}`, tone: 'danger' }
+  if (days < 60) return { label: `до ${valid_to}`, tone: 'warning' }
   return null
 }
 
@@ -126,9 +154,14 @@ export function RegulationList() {
       <PageHeader
         icon={ListTree}
         tone="model"
-        title="Регламенты"
-        badges={<Badge tone="info" uppercase>Model Layer</Badge>}
-        description="Карта регламентов по доменам — правила, ограничения SHACL и потоки реагирования."
+        title="Цифровые регламенты"
+        badges={
+          <>
+            <Badge tone="info" uppercase>Model Layer</Badge>
+            <Badge tone="neutral">SIGMA §4.1.3</Badge>
+          </>
+        }
+        description="Машиноисполняемые представления норм: параметры, SHACL-ограничения, потоки реагирования. Каждый связан с источником в нормативной базе и периодом действия."
         actions={
           <div className="hidden flex-wrap items-center gap-2 sm:flex">
             <Stat icon={FileText} value={totals.regs}        label="регл." />
@@ -271,7 +304,7 @@ function RegulationCard({ reg, visual }: { reg: RegRow; visual: DomainVisual }) 
 
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 p-3 sm:flex-nowrap">
         <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-2">
+          <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
             <Link
               to={`/regulations/${reg.id}/edit`}
               className="line-clamp-2 font-medium leading-snug text-stone-900 transition hover:text-primary"
@@ -279,6 +312,18 @@ function RegulationCard({ reg, visual }: { reg: RegRow; visual: DomainVisual }) 
             >
               {reg.name}
             </Link>
+            {/* SIGMA: критичность + срок действия — самая видимая семантика
+                регламента. Бэйджи стоят рядом с названием, чтобы аналитик
+                сразу понимал «горящий это регламент или нет». */}
+            {reg.priority && (
+              <Badge tone={PRIORITY_META[reg.priority].tone}>
+                {PRIORITY_META[reg.priority].label}
+              </Badge>
+            )}
+            {(() => {
+              const exp = expirationBadge(reg.valid_to)
+              return exp ? <Badge tone={exp.tone}>{exp.label}</Badge> : null
+            })()}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
             <code className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-[11px] text-stone-600">
@@ -300,6 +345,12 @@ function RegulationCard({ reg, visual }: { reg: RegRow; visual: DomainVisual }) 
               <span className="inline-flex items-center gap-1">
                 <AlertCircle size={11} className="text-stone-400" />
                 {reg.recommendations_count} рекомендации
+              </span>
+            )}
+            {reg.source_document && (
+              <span className="inline-flex items-center gap-1 italic" title="Нормативный документ">
+                <BookOpen size={11} className="text-stone-400" />
+                {reg.source_document}
               </span>
             )}
           </div>

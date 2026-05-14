@@ -145,7 +145,12 @@ def semantic_search(query: str, top_k: int = 5) -> list[dict[str, Any]]:
 
 # Словарь контекстных слов (русск.) → camelCase parameter name.
 # Используется чтобы для матча "давление 20.5 атм" вытащить name=pressure.
+#
+# Порядок не важен — `_guess_name` берёт стем с максимальным `rfind` (ближе к
+# числу). Стемы могут быть многословные ("пик нагрузк") и пересекаться по
+# подстрокам — это нормально, выигрывает ближайший к числу.
 CONTEXT_NAMES: dict[str, str] = {
+    # — Физические параметры
     "температур": "temperature",
     "давлен": "pressure",
     "диаметр": "diameter",
@@ -168,6 +173,23 @@ CONTEXT_NAMES: dict[str, str] = {
     "время": "responseTime",
     "реакц": "responseTime",
     "приоритет": "priority",
+    # — Оповещения / уведомления (Sigma 4.2.1)
+    "уведомлен": "notificationLeadTime",
+    "оповещен": "alertLeadTime",
+    "оповещ": "alertLeadTime",
+    "смс": "smsLeadTime",
+    "sms": "smsLeadTime",
+    "упрежда": "advanceLeadTime",
+    "до прогноз": "forecastLeadTime",
+    "до пика": "peakLoadLeadTime",
+    "пик нагрузк": "peakLoadLeadTime",
+    # — Регламенты режима / ремонт
+    "очист": "cleaningInterval",
+    "уборк": "cleaningInterval",
+    "опорожн": "drainInterval",
+    "штабел": "stockpileTemperature",
+    "повтор": "repeatCount",
+    "не менее одного раза": "minRepeatCount",
 }
 
 # Известные единицы — порядок имеет значение (длинные первыми).
@@ -243,6 +265,49 @@ def _guess_name(window: str) -> str | None:
     return best[1] if best else None
 
 
+def _guess_name_with_fallback(text: str, match_start: int, match_end: int) -> str | None:
+    """Многоуровневый поиск имени параметра.
+
+    Раньше использовали только окно 80 символов слева — это не работает на
+    текстах где ключевое слово стоит в начале абзаца, а само число — в конце
+    длинного предложения. Пример из реального регламента:
+      "SMS-уведомления уязвимым группам потребителей, а также ответственным
+       лицам объектов социальной инфраструктуры отправляются за 6 ± 2 часа..."
+    Слово «уведомления» — за пределами 80-char окна, поэтому extract возвращал
+    `param_1` вместо `notificationLeadTime`.
+
+    Стратегия (от ближнего к дальнему контексту):
+      1. Окно 80 символов слева — самый сильный сигнал (proximity).
+      2. Если не нашли — целое предложение, в котором лежит число.
+      3. Если всё ещё нет — предыдущее предложение (часто заголовок абзаца).
+    Возвращаем None если ничего не подошло (вызывающая сторона ставит
+    русско-язычный плейсхолдер).
+    """
+    # 1. Узкое окно слева — приоритет proximity
+    near = _left_context(text, match_start, width=80)
+    name = _guess_name(near)
+    if name:
+        return name
+
+    # 2. Целое предложение вокруг матча
+    sentence = _enclosing_sentence(text, match_start, match_end)
+    name = _guess_name(sentence)
+    if name:
+        return name
+
+    # 3. Предыдущее предложение (для конструкций «Заголовок: ... 6 ± 2 ч ...»)
+    prev_chunk = text[max(0, match_start - 400) : match_start]
+    last_sent_break = max(
+        prev_chunk.rfind(". "),
+        prev_chunk.rfind(".\n"),
+        prev_chunk.rfind(": "),
+        prev_chunk.rfind(":\n"),
+    )
+    if last_sent_break != -1:
+        prev_chunk = prev_chunk[: last_sent_break + 1]
+    return _guess_name(prev_chunk)
+
+
 def _enclosing_sentence(text: str, start: int, end: int) -> str:
     """Возвращает целое предложение, в котором лежит match."""
     sent_start = max(text.rfind(".", 0, start), text.rfind(";", 0, start), text.rfind("\n", 0, start))
@@ -279,8 +344,9 @@ def extract_parameters(text: str) -> list[dict[str, Any]]:
         if value is None:
             continue
 
-        window = _left_context(text, m.start())
-        suggested = _guess_name(window)
+        # Многоуровневый поиск имени: окно 80 → предложение → предыдущее
+        # предложение. Подробнее см. `_guess_name_with_fallback`.
+        suggested = _guess_name_with_fallback(text, m.start(), m.end())
         confidence = 0.85 if suggested else 0.4
         # Слегка повышаем confidence если есть симметричное deviation —
         # это сильно похоже на наш формат "ref ± dev unit".
@@ -289,10 +355,16 @@ def extract_parameters(text: str) -> list[dict[str, Any]]:
 
         sentence = _enclosing_sentence(text, m.start(), m.end())
 
+        # Если имя не угадали — даём осмысленный русский плейсхолдер
+        # (не "param_N" — не путаем аналитика английским литералом, плюс
+        # явно сигналим «надо переименовать вручную»).
+        if not suggested:
+            suggested = f"параметр_{len(found) + 1}"
+
         found.append(
             {
                 "id": f"ext_{uuid.uuid4().hex[:8]}",
-                "suggested_name": suggested or f"param_{len(found) + 1}",
+                "suggested_name": suggested,
                 "value": value,
                 "deviation": deviation,
                 "unit": unit,

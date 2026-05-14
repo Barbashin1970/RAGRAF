@@ -4,25 +4,39 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   Archive,
+  BookOpen,
+  CalendarClock,
+  Calendar,
   ChevronDown,
   ChevronUp,
   CircleSlash,
   CopyCheck,
   FileCode2,
+  Flag,
+  GitCommit,
+  Hash,
   History,
+  Info,
   type LucideIcon,
+  ListTodo,
+  MessageSquare,
   Plus,
+  Ruler,
   RotateCcw,
   Save,
   Send,
+  ShieldCheck,
   Sliders,
+  Tag,
+  Target,
+  Timer,
   Trash2,
 } from 'lucide-react'
 import { api, type Parameter, type Regulation } from '@/lib/api'
 import { nanoid } from '@/lib/nanoid'
 import { cn } from '@/lib/cn'
 import { deriveSliderRange, fillPercent as computeFillPercent } from '@/lib/sliderDomain'
-import { Button, Tabs, type TabDef } from '@/components/ui'
+import { Badge, Button, Section, Tabs, type TabDef } from '@/components/ui'
 import { RegulationHeader } from './RegulationHeader'
 
 type Tab = 'form' | 'sliders' | 'source'
@@ -251,10 +265,12 @@ function FormView({
   return (
     <div className="space-y-4">
       {/* Метаданные */}
-      <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-        <h3 className="mb-3 text-sm font-semibold text-stone-700">Метаданные</h3>
+      <Section
+        title={<SectionTitle icon={Info} label="Метаданные" />}
+        elevated
+      >
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <FormRow label="Название">
+          <FormRow label="Название" icon={Tag}>
             <textarea
               rows={2}
               value={draft.name}
@@ -262,7 +278,7 @@ function FormView({
               className={tx}
             />
           </FormRow>
-          <FormRow label="Дата принятия">
+          <FormRow label="Дата принятия" icon={Calendar}>
             <input
               type="date"
               value={draft.date ?? ''}
@@ -270,14 +286,14 @@ function FormView({
               className={tx}
             />
           </FormRow>
-          <FormRow label="Версия">
+          <FormRow label="Версия" icon={GitCommit}>
             <input
               value={draft.version}
               onChange={(e) => patch({ version: e.target.value })}
               className={tx}
             />
           </FormRow>
-          <FormRow label="Статус">
+          <FormRow label="Статус" icon={Flag}>
             <div className="flex flex-wrap gap-1.5">
               {STATUS_OPTIONS.map((s) => (
                 <button
@@ -294,21 +310,71 @@ function FormView({
             </div>
           </FormRow>
         </div>
-      </section>
+      </Section>
+
+      {/* Нормативное основание — SIGMA §4.1.3, §4.2.2 #3 (объяснимость).
+          Указываем где «живёт» правило в исходном нормативном поле и до
+          какой даты оно действует. Используется для аудита решений. */}
+      <Section
+        title={<SectionTitle icon={BookOpen} label="Нормативное основание" />}
+        description="Источник правила в нормативной базе и период действия. Используется для объяснимости решений и аудита (SIGMA §4.1.3)."
+        elevated
+      >
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <FormRow label="Нормативный документ" icon={BookOpen}>
+            <input
+              value={draft.source_document ?? ''}
+              onChange={(e) => patch({ source_document: e.target.value || null })}
+              placeholder="напр. СП 124.13330.2012 «Тепловые сети»"
+              className={tx}
+            />
+          </FormRow>
+          <FormRow label="Пункт / раздел" icon={Hash}>
+            <input
+              value={draft.source_clause ?? ''}
+              onChange={(e) => patch({ source_clause: e.target.value || null })}
+              placeholder="напр. §5.10 или п. 7.2.3"
+              className={tx}
+            />
+          </FormRow>
+          <FormRow label="Действует с" icon={CalendarClock}>
+            <input
+              type="date"
+              value={draft.valid_from ?? ''}
+              onChange={(e) => patch({ valid_from: e.target.value || null })}
+              className={tx}
+            />
+          </FormRow>
+          <FormRow label="Действует по" icon={Timer}>
+            <input
+              type="date"
+              value={draft.valid_to ?? ''}
+              onChange={(e) => patch({ valid_to: e.target.value || null })}
+              className={tx}
+            />
+          </FormRow>
+        </div>
+      </Section>
 
       {/* Параметры */}
-      <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-700">
-            Параметры <span className="ml-1 text-xs font-normal text-stone-500">{draft.parameters.length}</span>
-          </h3>
-          <button
+      <Section
+        title={
+          <SectionTitle icon={Sliders} label="Параметры">
+            <Badge tone="neutral">{draft.parameters.length}</Badge>
+          </SectionTitle>
+        }
+        actions={
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Plus size={12} />}
             onClick={addParam}
-            className="inline-flex items-center gap-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-xs hover:bg-stone-50"
           >
-            <Plus size={12} className="text-stone-500" /> Добавить параметр
-          </button>
-        </div>
+            Добавить параметр
+          </Button>
+        }
+        elevated
+      >
         <div className="space-y-2">
           {draft.parameters.length === 0 && (
             <div className="rounded-md border border-dashed border-stone-300 p-4 text-center text-sm text-stone-400">
@@ -316,93 +382,117 @@ function FormView({
             </div>
           )}
           {draft.parameters.map((p, idx) => (
-            <div key={p.id} className="rounded-md border border-stone-200 bg-stone-50/50 p-3">
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_1fr_1fr_auto]">
-                <FormRow label="Имя" compact>
-                  <input value={p.name} onChange={(e) => patchParam(idx, { name: e.target.value })} className={tx} />
-                </FormRow>
-                <FormRow label="Reference" compact>
-                  <input
-                    type="number"
-                    value={p.referenceValue ?? ''}
-                    onChange={(e) => patchParam(idx, { referenceValue: e.target.value === '' ? null : Number(e.target.value) })}
-                    className={tx}
-                    step="any"
-                  />
-                </FormRow>
-                <FormRow label="Deviation" compact>
-                  <input
-                    type="number"
-                    value={p.deviationAllowed ?? ''}
-                    onChange={(e) => patchParam(idx, { deviationAllowed: e.target.value === '' ? null : Number(e.target.value) })}
-                    className={tx}
-                    step="any"
-                  />
-                </FormRow>
-                <FormRow label="Ед. изм." compact>
-                  <input
-                    value={p.unit ?? ''}
-                    onChange={(e) => patchParam(idx, { unit: e.target.value || null })}
-                    className={tx}
-                  />
-                </FormRow>
-                <div className="flex items-end pb-0.5">
+            <div
+              key={p.id}
+              className="flex overflow-hidden rounded-md border border-stone-200 bg-white shadow-sm transition hover:border-primary/40"
+            >
+              {/* Node-RED-style accent strip с иконкой типа параметра */}
+              <div className="flex w-9 shrink-0 items-start justify-center bg-primary/90 pt-3 text-white">
+                <Sliders size={14} />
+              </div>
+              <div className="min-w-0 flex-1 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-stone-400">#{idx + 1}</span>
                   <button
                     onClick={() => removeParam(idx)}
-                    title="Удалить"
-                    className="rounded-md p-1.5 text-stone-400 hover:bg-rose-50 hover:text-rose-600"
+                    title="Удалить параметр"
+                    className="rounded-md p-1 text-stone-400 transition hover:bg-rose-50 hover:text-rose-600"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
-              </div>
-              <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-stone-500">
-                <FormRow label="SHACL min ≥" compact>
-                  <input
-                    type="number"
-                    value={p.minInclusive ?? ''}
-                    onChange={(e) => patchParam(idx, { minInclusive: e.target.value === '' ? null : Number(e.target.value) })}
-                    className={tx}
-                    step="any"
-                  />
-                </FormRow>
-                <FormRow label="SHACL max ≤" compact>
-                  <input
-                    type="number"
-                    value={p.maxInclusive ?? ''}
-                    onChange={(e) => patchParam(idx, { maxInclusive: e.target.value === '' ? null : Number(e.target.value) })}
-                    className={tx}
-                    step="any"
-                  />
-                </FormRow>
+                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
+                  <FormRow label="Имя" icon={Tag} compact>
+                    <input value={p.name} onChange={(e) => patchParam(idx, { name: e.target.value })} className={tx} />
+                  </FormRow>
+                  <FormRow label="Reference" icon={Target} compact>
+                    <input
+                      type="number"
+                      value={p.referenceValue ?? ''}
+                      onChange={(e) => patchParam(idx, { referenceValue: e.target.value === '' ? null : Number(e.target.value) })}
+                      className={tx}
+                      step="any"
+                    />
+                  </FormRow>
+                  <FormRow label="Deviation" icon={Sliders} compact>
+                    <input
+                      type="number"
+                      value={p.deviationAllowed ?? ''}
+                      onChange={(e) => patchParam(idx, { deviationAllowed: e.target.value === '' ? null : Number(e.target.value) })}
+                      className={tx}
+                      step="any"
+                    />
+                  </FormRow>
+                  <FormRow label="Ед. изм." icon={Ruler} compact>
+                    <input
+                      value={p.unit ?? ''}
+                      onChange={(e) => patchParam(idx, { unit: e.target.value || null })}
+                      className={tx}
+                    />
+                  </FormRow>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2.5 rounded-md border border-emerald-100 bg-emerald-50/40 p-2">
+                  <FormRow label="SHACL min ≥" icon={ShieldCheck} compact>
+                    <input
+                      type="number"
+                      value={p.minInclusive ?? ''}
+                      onChange={(e) => patchParam(idx, { minInclusive: e.target.value === '' ? null : Number(e.target.value) })}
+                      className={tx}
+                      step="any"
+                    />
+                  </FormRow>
+                  <FormRow label="SHACL max ≤" icon={ShieldCheck} compact>
+                    <input
+                      type="number"
+                      value={p.maxInclusive ?? ''}
+                      onChange={(e) => patchParam(idx, { maxInclusive: e.target.value === '' ? null : Number(e.target.value) })}
+                      className={tx}
+                      step="any"
+                    />
+                  </FormRow>
+                </div>
               </div>
             </div>
           ))}
         </div>
-      </section>
+      </Section>
 
       {/* Рекомендация */}
-      <section className="rounded-lg border border-stone-200 bg-white p-4 shadow-sm">
-        <h3 className="mb-3 text-sm font-semibold text-stone-700">Рекомендация</h3>
-        <FormRow label="Приоритет">
+      <Section
+        title={<SectionTitle icon={ListTodo} label="Рекомендация" />}
+        description="Текст, который выдаём пользователю при срабатывании регламента."
+        elevated
+      >
+        <FormRow label="Приоритет" icon={AlertTriangle}>
           <div className="flex gap-1">
-            {[1, 2, 3].map((pr) => (
-              <button
-                key={pr}
-                onClick={() => setRec(recText, pr)}
-                className={cn(
-                  'rounded-md border px-2.5 py-0.5 text-xs',
-                  recPriority === pr
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50',
-                )}
-              >
-                {pr === 1 ? '1 — критический' : pr === 2 ? '2 — важный' : '3 — обычный'}
-              </button>
-            ))}
+            {[1, 2, 3].map((pr) => {
+              const labels: Record<number, { text: string; tone: 'danger' | 'warning' | 'neutral' }> = {
+                1: { text: '1 — критический', tone: 'danger' },
+                2: { text: '2 — важный', tone: 'warning' },
+                3: { text: '3 — обычный', tone: 'neutral' },
+              }
+              const { text, tone } = labels[pr]
+              const active = recPriority === pr
+              const activeStyle =
+                tone === 'danger' ? 'border-rose-300 bg-rose-50 text-rose-800'
+                : tone === 'warning' ? 'border-amber-300 bg-amber-50 text-amber-800'
+                : 'border-stone-300 bg-stone-100 text-stone-800'
+              return (
+                <button
+                  key={pr}
+                  onClick={() => setRec(recText, pr)}
+                  className={cn(
+                    'rounded-md border px-2.5 py-0.5 text-xs transition',
+                    active ? activeStyle : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50',
+                  )}
+                >
+                  {text}
+                </button>
+              )
+            })}
           </div>
         </FormRow>
-        <FormRow label="Текст">
+        <FormRow label="Текст" icon={MessageSquare}>
           <textarea
             rows={6}
             value={recText}
@@ -411,8 +501,26 @@ function FormView({
             placeholder="При возникновении ситуации: 1) … 2) … 3) …"
           />
         </FormRow>
-      </section>
+      </Section>
     </div>
+  )
+}
+
+function SectionTitle({
+  icon: Icon,
+  label,
+  children,
+}: {
+  icon: LucideIcon
+  label: string
+  children?: React.ReactNode
+}) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Icon size={14} className="text-stone-500" />
+      <span>{label}</span>
+      {children}
+    </span>
   )
 }
 
@@ -444,22 +552,25 @@ function SlidersView({
 
   return (
     <div className="space-y-3">
-      <div className="rounded-md border border-blue-100 bg-blue-50/40 px-4 py-3 text-xs text-blue-900">
-        <div className="mb-2">
-          Слайдеры — быстрая калибровка <b>reference</b> и <b>deviation</b> каждого параметра. Диапазон берётся из
-          SHACL <code>sh:minInclusive</code> / <code>sh:maxInclusive</code>, шаг — эвристика. Точные значения можно
-          править на вкладке «Поля». Сохранение — общее, кнопкой «Сохранить» в шапке.
-        </div>
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-blue-100 pt-2 text-[11px]">
-          <span className="font-medium text-blue-900">Подсказка:</span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-1.5 w-7 rounded-full bg-sky-500" />
-            <span className="text-stone-700">слева от шарика — выдвинутая часть параметра (текущее значение)</span>
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-1.5 w-7 rounded-full bg-sky-200" />
-            <span className="text-stone-700">справа — куда ещё можно дорастить в рамках SHACL</span>
-          </span>
+      <div className="flex items-start gap-2 rounded-md border border-sky-200 bg-sky-50/60 px-4 py-3 text-xs text-sky-900">
+        <Info size={14} className="mt-0.5 shrink-0 text-sky-600" />
+        <div className="space-y-2">
+          <div>
+            Слайдеры — быстрая калибровка <b>reference</b> и <b>deviation</b> каждого параметра. Диапазон берётся из
+            SHACL <code>sh:minInclusive</code> / <code>sh:maxInclusive</code>, шаг — эвристика. Точные значения можно
+            править на вкладке «Поля». Сохранение — общее, кнопкой «Сохранить» в шапке.
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-sky-100 pt-2 text-[11px]">
+            <span className="font-medium">Легенда трека:</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-7 rounded-full bg-sky-500" />
+              <span className="text-stone-700">слева от шарика — текущее значение</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-1.5 w-7 rounded-full bg-sky-200" />
+              <span className="text-stone-700">справа — остаток до верхней границы SHACL</span>
+            </span>
+          </div>
         </div>
       </div>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
@@ -871,20 +982,32 @@ function DiffDetail({ id, versionId }: { id: string; versionId: string }) {
 // Helpers
 // ──────────────────────────────────────────────────────────
 
-const tx = 'mt-1 w-full rounded-md border border-stone-200 bg-white px-2 py-1 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40'
+// Node-RED-style input: чуть утолщённый border, заметный focus-ring, ровные
+// 28px высоты для соразмерности с иконками подписей и Button size=sm.
+const tx = 'w-full rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-800 placeholder:text-stone-400 transition focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25 hover:border-stone-400'
 
 function FormRow({
   label,
+  icon: Icon,
   children,
   compact,
 }: {
   label: string
+  icon?: LucideIcon
   children: React.ReactNode
   compact?: boolean
 }) {
+  // Node-RED-стиль: uppercase-капитель, заметнее чем lowercase-серый. Иконка
+  // в primary/60 — выделяется относительно стоунового бэкграунда.
   return (
-    <label className={cn('block', compact ? '' : 'space-y-0.5')}>
-      <div className={cn('text-xs text-stone-500', compact ? 'mb-0.5' : '')}>{label}</div>
+    <label className={cn('block', compact ? '' : 'space-y-1')}>
+      <div className={cn(
+        'inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide text-stone-600',
+        compact ? 'mb-1' : '',
+      )}>
+        {Icon && <Icon size={12} className="text-primary/70" />}
+        {label}
+      </div>
       {children}
     </label>
   )

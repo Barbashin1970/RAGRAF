@@ -60,10 +60,18 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
             status         VARCHAR NOT NULL DEFAULT 'draft',
             recommendation TEXT,
             recommendation_priority INTEGER,
-            updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            updated_at     TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            source_document VARCHAR,
+            source_clause   VARCHAR,
+            valid_from      VARCHAR,
+            valid_to        VARCHAR
         )
         """
     )
+    # Идемпотентная миграция для существующих DB (без drop'а данных).
+    # DuckDB поддерживает ADD COLUMN IF NOT EXISTS начиная с 0.9 — для нас ок.
+    for col in ("source_document", "source_clause", "valid_from", "valid_to"):
+        c.execute(f"ALTER TABLE regulations ADD COLUMN IF NOT EXISTS {col} VARCHAR")
     c.execute(
         """
         CREATE TABLE IF NOT EXISTS parameters (
@@ -121,7 +129,10 @@ def list_all() -> list[dict[str, Any]]:
             """
             SELECT r.source_id, r.name, r.domain,
                    (SELECT COUNT(*) FROM parameters p WHERE p.source_id = r.source_id) AS params_count,
-                   CASE WHEN r.recommendation IS NULL OR r.recommendation = '' THEN 0 ELSE 1 END AS recs_count
+                   CASE WHEN r.recommendation IS NULL OR r.recommendation = '' THEN 0 ELSE 1 END AS recs_count,
+                   r.recommendation_priority,
+                   r.valid_to,
+                   r.source_document
             FROM regulations r
             ORDER BY r.domain, r.source_id
             """
@@ -134,6 +145,11 @@ def list_all() -> list[dict[str, Any]]:
             "domain": r[2],
             "parameters_count": int(r[3]),
             "recommendations_count": int(r[4]),
+            # SIGMA-compliance: критичность (из priority) + срок действия +
+            # ссылка на нормативный документ — выводятся в карточке регламента.
+            "priority": int(r[5]) if r[5] is not None else None,
+            "valid_to": r[6],
+            "source_document": r[7],
         }
         for r in rows
     ]
@@ -144,7 +160,8 @@ def get(source_id: str) -> Regulation | None:
         c = _connection()
         head = c.execute(
             """
-            SELECT source_id, name, domain, date, version, status, recommendation, recommendation_priority
+            SELECT source_id, name, domain, date, version, status, recommendation, recommendation_priority,
+                   source_document, source_clause, valid_from, valid_to
             FROM regulations WHERE source_id = ?
             """,
             [source_id],
@@ -192,6 +209,10 @@ def get(source_id: str) -> Regulation | None:
         parameters=parameters,
         constraints=[],  # constraints живут в upstream /shapes
         recommendations=recommendations,
+        source_document=head[8],
+        source_clause=head[9],
+        valid_from=head[10],
+        valid_to=head[11],
     )
 
 
@@ -212,8 +233,12 @@ def save(reg: Regulation, author: str = "anonymous", comment: str | None = None)
             # Upsert regulation head
             c.execute(
                 """
-                INSERT INTO regulations (source_id, name, domain, date, version, status, recommendation, recommendation_priority, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO regulations (
+                    source_id, name, domain, date, version, status,
+                    recommendation, recommendation_priority, updated_at,
+                    source_document, source_clause, valid_from, valid_to
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (source_id) DO UPDATE SET
                     name = EXCLUDED.name,
                     domain = EXCLUDED.domain,
@@ -222,9 +247,17 @@ def save(reg: Regulation, author: str = "anonymous", comment: str | None = None)
                     status = EXCLUDED.status,
                     recommendation = EXCLUDED.recommendation,
                     recommendation_priority = EXCLUDED.recommendation_priority,
-                    updated_at = EXCLUDED.updated_at
+                    updated_at = EXCLUDED.updated_at,
+                    source_document = EXCLUDED.source_document,
+                    source_clause = EXCLUDED.source_clause,
+                    valid_from = EXCLUDED.valid_from,
+                    valid_to = EXCLUDED.valid_to
                 """,
-                [reg.id, reg.name, reg.domain, reg.date, reg.version, reg.status, rec_text, rec_priority, now],
+                [
+                    reg.id, reg.name, reg.domain, reg.date, reg.version, reg.status,
+                    rec_text, rec_priority, now,
+                    reg.source_document, reg.source_clause, reg.valid_from, reg.valid_to,
+                ],
             )
             # Полная замена параметров (упрощённая стратегия — drop+insert).
             c.execute("DELETE FROM parameters WHERE source_id = ?", [reg.id])

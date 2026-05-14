@@ -885,6 +885,12 @@ function ExtractDemo() {
   const [picked, setPicked] = useState<Record<string, string>>({})
   // suggested_name → включён ли в сборку (по умолчанию все включены).
   const [included, setIncluded] = useState<Record<string, boolean>>({})
+  // suggested_name (original, как пришёл с бэка) → переименованное юзером
+  // имя. Когда parameter-extractor возвращает "параметр_1" или
+  // "forecastLeadTime", аналитик хочет дать своё имя — `notificationLead`
+  // или `pressureFallRate`. Используем original-name как стабильный key
+  // для группировки/выбора варианта, а в payload передаём custom.
+  const [customNames, setCustomNames] = useState<Record<string, string>>({})
   const [regName, setRegName] = useState(DEFAULT_PRESET.suggestedName)
   const [domain, setDomain] = useState<string>(DEFAULT_PRESET.suggestedDomain)
 
@@ -900,6 +906,7 @@ function ExtractDemo() {
       }
       setPicked(newPicked)
       setIncluded(newIncluded)
+      setCustomNames({}) // сбрасываем кастомные имена при ре-extract
     },
   })
 
@@ -924,6 +931,7 @@ function ExtractDemo() {
     setDomain(p.suggestedDomain)
     setPicked({})
     setIncluded({})
+    setCustomNames({})
     extract.reset()
   }
 
@@ -957,7 +965,9 @@ function ExtractDemo() {
       name: regName.trim(),
       domain,
       params: selectedParams.map((p) => ({
-        suggested_name: p.suggested_name,
+        // Если аналитик переименовал параметр — отдаём его имя.
+        // Trim + fallback на оригинал, чтобы пустая строка не прошла валидацию.
+        suggested_name: customNames[p.suggested_name]?.trim() || p.suggested_name,
         value: p.value,
         deviation: p.deviation ?? null,
         unit: p.unit ?? null,
@@ -1024,11 +1034,13 @@ function ExtractDemo() {
                 <ParamGroupCard
                   key={name}
                   name={name}
+                  customName={customNames[name] ?? ''}
                   items={items}
                   included={isIncluded}
                   pickedId={pickedId}
                   onToggle={() => setIncluded((s) => ({ ...s, [name]: !isIncluded }))}
                   onPick={(id) => setPicked((s) => ({ ...s, [name]: id }))}
+                  onRename={(v) => setCustomNames((s) => ({ ...s, [name]: v }))}
                 />
               )
             })}
@@ -1124,19 +1136,30 @@ function StepHeader({ n, title, hint }: { n: number; title: string; hint?: strin
 
 function ParamGroupCard({
   name,
+  customName,
   items,
   included,
   pickedId,
   onToggle,
   onPick,
+  onRename,
 }: {
   name: string
+  customName: string
   items: ExtractedParam[]
   included: boolean
   pickedId: string
   onToggle: () => void
   onPick: (id: string) => void
+  onRename: (v: string) => void
 }) {
+  // Авто-нейм может быть «параметр_1» (если контекстный стем не найден) или
+  // нормальное «pressureFallRate». В обоих случаях даём аналитику переименовать.
+  // Локальный state — чтобы не дёргать родителя на каждый keystroke.
+  const [localName, setLocalName] = useState(customName || name)
+  useEffect(() => setLocalName(customName || name), [customName, name])
+  const isAutoplaceholder = name.startsWith('параметр_')
+
   return (
     <div
       className={cn(
@@ -1144,22 +1167,45 @@ function ParamGroupCard({
         included ? 'border-violet-200 shadow-sm' : 'border-stone-200 opacity-60',
       )}
     >
-      <label className="flex cursor-pointer items-center justify-between">
-        <div className="flex items-center gap-2">
+      <label className="flex cursor-pointer items-start justify-between gap-2">
+        <div className="flex flex-1 items-center gap-2">
           <input
             type="checkbox"
             checked={included}
             onChange={onToggle}
-            className="h-4 w-4 cursor-pointer accent-violet-600"
+            className="h-4 w-4 shrink-0 cursor-pointer accent-violet-600"
           />
-          <span className="font-semibold text-stone-800">{name}</span>
+          <div className="min-w-0 flex-1">
+            <input
+              type="text"
+              value={localName}
+              onChange={(e) => setLocalName(e.target.value)}
+              onBlur={() => onRename(localName.trim() === name ? '' : localName.trim())}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+              }}
+              disabled={!included}
+              title="Имя параметра в регламенте — можно переименовать"
+              className={cn(
+                'w-full rounded border bg-transparent px-1.5 py-0.5 font-mono text-sm font-semibold transition',
+                isAutoplaceholder
+                  ? 'border-amber-300 bg-amber-50/40 text-amber-900 focus:bg-white'
+                  : 'border-transparent text-stone-800 hover:border-stone-200 focus:border-violet-300 focus:bg-white',
+              )}
+            />
+            {isAutoplaceholder && (
+              <div className="ml-1.5 mt-0.5 text-[10px] text-amber-700">
+                Авто-имя не угадано — задайте своё (например, `notificationLead`)
+              </div>
+            )}
+          </div>
           {items.length > 1 && (
-            <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-600">
+            <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] text-stone-600">
               {items.length} вариант{items.length < 5 ? 'а' : 'ов'}
             </span>
           )}
         </div>
-        <div className="text-[10px] uppercase tracking-wide text-stone-400">
+        <div className="shrink-0 pt-1 text-[10px] uppercase tracking-wide text-stone-400">
           {included ? 'включён' : 'исключён'}
         </div>
       </label>

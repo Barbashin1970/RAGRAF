@@ -128,9 +128,40 @@ def test_extract_without_context_uses_fallback_name(client):
     r = client.post("/api/sandbox/extract-parameters", json={"text": text})
     extracted = r.json()["extracted"]
     assert extracted
-    # Контекстное слово ("время"/"реакц") не найдено — будет fallback param_N с низкой confidence
-    if extracted[0]["suggested_name"].startswith("param_"):
+    # Контекстное слово не найдено — fallback "параметр_N" с низкой confidence.
+    # (Раньше было "param_N" латиницей — путало аналитика; теперь русский
+    # плейсхолдер явно сигналит «надо переименовать вручную».)
+    if extracted[0]["suggested_name"].startswith("параметр_"):
         assert extracted[0]["confidence"] < 0.5
+
+
+def test_extract_notification_regulation_uses_lead_time_name(client):
+    """SMS-уведомления отправляются за 6 ± 2 ч до прогнозируемого пика —
+    раньше выдавало `param_1` (стем не попадал в 80-char окно слева). Теперь
+    fallback на целое предложение должен найти 'до прогноз' / 'уведомлен' /
+    'пик нагрузк' и выдать осмысленное имя."""
+    text = (
+        "SMS-уведомления уязвимым группам потребителей, а также ответственным "
+        "лицам объектов социальной инфраструктуры отправляются за 6 ± 2 часа "
+        "до прогнозируемого пика нагрузки или планового ограничения."
+    )
+    r = client.post("/api/sandbox/extract-parameters", json={"text": text})
+    extracted = r.json()["extracted"]
+    assert len(extracted) == 1
+    name = extracted[0]["suggested_name"]
+    # Любой из CONTEXT_NAMES-стемов про оповещение / lead-time должен сработать.
+    assert name in {
+        "notificationLeadTime",
+        "alertLeadTime",
+        "smsLeadTime",
+        "forecastLeadTime",
+        "peakLoadLeadTime",
+    }, f"got unexpected name: {name}"
+    # Confidence должна быть высокой (контекст найден + deviation присутствует).
+    assert extracted[0]["confidence"] >= 0.85
+    assert extracted[0]["value"] == 6.0
+    assert extracted[0]["deviation"] == 2.0
+    assert extracted[0]["unit"] == "ч"
 
 
 def test_extract_empty_text_returns_empty(client):

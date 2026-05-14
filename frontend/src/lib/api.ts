@@ -73,6 +73,11 @@ export interface Regulation {
     priority: 1 | 2 | 3
     linkedParameters: string[]
   }>
+  // SIGMA-compliance (ТЗ §4.1.3): нормативное основание + период действия.
+  source_document?: string | null
+  source_clause?: string | null
+  valid_from?: string | null
+  valid_to?: string | null
 }
 
 export interface Domain {
