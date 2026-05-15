@@ -9,19 +9,61 @@ import asyncio
 
 from fastapi import APIRouter, HTTPException, Query
 
+from pydantic import BaseModel, Field
+
 from app.adapters.cytoscape_adapter import to_cytoscape
 from app.schemas.domain import GraphPayload
-from app.services import fixtures, graph_builder, ragu_service
+from app.services import domain_store, fixtures, graph_builder, ragu_service
 from app.services.regulation_client import client
 from app.services.turtle_bridge import parse_regulation_turtle, parse_shapes_turtle
 
 router = APIRouter()
 
 
+class CreateDomainRequest(BaseModel):
+    """Тело `POST /api/domains`.
+
+    Аналитик создаёт новый домен из UI — обычно из пустого состояния анализа
+    документа («регламентов нет, давай заведём новый домен»). `suggested_id`
+    опционален: если не задан, слаг строится из label.
+    """
+    label: str = Field(..., min_length=1, max_length=80)
+    hint: str | None = Field(default=None, max_length=200)
+    suggested_id: str | None = Field(default=None, max_length=40)
+
+
 @router.get("/domains")
 def list_domains():
-    """Список доменов (для табов в Graph View). Sync — данные in-memory."""
-    return fixtures.list_domains()
+    """Список доменов (seed + пользовательские). Используется табами Graph View,
+    селектором при создании регламента, валидацией domain-полей."""
+    return domain_store.list_all()
+
+
+@router.post("/domains", status_code=201)
+def create_domain(req: CreateDomainRequest):
+    """Создать новый пользовательский домен.
+
+    UX: после успеха клиент инвалидирует кэш `['domains']` и обычно открывает
+    «Извлечь параметры» с pre-selected новым доменом — чтобы заполнить корпус.
+    """
+    try:
+        return domain_store.create(req.label, req.hint or "", req.suggested_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.delete("/domains/{domain_id}")
+def delete_domain(domain_id: str) -> dict[str, str]:
+    """Удалить пользовательский домен. Seed-домены защищены.
+
+    Регламенты, ссылающиеся на этот домен, остаются с прежним domain-значением
+    (отображаются в группе «Без домена» после удаления).
+    """
+    if any(d["id"] == domain_id for d in fixtures.list_domains()):
+        raise HTTPException(status_code=409, detail="Этот домен — встроенный, его нельзя удалить")
+    if not domain_store.delete(domain_id):
+        raise HTTPException(status_code=404, detail=f"Домен '{domain_id}' не найден")
+    return {"id": domain_id, "status": "deleted"}
 
 
 async def _domain_for(source_id: str):

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
-import cytoscape, { type Core, type ElementDefinition, type NodeSingular } from 'cytoscape'
+import cytoscape, { type Core, type ElementDefinition, type Layouts, type NodeSingular } from 'cytoscape'
 import cola from 'cytoscape-cola'
 import {
   AlertCircle,
@@ -52,11 +52,15 @@ export function GraphView() {
   const [params, setParams] = useSearchParams()
   const ref = useRef<HTMLDivElement>(null)
   const cyRef = useRef<Core | null>(null)
+  // Текущий запущенный layout — хранится чтобы можно было корректно остановить
+  // его перед запуском нового. Иначе cytoscape-cola при повторном `.run()`
+  // на работающем инстансе залипает (анимация не перезапускается → «авто-укладка
+  // работает один раз»).
+  const layoutRef = useRef<Layouts | null>(null)
   const [selected, setSelected] = useState<CyNode['data'] | null>(null)
-  // Locked-режим: пользователь зафиксировал позиции вручную. cola-layout
-  // не пересчитывает координаты, только применяет сохранённые из localStorage.
-  // Изменения per-node (drag) автосохраняются при locked=false тоже —
-  // toggle меняет только поведение cola (применять/не применять).
+  // Locked-режим: при следующем (data) refresh используем preset-layout
+  // вместо cola, чтобы не сбивать ручную раскладку. Drag всегда разрешён —
+  // позиции автосохраняются по dragfree.
   const [locked, setLocked] = useState<boolean>(false)
   const [savedCount, setSavedCount] = useState<number>(0)
 
@@ -136,18 +140,26 @@ export function GraphView() {
     // ломать её каждым refresh.
     if (hasSaved) setLocked(true)
 
-    // Layout: если есть saved и locked — используем 'preset' (применит position
-    // из node data, не двигает узлы); иначе cola-layout пересчитывает с нуля.
-    // preset — встроенный layout cytoscape, не нужен сторонний helper.
-    const layoutOpts = hasSaved && locked
+    // Layout: если есть saved позиции — preset (не двигает узлы); иначе cola
+    // с нуля. preset выбирается и в lock'е, и в просто-есть-сохранённое —
+    // потому что иначе cola моментально перетряхнул бы только что применённые
+    // координаты, превратив "у нас есть сохранёнка" в неотличимое от пустого.
+    const layoutOpts: cytoscape.LayoutOptions = hasSaved
       ? ({ name: 'preset', fit: true } as cytoscape.LayoutOptions)
       : asCytoscapeLayout({ name: 'cola', animate: true })
+
+    // Перед запуском нового layout останавливаем предыдущий — иначе cytoscape-cola
+    // на повторном run() игнорирует команду (видимый симптом «авто-укладка
+    // срабатывает один раз»).
+    layoutRef.current?.stop()
 
     if (cyRef.current) {
       cyRef.current.elements().remove()
       cyRef.current.add(elements)
       if (hasSaved) applySavedPositions(cyRef.current, saved)
-      cyRef.current.layout(layoutOpts).run()
+      const lo = cyRef.current.layout(layoutOpts)
+      layoutRef.current = lo
+      lo.run()
       setSelected(null)
       return
     }
@@ -210,17 +222,42 @@ export function GraphView() {
     cy.on('dragfree', 'node', () => handleDragFree(activeDomain))
 
     cyRef.current = cy
+    // Сохраним handle на layout для последующего stop'а перед перезапуском.
+    layoutRef.current = cy.layout(layoutOpts)
     return () => {
       cy.destroy()
       cyRef.current = null
+      layoutRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data])
 
   // Toolbar handlers
+  // Lock toggle: при включении захватываем текущие позиции (если их ещё нет),
+  // чтобы кнопка не была мёртвой в начальном состоянии — сразу после
+  // первой автоматической раскладки можно нажать «Закрепить», и она запомнит
+  // как cola выложил граф. Drag всё равно работает и автодополняет позиции.
   const onToggleLock = useCallback(() => {
-    setLocked((prev) => !prev)
-  }, [])
+    setLocked((prev) => {
+      const next = !prev
+      const cy = cyRef.current
+      if (next && cy) {
+        // включаем lock → сохраняем текущие позиции узлов как «зафиксированные»
+        const positions: PositionMap = {}
+        cy.nodes().forEach((n) => {
+          const p = n.position()
+          positions[n.id()] = { x: p.x, y: p.y }
+        })
+        if (Object.keys(positions).length > 0) {
+          savePositions(activeDomain, positions)
+          setSavedCount(Object.keys(positions).length)
+        }
+        // Останавливаем активный layout — иначе он может продолжить дёргать узлы.
+        layoutRef.current?.stop()
+      }
+      return next
+    })
+  }, [activeDomain])
 
   const onResetPositions = useCallback(() => {
     const ok = window.confirm(
@@ -232,14 +269,28 @@ export function GraphView() {
     setLocked(false)
     const cy = cyRef.current
     if (cy) {
-      cy.layout(asCytoscapeLayout({ name: 'cola', animate: true })).run()
+      layoutRef.current?.stop()
+      // randomize:true гарантирует что cola реально перетряхнёт узлы — без него
+      // на «уже разложенном» графе layout почти не двигает координаты.
+      const lo = cy.layout(asCytoscapeLayout({ name: 'cola', animate: true, randomize: true }))
+      layoutRef.current = lo
+      lo.run()
     }
   }, [activeDomain])
 
   const onRerunLayout = useCallback(() => {
     const cy = cyRef.current
     if (!cy) return
-    cy.layout(asCytoscapeLayout({ name: 'cola', animate: true })).run()
+    // Останавливаем предыдущий layout перед запуском нового — иначе cola
+    // на уже работающем инстансе игнорирует .run() и узлы не двигаются.
+    layoutRef.current?.stop()
+    // Снимаем lock с узлов на случай если они залочены (cola не двигает locked
+    // ноды). После reset/auto-layout user может снова drag'нуть и автосейв
+    // подхватит позиции.
+    cy.nodes().unlock()
+    const lo = cy.layout(asCytoscapeLayout({ name: 'cola', animate: true, randomize: true }))
+    layoutRef.current = lo
+    lo.run()
   }, [])
 
   // Re-sync savedCount при смене домена (новый файл в localStorage)
@@ -287,13 +338,10 @@ export function GraphView() {
             size="sm"
             icon={locked ? <Lock size={13} className="text-primary" /> : <Unlock size={13} />}
             onClick={onToggleLock}
-            disabled={savedCount === 0}
             title={
-              savedCount === 0
-                ? 'Сначала перетащите узлы — позиции сохранятся автоматически'
-                : locked
-                  ? 'Закреплено: cola-layout не двигает узлы'
-                  : 'Свободно: cola-layout пересчитывает раскладку'
+              locked
+                ? 'Закреплено: при следующей загрузке узлы встанут в эти позиции'
+                : 'Запомнить текущие позиции узлов как закреплённую раскладку'
             }
           >
             {locked ? 'Закреплено' : 'Закрепить'}

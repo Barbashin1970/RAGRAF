@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from app.services import document_analysis, document_store, fixtures, regulation_store, sandbox, templates
+from app.services import document_analysis, document_store, domain_store, fixtures, regulation_store, sandbox, templates  # noqa: F401
 from app.services.flow_storage import save_flow
 from app.services.templates import ensure_unique_source_id, slugify
 
@@ -190,11 +190,10 @@ def sandbox_create_from_params(req: CreateFromParamsRequest) -> dict[str, Any]:
     в `data/flows/`. Клиент после успеха переходит в `/regulations/:id/edit`,
     чтобы пользователь уточнил пороги и допилил Flow Editor.
     """
-    valid_domains = {d["id"] for d in fixtures.list_domains()}
-    if req.domain not in valid_domains:
+    if not domain_store.exists(req.domain):
         raise HTTPException(
             status_code=400,
-            detail=f"Неизвестный домен '{req.domain}'. Доступны: {sorted(valid_domains)}",
+            detail=f"Неизвестный домен '{req.domain}'. Доступны: {[d['id'] for d in domain_store.list_all()]}",
         )
 
     source_id = ensure_unique_source_id(slugify(req.name))

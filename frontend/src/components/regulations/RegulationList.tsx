@@ -32,6 +32,7 @@ import {
   PageShell,
 } from '@/components/ui'
 import { CreateRegulationDialog } from './CreateRegulationDialog'
+import { CreateDomainDialog } from './CreateDomainDialog'
 
 interface RegRow {
   id: string
@@ -89,9 +90,15 @@ function expirationBadge(valid_to: string | null | undefined): { label: string; 
   return null
 }
 
+// id'ы seed-доменов из бэкенда (fixtures.DOMAINS). Их нельзя удалить из UI,
+// поэтому корзина не показывается. Если на бэке появятся новые seed-домены,
+// сюда тоже нужно добавить — иначе UI предложит удалить, а сервер ответит 409.
+const SEED_DOMAIN_IDS = new Set(['heating', 'housing', 'safety', 'environment'])
+
 export function RegulationList() {
   const [query, setQuery] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [showCreateDomain, setShowCreateDomain] = useState(false)
   const { data: rawDatasets, isLoading, error } = useQuery({
     queryKey: ['datasets'],
     queryFn: () => api.datasets.list(),
@@ -183,6 +190,14 @@ export function RegulationList() {
               className="w-full rounded-md border border-stone-200 bg-white py-1.5 pl-8 pr-3 text-sm placeholder:text-stone-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
             />
           </div>
+          <Button
+            variant="secondary"
+            icon={<Boxes size={14} />}
+            onClick={() => setShowCreateDomain(true)}
+            title="Новый домен — крупный смысловой кластер для регламентов"
+          >
+            Создать домен
+          </Button>
           <Button variant="primary" icon={<Plus size={14} />} onClick={() => setShowCreate(true)}>
             Создать регламент
           </Button>
@@ -190,6 +205,7 @@ export function RegulationList() {
       </PageHeader>
 
       <CreateRegulationDialog open={showCreate} onClose={() => setShowCreate(false)} />
+      <CreateDomainDialog open={showCreateDomain} onClose={() => setShowCreateDomain(false)} />
 
       <PageBody>
         {isLoading && (
@@ -255,9 +271,26 @@ function DomainSection({
   fallbackKey: string | null
   items: RegRow[]
 }) {
+  const qc = useQueryClient()
   const v = domain?.id ? getDomainVisual(domain.id) : FALLBACK_VISUAL
   const Icon = v.icon
   const label = domain?.label ?? (fallbackKey ?? 'Без домена')
+  // User-created (custom) домен — id не в seed-списке и не null.
+  const canDelete = !!domain && !SEED_DOMAIN_IDS.has(domain.id)
+
+  const del = useMutation({
+    mutationFn: () => api.domains.delete(domain!.id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['domains'] }),
+  })
+
+  const onDelete = () => {
+    if (!canDelete) return
+    const used = items.length
+    const msg = used
+      ? `В домене «${label}» ${used} регламентов. После удаления они останутся, но окажутся в группе «Без домена». Продолжить?`
+      : `Удалить пустой домен «${label}»?`
+    if (window.confirm(msg)) del.mutate()
+  }
 
   return (
     <section className="mb-6">
@@ -271,6 +304,17 @@ function DomainSection({
             <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', v.chipBg, v.chipFg)}>
               {items.length}
             </span>
+            {canDelete && (
+              <button
+                onClick={onDelete}
+                disabled={del.isPending}
+                className="inline-flex h-6 w-6 items-center justify-center rounded text-stone-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
+                title="Удалить пользовательский домен"
+                aria-label={`Удалить домен ${label}`}
+              >
+                <Trash2 size={12} />
+              </button>
+            )}
             {/* domain-цвет сохраняем — это семантика (heating=orange, housing=blue
                 и т.д.). См. DESIGN_SYSTEM.md → §1 «domain-цвета не унифицируем». */}
           </div>

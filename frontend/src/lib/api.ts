@@ -290,6 +290,18 @@ export const api = {
   },
   domains: {
     list: () => request(`/api/domains`, undefined, domainsSchema),
+    create: (payload: { label: string; hint?: string; suggested_id?: string }) =>
+      request<Domain>(
+        `/api/domains`,
+        { method: 'POST', body: JSON.stringify(payload) },
+        z.object({ id: z.string(), label: z.string(), hint: z.string().optional() }),
+      ),
+    delete: (id: string) =>
+      request<{ id: string; status: string }>(
+        `/api/domains/${encodeURIComponent(id)}`,
+        { method: 'DELETE' },
+        z.object({ id: z.string(), status: z.string() }),
+      ),
   },
   search: {
     query: (q: string, mode: 'local' | 'global' | 'naive' = 'local') =>

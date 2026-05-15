@@ -1,19 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   ArrowRight,
   BarChart3,
+  Boxes,
   FileSearch,
   Layers,
   Loader2,
   type LucideIcon,
   Sparkles,
+  Wand2,
   X,
 } from 'lucide-react'
 import { api, type DocumentAnalysisResult, type UserDocument } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { Badge, Button } from '@/components/ui'
+import { CreateDomainDialog } from '@/components/regulations/CreateDomainDialog'
 
 /**
  * Cross-corpus анализ документа против корпуса регламентов.
@@ -51,10 +54,17 @@ interface Props {
 
 export function DocumentAnalysisModal({ doc, onClose }: Props) {
   const [autoTriggered, setAutoTriggered] = useState(false)
+  const [showCreateDomain, setShowCreateDomain] = useState(false)
+  const qc = useQueryClient()
+  const navigate = useNavigate()
 
   const analyze = useMutation({
     mutationFn: () => api.sandbox.analyzeDocument(doc.doc_id),
   })
+
+  // Префилл для CreateDomainDialog: имя файла без расширения как кандидат
+  // на label, чтобы аналитик не печатал с нуля.
+  const filenameStem = doc.filename.replace(/\.[a-z0-9]+$/i, '').trim()
 
   // Авто-запуск при открытии (один раз)
   useEffect(() => {
@@ -110,8 +120,28 @@ export function DocumentAnalysisModal({ doc, onClose }: Props) {
               <span className="font-mono text-xs">{(analyze.error as Error).message}</span>
             </div>
           )}
-          {analyze.data && <AnalysisReport data={analyze.data} />}
+          {analyze.data && (
+            <AnalysisReport
+              data={analyze.data}
+              onBootstrap={() => setShowCreateDomain(true)}
+            />
+          )}
         </div>
+
+        <CreateDomainDialog
+          open={showCreateDomain}
+          onClose={() => setShowCreateDomain(false)}
+          initialLabel={filenameStem}
+          initialHint={`Создан из документа «${doc.filename}»`}
+          onCreated={(d) => {
+            qc.invalidateQueries({ queryKey: ['domains'] })
+            // Закрываем модалку анализа и ведём на /regulations с подсветкой
+            // нового домена. UX: следующий шаг — нажать «Создать регламент»
+            // в нём, либо использовать «Извлечь параметры» из песочницы.
+            onClose()
+            navigate(`/regulations?domain=${encodeURIComponent(d.id)}`)
+          }}
+        />
 
         <footer className="flex items-center justify-between border-t border-stone-200 bg-stone-50/60 px-5 py-3">
           <div className="text-[11px] text-stone-500">
@@ -146,7 +176,13 @@ function AnalyzingPlaceholder() {
   )
 }
 
-function AnalysisReport({ data }: { data: DocumentAnalysisResult }) {
+function AnalysisReport({
+  data,
+  onBootstrap,
+}: {
+  data: DocumentAnalysisResult
+  onBootstrap: () => void
+}) {
   // Max total_hits для нормализации bar chart
   const maxHits = useMemo(
     () => Math.max(...data.domain_spectrum.map((d) => d.total_hits), 1),
@@ -157,7 +193,7 @@ function AnalysisReport({ data }: { data: DocumentAnalysisResult }) {
     <div className="space-y-6">
       <SectionTitle icon={BarChart3} label="Картина по доменам" />
       {data.domain_spectrum.length === 0 ? (
-        <EmptyAnswer />
+        <EmptyAnswer onBootstrap={onBootstrap} />
       ) : (
         <div className="space-y-1.5">
           {data.domain_spectrum.map((d) => {
@@ -211,12 +247,31 @@ function AnalysisReport({ data }: { data: DocumentAnalysisResult }) {
   )
 }
 
-function EmptyAnswer() {
+function EmptyAnswer({ onBootstrap }: { onBootstrap: () => void }) {
+  // Это не «провал поиска» — это сигнал что мы попали на тему, которой пока
+  // нет в корпусе. UX-стратегия: предложить bootstrap нового домена прямо
+  // отсюда, чтобы аналитик не уходил на отдельную страницу за CRUD'ом.
   return (
-    <div className="rounded-md border border-dashed border-stone-300 bg-stone-50 px-4 py-6 text-center text-sm text-stone-500">
-      Документ не пересекается с регламентами корпуса. Возможно тема выходит за
-      рамки оцифрованной нормативной базы — стоит оцифровать новый регламент
-      через «Извлечь параметры».
+    <div className="rounded-md border border-dashed border-violet-200 bg-violet-50/40 px-4 py-6 text-center">
+      <Wand2 size={28} className="mx-auto text-violet-400" />
+      <div className="mt-2 text-sm font-semibold text-stone-800">
+        Документ открывает новую тему для корпуса
+      </div>
+      <p className="mx-auto mt-1 max-w-md text-xs leading-relaxed text-stone-600">
+        Регламентов по этим темам пока нет — это типичная ситуация при оцифровке
+        нового направления. Заведите домен и начните заполнять его регламентами,
+        извлекая параметры прямо из этого документа.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+        <Button variant="primary" size="sm" icon={<Boxes size={13} />} onClick={onBootstrap}>
+          Создать новый домен
+        </Button>
+        <Link to="/sandbox?tab=extract" className="inline-flex">
+          <Button variant="secondary" size="sm" icon={<Wand2 size={13} />}>
+            Извлечь параметры
+          </Button>
+        </Link>
+      </div>
     </div>
   )
 }

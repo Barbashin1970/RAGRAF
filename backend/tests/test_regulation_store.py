@@ -93,3 +93,80 @@ def test_prev_snapshot_lookup(store, sample_regulation):
     prev = store.get_prev_snapshot("test-reg", latest_id)
     assert prev is not None
     assert prev["name"] == sample_regulation.name
+
+
+def test_save_reconciles_flow_when_parameter_deleted(store, sample_regulation):
+    """Удаление параметра в Form должно вычистить orphan-цепочку во Flow.
+
+    Регрессия: Form и Flow могли расходиться (Form говорит «pressure удалён»,
+    Flow Editor всё ещё показывает его input/threshold/compare).
+    """
+    from app.schemas.domain import FlowEdge, FlowNode, RuleDSL
+    from app.services.flow_storage import load_flow, save_flow
+
+    store.save(sample_regulation, comment="initial")
+
+    # Создаём flow с двумя цепочками, share-узел n_output (incoming=2).
+    flow = RuleDSL(
+        rule_id="rule_test-reg",
+        regulation_id="test-reg",
+        nodes=[
+            FlowNode(id="n_in_pressure", type="input", paramRef="pressure"),
+            FlowNode(id="n_thr_pressure", type="threshold", refValue=20.5),
+            FlowNode(id="n_cmp_pressure", type="compare", operator="outside_range"),
+            FlowNode(id="n_in_diameter", type="input", paramRef="diameter"),
+            FlowNode(id="n_thr_diameter", type="threshold", refValue=5.0),
+            FlowNode(id="n_cmp_diameter", type="compare", operator="outside_range"),
+            FlowNode(id="n_output", type="output", action="recommendation", text="Ок"),
+        ],
+        edges=[
+            FlowEdge(source="n_in_pressure", target="n_thr_pressure"),
+            FlowEdge(source="n_thr_pressure", target="n_cmp_pressure"),
+            FlowEdge(source="n_cmp_pressure", target="n_output", condition="outside"),
+            FlowEdge(source="n_in_diameter", target="n_thr_diameter"),
+            FlowEdge(source="n_thr_diameter", target="n_cmp_diameter"),
+            FlowEdge(source="n_cmp_diameter", target="n_output", condition="outside"),
+        ],
+    )
+    save_flow("test-reg", flow, comment="seed")
+
+    # Удаляем pressure через регламент → reconcile должен убрать только
+    # цепочку pressure, оставить diameter и shared output.
+    modified = copy.deepcopy(sample_regulation)
+    modified.parameters = [p for p in modified.parameters if p.id != "pressure"]
+    store.save(modified, comment="drop pressure")
+
+    after = load_flow("test-reg")
+    assert after is not None
+    node_ids = {n.id for n in after.nodes}
+    assert "n_in_pressure" not in node_ids
+    assert "n_thr_pressure" not in node_ids
+    assert "n_cmp_pressure" not in node_ids
+    # diameter и shared output остались
+    assert "n_in_diameter" in node_ids
+    assert "n_output" in node_ids
+    # Edge'и pressure тоже вычищены
+    for e in after.edges:
+        assert "pressure" not in e.source and "pressure" not in e.target
+
+
+def test_save_does_not_touch_flow_without_orphans(store, sample_regulation):
+    """Если все paramRef валидны, reconcile не меняет flow."""
+    from app.schemas.domain import FlowEdge, FlowNode, RuleDSL
+    from app.services.flow_storage import load_flow, save_flow
+
+    store.save(sample_regulation, comment="initial")
+    flow = RuleDSL(
+        rule_id="rule_test-reg",
+        regulation_id="test-reg",
+        nodes=[
+            FlowNode(id="n_in_pressure", type="input", paramRef="pressure"),
+            FlowNode(id="n_output", type="output", action="recommendation", text="Ок"),
+        ],
+        edges=[FlowEdge(source="n_in_pressure", target="n_output")],
+    )
+    save_flow("test-reg", flow, comment="seed")
+
+    store.save(sample_regulation, comment="resave")
+    after = load_flow("test-reg")
+    assert {n.id for n in after.nodes} == {"n_in_pressure", "n_output"}

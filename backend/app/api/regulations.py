@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.config import settings
 from app.schemas.domain import Regulation
-from app.services import fixtures, regulation_store, templates
+from app.services import domain_store, fixtures, regulation_store, templates
 from app.services.flow_storage import delete_flow as save_flow_module_delete, save_flow
 from app.services.regulation_client import client
 from app.services.templates import ensure_unique_source_id, slugify
@@ -53,10 +53,10 @@ def create_regulation(payload: CreateRegulationRequest) -> Regulation:
     Это закрывает гэп «нет ручки создания»: раньше регламенты появлялись
     только через seed из фикстур или upstream Sigma.
     """
-    if payload.domain not in {d["id"] for d in fixtures.list_domains()}:
+    if not domain_store.exists(payload.domain):
         raise HTTPException(
             status_code=400,
-            detail=f"Неизвестный домен '{payload.domain}'. Доступны: {[d['id'] for d in fixtures.list_domains()]}",
+            detail=f"Неизвестный домен '{payload.domain}'. Доступны: {[d['id'] for d in domain_store.list_all()]}",
         )
 
     raw_slug = slugify(payload.source_id or payload.name or templates.TEMPLATES.get(payload.domain, {}).get("default_name", "regulation"))

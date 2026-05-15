@@ -142,6 +142,22 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
     )
     c.execute("CREATE INDEX IF NOT EXISTS idx_chunks_doc ON document_chunks(doc_id, chunk_index)")
 
+    # ── Пользовательские домены ─────────────────────────────────────────
+    # Аналитик может создать новый домен из UI, в т.ч. в сценарии bootstrap'а
+    # корпуса с нуля (загрузили PDF → анализ не нашёл соседей → создаём домен
+    # «прямо отсюда»). Seed-домены живут в fixtures.DOMAINS, пользовательские —
+    # здесь. На read домены объединяются (см. domain_store.list_all).
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_domains (
+            id          VARCHAR PRIMARY KEY,
+            label       VARCHAR NOT NULL,
+            hint        VARCHAR,
+            created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
 
 # ---- Public API -------------------------------------------------------
 
@@ -331,6 +347,21 @@ def save(reg: Regulation, author: str = "anonymous", comment: str | None = None)
         except Exception:
             c.rollback()
             raise
+
+    # После успешного коммита — синхронизируем flow с новым набором параметров,
+    # чтобы Form Editor и Flow Editor не расходились (Form удаляет параметр →
+    # во Flow остаётся orphan-цепочка input/threshold/compare со stale paramRef).
+    # Выполняется вне транзакции — флоу хранится в файлах, не блокирует DB-лок,
+    # и сбой синка не должен откатывать запись регламента.
+    try:
+        from app.services.flow_storage import reconcile_flow_with_params
+
+        reconcile_flow_with_params(reg.id, {p.id for p in reg.parameters})
+    except Exception:
+        # Сознательно глотаем: flow можно поправить вручную в Flow Editor,
+        # потеря регламента из-за рассинка флоу — недопустима.
+        pass
+
     return version_id
 
 

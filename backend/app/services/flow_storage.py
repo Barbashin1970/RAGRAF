@@ -101,3 +101,76 @@ def restore_version(regulation_id: str, version_id: str) -> FlowVersion | None:
     if not v:
         return None
     return save_flow(regulation_id, v.dsl_snapshot, comment=f"restore of {version_id}")
+
+
+def reconcile_flow_with_params(regulation_id: str, valid_param_ids: set[str]) -> dict[str, list[str]]:
+    """Согласовать flow с актуальным списком параметров регламента.
+
+    Если в Form-редакторе удалили параметр, во flow остаются болтающиеся
+    `n_in_<X>` / `n_thr_<X>` / `n_cmp_<X>` цепочки со ссылкой на несуществующий
+    param. Это порождает «два расходящихся представления одной и той же истины»
+    — Form говорит «параметра нет», Flow Editor — «вот он».
+
+    Решение: при сохранении регламента находим все input-ноды с устаревшим
+    `paramRef` и удаляем их вместе с непосредственной цепочкой
+    (input → threshold → compare → …), останавливаясь на shared-узле
+    (например `n_output`, у которого incoming > 1 — он используется другими
+    параметрами). Стратегия консервативная: ничего не добавляем (новые
+    параметры пользователь сам затащит в flow), удаляем только то, что
+    точно стало мусором.
+
+    Возвращает `{"removed_params": [...], "removed_nodes": [...]}` —
+    для UI/логов. Если flow'а нет или нет orphan'ов — пустые списки.
+    """
+    flow = load_flow(regulation_id)
+    if flow is None:
+        return {"removed_params": [], "removed_nodes": []}
+
+    # Шаг 1. Находим input-ноды, у которых paramRef больше не в наборе.
+    stale_inputs = [
+        n for n in flow.nodes
+        if n.type == "input" and n.paramRef and n.paramRef not in valid_param_ids
+    ]
+    if not stale_inputs:
+        return {"removed_params": [], "removed_nodes": []}
+
+    # Шаг 2. Построим индексы для walk-forward.
+    successors: dict[str, list[str]] = {}
+    incoming: dict[str, int] = {}
+    for e in flow.edges:
+        successors.setdefault(e.source, []).append(e.target)
+        incoming[e.target] = incoming.get(e.target, 0) + 1
+
+    to_remove: set[str] = set()
+    for inp in stale_inputs:
+        cursor = inp.id
+        while True:
+            to_remove.add(cursor)
+            succ = successors.get(cursor, [])
+            # Однозначная следующая нода. Если несколько — это switch/branch,
+            # дальше не идём (логика расходится, шагать опасно).
+            if len(succ) != 1:
+                break
+            next_id = succ[0]
+            # Shared-узел: на него ссылаются несколько источников (типичный
+            # `n_output`). Удалять его нельзя — это шеренга для других param'ов.
+            if incoming.get(next_id, 0) > 1:
+                break
+            cursor = next_id
+
+    new_nodes = [n for n in flow.nodes if n.id not in to_remove]
+    new_edges = [
+        e for e in flow.edges
+        if e.source not in to_remove and e.target not in to_remove
+    ]
+
+    flow.nodes = new_nodes
+    flow.edges = new_edges
+    removed_params = sorted({n.paramRef for n in stale_inputs if n.paramRef})
+    save_flow(
+        regulation_id,
+        flow,
+        author="system",
+        comment=f"Sync с регламентом: удалены ноды для параметров {', '.join(removed_params)}",
+    )
+    return {"removed_params": removed_params, "removed_nodes": sorted(to_remove)}
