@@ -284,13 +284,25 @@ def sandbox_delete_document(doc_id: str) -> dict[str, str]:
 
 @router.post("/sandbox/documents/{doc_id}/analyze")
 async def sandbox_analyze_document(doc_id: str) -> dict[str, Any]:
-    """Cross-corpus анализ документа против корпуса регламентов.
+    """Быстрый cross-corpus анализ документа против корпуса регламентов.
 
-    Возвращает «картину по доменам» (сколько регламентов каждого домена
-    затронуто) + список релевантных регламентов с числом совпадений +
-    LLM-summary. Время: ~5 сек retrieval + 10-30 сек LLM (qwen2.5:7b на M2).
+    Возвращает «картину по доменам» + список релевантных регламентов +
+    структурированный fallback-summary без LLM. Целевое время: ~5-10 сек
+    (зависит от размера документа). LLM-summary вынесена в отдельный
+    эндпойнт `/analyze-summary` — она тяжёлая (60-120 сек на M2 Air,
+    swap-thrashing на qwen2.5:7b), пользователь зовёт её по явной кнопке.
     """
     try:
         return await document_analysis.analyze_document(doc_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+@router.post("/sandbox/documents/{doc_id}/analyze-summary")
+async def sandbox_analyze_document_summary(doc_id: str) -> dict[str, Any]:
+    """LLM-саммари по документу (qwen2.5:7b). Тяжёлая операция, отдельным
+    эндпойнтом — UI зовёт по явной кнопке «Сгенерировать LLM-анализ»."""
+    try:
+        return await document_analysis.analyze_document_summary(doc_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e

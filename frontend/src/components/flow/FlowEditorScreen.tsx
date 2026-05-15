@@ -61,7 +61,15 @@ export function FlowEditorScreen() {
 
   const saveMutation = useMutation({
     mutationFn: (next: RuleDSL) => api.flow.save(id, next),
-    onSuccess: () => qc.invalidateQueries({ queryKey: dslKey }),
+    onSuccess: () => {
+      // На бэке save_flow синхронизирует регламент: derive_params_from_flow
+      // выводит параметры из input-нод и обновляет DuckDB. Инвалидируем оба
+      // запроса, чтобы Form Editor / списки увидели актуальные параметры.
+      qc.invalidateQueries({ queryKey: dslKey })
+      qc.invalidateQueries({ queryKey: regKey })
+      qc.invalidateQueries({ queryKey: ['datasets'] })
+      qc.invalidateQueries({ queryKey: ['regulation-history', id] })
+    },
   })
 
   const validateMutation = useMutation({

@@ -28,8 +28,30 @@ from app.config import settings
 from app.services import regulation_store
 
 
+# Сколько chunks макс анализируем за один проход. Длинные PDF дают сотни
+# чанков; 50 — sweet spot между полнотой и временем (на M2 Air retrieval
+# ~3 сек на 50 параллельных embed-запросах). При превышении выбираем
+# uniformly-распределённую выборку, чтобы покрыть весь документ.
+_MAX_CHUNKS_FOR_RETRIEVAL = 50
+
+
+def _sample_chunks_uniform(chunks: list[dict[str, str]], cap: int) -> list[dict[str, str]]:
+    """Если chunks > cap — берём uniform по индексу подвыборку из cap элементов.
+    Сохраняет начало/середину/конец документа в выборке, чтобы анализ покрывал
+    весь документ, а не только первые N страниц."""
+    n = len(chunks)
+    if n <= cap:
+        return chunks
+    step = n / cap
+    return [chunks[int(i * step)] for i in range(cap)]
+
+
 async def analyze_document(doc_id: str) -> dict[str, Any]:
-    """Полный анализ: chunks → retrieval → spectrum → summary.
+    """Анализ без LLM: chunks → retrieval → spectrum + fallback summary.
+
+    LLM-саммари выделена в отдельный эндпойнт (`analyze_document_summary`),
+    чтобы UI рендерил данные сразу — иначе пользователь видит «бесконечный»
+    спиннер 60-120 сек пока qwen2.5:7b генерирует текст на M2 Air.
 
     Возвращает структуру для UI:
       {
@@ -37,7 +59,8 @@ async def analyze_document(doc_id: str) -> dict[str, Any]:
         "filename": ...,
         "domain_spectrum": [{domain, regulation_count, total_hits}, ...],
         "regulations": [{regulation_id, name, domain, hits, max_score}, ...],
-        "summary": "LLM-generated text",
+        "summary": "fallback-текст без LLM" (structured),
+        "summary_llm_available": True/False (можно ли запросить LLM-summary),
         "stats": {chunks_analyzed, regulations_matched, avg_hits_per_chunk}
       }
     """
@@ -46,16 +69,21 @@ async def analyze_document(doc_id: str) -> dict[str, Any]:
         raise ValueError(f"Документ {doc_id} не найден или пуст")
 
     filename = chunks_data["filename"]
-    chunks = chunks_data["chunks"]  # list of {chunk_id, text}
-    if not chunks:
+    all_chunks = chunks_data["chunks"]  # list of {chunk_id, text}
+    if not all_chunks:
         return {
             "doc_id": doc_id,
             "filename": filename,
             "domain_spectrum": [],
             "regulations": [],
             "summary": "Документ не содержит фрагментов для анализа.",
+            "summary_llm_available": False,
             "stats": {"chunks_analyzed": 0, "regulations_matched": 0, "avg_hits_per_chunk": 0.0},
         }
+
+    # Uniform-sampling chunks для retrieval — длинные PDF не уводят backend
+    # в 200+ параллельных embed-запросов, при этом покрытие документа полное.
+    chunks = _sample_chunks_uniform(all_chunks, _MAX_CHUNKS_FOR_RETRIEVAL)
 
     # Retrieval pass: для каждого chunk top-3 регламентов
     chunk_hits = await _retrieve_for_chunks(chunks, top_k=3)
@@ -109,8 +137,11 @@ async def analyze_document(doc_id: str) -> dict[str, Any]:
         reverse=True,
     )
 
-    # LLM summary
-    summary = await _generate_summary(filename, chunks, regulations, domain_spectrum)
+    # Fast path: возвращаем структурированный fallback-summary без LLM-вызова.
+    # На M2 Air qwen2.5:7b занимает ~4.4 ГБ RAM и съедает CPU на 60-120 сек на
+    # генерации — UI зависал, курсор лагал из-за swap-thrashing. LLM-саммари
+    # теперь отдельным эндпойнтом по явному запросу.
+    summary = _build_summary_fallback(filename, regulations, domain_spectrum)
 
     return {
         "doc_id": doc_id,
@@ -118,6 +149,7 @@ async def analyze_document(doc_id: str) -> dict[str, Any]:
         "domain_spectrum": domain_spectrum,
         "regulations": regulations,
         "summary": summary,
+        "summary_llm_available": bool(settings.ragu_enabled and regulations),
         "stats": {
             "chunks_analyzed": len(chunks),
             "regulations_matched": len(regulations),
@@ -126,6 +158,69 @@ async def analyze_document(doc_id: str) -> dict[str, Any]:
             ),
         },
     }
+
+
+async def analyze_document_summary(doc_id: str) -> dict[str, Any]:
+    """LLM-саммари по уже-проанализированному документу. Слепить один абзац
+    через qwen2.5 — это тяжёлая операция (4.4 ГБ RAM, 60-120 сек на M2 Air),
+    поэтому вынесена отдельным эндпойнтом: UI зовёт её по явной кнопке
+    «Сгенерировать LLM-анализ» когда пользователь готов подождать.
+
+    Возвращает `{"doc_id", "summary"}`. На ошибке/таймауте — fallback-текст
+    с пометкой «LLM недоступна».
+    """
+    if not settings.ragu_enabled:
+        return {
+            "doc_id": doc_id,
+            "summary": "LLM выключена (RAGU_ENABLED=false). Доступен только структурированный отчёт.",
+        }
+
+    chunks_data = _load_document_chunks(doc_id)
+    if not chunks_data:
+        raise ValueError(f"Документ {doc_id} не найден или пуст")
+    all_chunks = chunks_data["chunks"]
+    if not all_chunks:
+        return {"doc_id": doc_id, "summary": "Документ пуст — нечего анализировать."}
+
+    # Повторяем retrieval только чтобы сформировать input для LLM. Можно было
+    # бы кэшировать результат analyze_document, но 6 регламентов × 50 chunks
+    # retrieval'а ~5 сек — мизерная доля LLM-генерации, не стоит ботвы кэша.
+    chunks = _sample_chunks_uniform(all_chunks, _MAX_CHUNKS_FOR_RETRIEVAL)
+    chunk_hits = await _retrieve_for_chunks(chunks, top_k=3)
+
+    reg_hits: dict[str, int] = defaultdict(int)
+    reg_max_score: dict[str, float] = defaultdict(float)
+    for _ch, hits in zip(chunks, chunk_hits):
+        for h in hits:
+            rid = h["regulation_id"]
+            reg_hits[rid] += 1
+            score = h.get("score", 0.0)
+            if score > reg_max_score[rid]:
+                reg_max_score[rid] = score
+
+    regulations: list[dict[str, Any]] = []
+    domain_stats: dict[str, dict[str, int]] = defaultdict(lambda: {"regulation_count": 0, "total_hits": 0})
+    for rid, hits_count in reg_hits.items():
+        reg = regulation_store.get(rid)
+        if reg is None:
+            continue
+        domain = reg.domain or "unknown"
+        regulations.append({
+            "regulation_id": rid, "name": reg.name, "domain": domain,
+            "hits": hits_count, "max_score": round(reg_max_score[rid], 3),
+        })
+        domain_stats[domain]["regulation_count"] += 1
+        domain_stats[domain]["total_hits"] += hits_count
+    regulations.sort(key=lambda r: (r["hits"], r["max_score"]), reverse=True)
+
+    domain_spectrum = sorted(
+        ({"domain": d, "regulation_count": s["regulation_count"], "total_hits": s["total_hits"]}
+         for d, s in domain_stats.items()),
+        key=lambda x: x["total_hits"], reverse=True,
+    )
+
+    summary = await _generate_summary(chunks_data["filename"], chunks, regulations, domain_spectrum)
+    return {"doc_id": doc_id, "summary": summary}
 
 
 def _load_document_chunks(doc_id: str) -> dict[str, Any] | None:
@@ -193,15 +288,19 @@ async def _generate_summary(
         # Fallback без LLM — структурированный текст по data
         return _build_summary_fallback(filename, regulations, domain_spectrum)
 
-    # Sample top-3 chunks by length (длинные обычно более информативны)
-    sampled = sorted(chunks, key=lambda c: len(c["text"]), reverse=True)[:3]
-    chunks_text = "\n\n".join(f"[Фрагмент {i + 1}]\n{c['text']}" for i, c in enumerate(sampled))
+    # 2 chunks с обрезкой по 600 символов: prompt-eval на qwen2.5:7b/M2 Air —
+    # ~50 tok/s; 4×800 chars/chunk ≈ 600-800 tokens → ~15 сек только на prefill.
+    # 2×600 chars ≈ 300 tokens → ~6 сек. Качество summary почти не падает —
+    # ретривер уже выделил релевантные регламенты.
+    sampled = sorted(chunks, key=lambda c: len(c["text"]), reverse=True)[:2]
+    chunks_text = "\n\n".join(
+        f"[Фрагмент {i + 1}]\n{c['text'][:600]}" for i, c in enumerate(sampled)
+    )
 
-    # Build regulation summary (top 8 по hits)
+    # Build regulation summary (top 5 по hits) — больше LLM всё равно не цитирует.
     regs_text = "\n".join(
-        f"- {r['name']} (id={r['regulation_id']}, домен={r['domain']}, "
-        f"совпадений с {r['hits']} фрагментами, max_score={r['max_score']})"
-        for r in regulations[:8]
+        f"- {r['name']} ({r['domain']}, совпадений: {r['hits']})"
+        for r in regulations[:5]
     )
 
     domain_summary = "\n".join(
@@ -209,28 +308,26 @@ async def _generate_summary(
         for d in domain_spectrum
     )
 
-    system_prompt = f"""Ты — аналитик нормативной базы. Проанализируй загруженный документ и его связи с корпусом цифровых регламентов системы.
-
-ЗАДАЧА: Написать связный summary 4-6 предложений, который объясняет:
-1. КАКИЕ ТЕМЫ затронуты в документе (по содержанию фрагментов).
-2. КАК ОНИ ПЕРЕСЕКАЮТСЯ с доменами корпуса (теплоснабжение / ЖКХ / безопасность / экология).
-3. КАКИЕ КОНКРЕТНЫЕ РЕГЛАМЕНТЫ наиболее релевантны (упомяни 2-3 имени).
-4. ЕСТЬ ЛИ ПРОБЕЛЫ — темы документа без соответствующих регламентов (если видно).
-
-ФОРМАТ: связный абзац без списков и markdown. Без вступления «Этот документ…» — сразу по сути."""
+    # Краткий system prompt — qwen2.5:7b на M2 Air платит ~50 tok/s за
+    # prompt-eval. 1000 токенов сист.промпта = 20 сек ожидания до первого
+    # output-токена. Чем короче — тем быстрее старт генерации.
+    system_prompt = (
+        "Ты — аналитик нормативной базы. По данным retrieval'а напиши связный "
+        "абзац 3-5 предложений: какие темы документа пересекаются с корпусом, "
+        "2-3 наиболее релевантных регламента по имени, есть ли явные пробелы. "
+        "Без списков и markdown."
+    )
 
     user_prompt = f"""Документ: "{filename}"
 
-=== ПРЕДСТАВИТЕЛЬНЫЕ ФРАГМЕНТЫ ДОКУМЕНТА ===
+Фрагменты:
 {chunks_text}
 
-=== СВЯЗАННЫЕ РЕГЛАМЕНТЫ (отсортированы по числу совпадений) ===
+Связанные регламенты:
 {regs_text}
 
-=== РАСПРЕДЕЛЕНИЕ ПО ДОМЕНАМ ===
-{domain_summary}
-
-Напиши summary."""
+Распределение по доменам:
+{domain_summary}"""
 
     try:
         from openai import AsyncOpenAI
@@ -238,7 +335,7 @@ async def _generate_summary(
         client = AsyncOpenAI(
             base_url=settings.openai_base_url or None,
             api_key=settings.openai_api_key or "ollama",
-            timeout=120.0,
+            timeout=180.0,
         )
         resp = await client.chat.completions.create(
             model=settings.ragu_llm_model,
@@ -246,7 +343,10 @@ async def _generate_summary(
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            max_tokens=500,
+            # 220 tokens ≈ 4-5 предложений. На 6 tok/s (qwen2.5:7b/M2 Air)
+            # ~35 сек генерации, плюс ~20 сек prompt-eval. Раньше было 500
+            # → почти минута генерации, что и вызывало «бесконечную» загрузку.
+            max_tokens=220,
             temperature=0.2,
         )
         text = (resp.choices[0].message.content or "").strip()

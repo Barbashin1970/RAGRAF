@@ -378,6 +378,11 @@ export const api = {
         `/api/sandbox/documents/${encodeURIComponent(docId)}/analyze`,
         { method: 'POST' },
       ),
+    analyzeDocumentSummary: (docId: string) =>
+      request<{ doc_id: string; summary: string }>(
+        `/api/sandbox/documents/${encodeURIComponent(docId)}/analyze-summary`,
+        { method: 'POST' },
+      ),
   },
 }
 
@@ -425,6 +430,7 @@ export interface DocumentAnalysisResult {
   domain_spectrum: DocumentAnalysisDomainSlice[]
   regulations: DocumentAnalysisRegulation[]
   summary: string
+  summary_llm_available?: boolean
   stats: {
     chunks_analyzed: number
     regulations_matched: number

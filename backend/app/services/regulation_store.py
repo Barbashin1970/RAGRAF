@@ -271,8 +271,18 @@ def get(source_id: str) -> Regulation | None:
     )
 
 
-def save(reg: Regulation, author: str = "anonymous", comment: str | None = None) -> str:
-    """Upsert + snapshot в history. Возвращает version_id."""
+def save(
+    reg: Regulation,
+    author: str = "anonymous",
+    comment: str | None = None,
+    sync_flow: bool = True,
+) -> str:
+    """Upsert + snapshot в history. Возвращает version_id.
+
+    `sync_flow=False` отключает Form → Flow reconcile — используется когда
+    save() вызван из Flow→Form sync пути (`derive_params_from_flow`), чтобы
+    не вернуться обратно в Flow с теми же изменениями (защита от циклов).
+    """
     version_id = uuid.uuid4().hex
     now = datetime.now(timezone.utc)
 
@@ -349,18 +359,21 @@ def save(reg: Regulation, author: str = "anonymous", comment: str | None = None)
             raise
 
     # После успешного коммита — синхронизируем flow с новым набором параметров,
-    # чтобы Form Editor и Flow Editor не расходились (Form удаляет параметр →
-    # во Flow остаётся orphan-цепочка input/threshold/compare со stale paramRef).
-    # Выполняется вне транзакции — флоу хранится в файлах, не блокирует DB-лок,
-    # и сбой синка не должен откатывать запись регламента.
-    try:
-        from app.services.flow_storage import reconcile_flow_with_params
+    # чтобы Form Editor и Flow Editor не расходились. Reconcile:
+    #   • удаляет orphan-цепочки удалённых параметров,
+    #   • добавляет цепочки для новых параметров,
+    #   • синхронит threshold-ноды (refValue/deviation/unit/label).
+    # Выполняется вне транзакции — флоу в файлах, не блокирует DB-лок, и сбой
+    # синка не должен откатывать запись регламента.
+    if sync_flow:
+        try:
+            from app.services.flow_storage import reconcile_flow_with_params
 
-        reconcile_flow_with_params(reg.id, {p.id for p in reg.parameters})
-    except Exception:
-        # Сознательно глотаем: flow можно поправить вручную в Flow Editor,
-        # потеря регламента из-за рассинка флоу — недопустима.
-        pass
+            reconcile_flow_with_params(reg.id, reg.parameters)
+        except Exception:
+            # Сознательно глотаем: flow можно поправить вручную в Flow Editor,
+            # потеря регламента из-за рассинка флоу — недопустима.
+            pass
 
     return version_id
 

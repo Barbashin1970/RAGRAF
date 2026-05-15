@@ -123,6 +123,7 @@ export function DocumentAnalysisModal({ doc, onClose }: Props) {
           {analyze.data && (
             <AnalysisReport
               data={analyze.data}
+              doc={doc}
               onBootstrap={() => setShowCreateDomain(true)}
             />
           )}
@@ -178,9 +179,11 @@ function AnalyzingPlaceholder() {
 
 function AnalysisReport({
   data,
+  doc,
   onBootstrap,
 }: {
   data: DocumentAnalysisResult
+  doc: UserDocument
   onBootstrap: () => void
 }) {
   // Max total_hits для нормализации bar chart
@@ -188,6 +191,13 @@ function AnalysisReport({
     () => Math.max(...data.domain_spectrum.map((d) => d.total_hits), 1),
     [data.domain_spectrum],
   )
+
+  // LLM-summary тяжёлая (qwen2.5:7b ~60 сек на M2 Air + swap-thrashing), поэтому
+  // не вызываем её автоматически. Кнопка показывается только если на бэке LLM
+  // вообще доступна (`summary_llm_available=true`).
+  const llmSummary = useMutation({
+    mutationFn: () => api.sandbox.analyzeDocumentSummary(doc.doc_id),
+  })
 
   return (
     <div className="space-y-6">
@@ -221,12 +231,35 @@ function AnalysisReport({
         </div>
       )}
 
-      {data.summary && (
+      {(data.summary || llmSummary.data) && (
         <>
           <SectionTitle icon={Sparkles} label="Краткий анализ" />
           <div className="whitespace-pre-line rounded-md border border-violet-100 bg-violet-50/40 px-4 py-3 text-sm leading-relaxed text-stone-700">
-            {data.summary}
+            {llmSummary.data?.summary || data.summary}
           </div>
+          {data.summary_llm_available && !llmSummary.data && (
+            <div className="flex flex-wrap items-center gap-3 rounded-md border border-stone-200 bg-stone-50 px-4 py-3 text-xs">
+              <span className="text-stone-600">
+                Это структурированный отчёт. LLM-анализ (qwen2.5:7b) даёт связный
+                абзац с пояснением связей, но занимает <b>60-120 сек</b> на M2 Air
+                и грузит память.
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={llmSummary.isPending ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                onClick={() => llmSummary.mutate()}
+                disabled={llmSummary.isPending}
+              >
+                {llmSummary.isPending ? 'Генерирую…' : 'Сгенерировать LLM-анализ'}
+              </Button>
+              {llmSummary.isError && (
+                <span className="text-rose-700">
+                  Ошибка: {(llmSummary.error as Error).message}
+                </span>
+              )}
+            </div>
+          )}
         </>
       )}
 

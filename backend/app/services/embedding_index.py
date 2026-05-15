@@ -23,14 +23,30 @@ from app.services import regulation_store
 
 
 class EmbeddingIndex:
-    """In-memory cosine-similarity индекс {regulation_id: vector}."""
+    """In-memory cosine-similarity индекс {regulation_id: vector}.
+
+    Sigma-audit Perf: signature() читает DuckDB для всех регламентов — за один
+    вызов это копеечно, но при concurrent retrieval (analyze_document с 50
+    chunks через asyncio.gather) её зовут 50 раз подряд, и каждый раз через
+    threading lock. Кэшируем результат signature() на 30 сек, чтобы сэкономить
+    ~290 лишних DB-итераций на анализ документа. Cache flush — `reset_index()`.
+    """
+
+    _SIGNATURE_CACHE_TTL = 30.0  # сек
 
     def __init__(self) -> None:
         self._vectors: dict[str, list[float]] = {}
         self._signature: str = ""
+        self._sig_cache: tuple[float, str] | None = None  # (timestamp, value)
 
     def signature(self) -> str:
-        """Хэш текущего состава регламентов — для детекта что нужно пересобрать."""
+        """Хэш текущего состава регламентов. Закэширован на TTL чтобы не дёргать
+        DuckDB на каждый из 50 параллельных search()-вызовов."""
+        import time as _time
+        now = _time.monotonic()
+        cached = self._sig_cache
+        if cached and (now - cached[0]) < self._SIGNATURE_CACHE_TTL:
+            return cached[1]
         items = sorted(regulation_store.list_all(), key=lambda r: r["id"])
         h = hashlib.sha256()
         for it in items:
@@ -41,7 +57,14 @@ class EmbeddingIndex:
             h.update((reg.name or "").encode())
             for r in reg.recommendations:
                 h.update((r.text or "").encode())
-        return h.hexdigest()
+        value = h.hexdigest()
+        self._sig_cache = (now, value)
+        return value
+
+    def invalidate_signature_cache(self) -> None:
+        """Сбросить кэш сигнатуры — например после save регламента, если хотим
+        чтобы следующий search() заметил изменение немедленно."""
+        self._sig_cache = None
 
     def is_fresh(self) -> bool:
         return self._signature == self.signature() and bool(self._vectors)
