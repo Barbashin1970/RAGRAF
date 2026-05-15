@@ -442,36 +442,34 @@ function SearchDemo() {
           disabled={chat.isPending}
           className="min-h-[42px] max-h-32 flex-1 resize-none rounded-md border border-stone-200 bg-white px-3 py-2 text-sm focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300 disabled:opacity-60"
         />
-        <button
+        <Button
+          variant="author"
+          icon={chat.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
           onClick={() => send()}
           disabled={!input.trim() || chat.isPending}
-          className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700 disabled:opacity-60"
         >
-          {chat.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
           Отправить
-        </button>
-        <button
+        </Button>
+        <Button
+          variant={showSettings ? 'secondary' : 'ghost'}
+          icon={<Settings2 size={14} />}
           onClick={() => setShowSettings((v) => !v)}
-          title={showSettings ? 'Скрыть параметры' : 'Параметры генерации (temperature, top-k, max-tokens)'}
           aria-expanded={showSettings}
-          className={cn(
-            'inline-flex items-center justify-center rounded-md border p-2 transition',
-            showSettings
-              ? 'border-violet-300 bg-violet-50 text-violet-700'
-              : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50',
-          )}
+          title={showSettings ? 'Скрыть параметры' : 'Параметры генерации (temperature, top-k, max-tokens)'}
+          className={cn(showSettings && 'border-violet-300 bg-violet-50 text-violet-700')}
         >
-          <Settings2 size={14} />
-        </button>
+          <span className="sr-only">Параметры</span>
+        </Button>
         {turns.length > 0 && (
-          <button
+          <Button
+            variant="ghost"
+            icon={<RotateCcw size={14} />}
             onClick={reset}
             disabled={chat.isPending}
             title="Очистить разговор"
-            className="inline-flex items-center justify-center rounded-md border border-stone-200 bg-white p-2 text-stone-600 hover:bg-stone-50 disabled:opacity-40"
           >
-            <RotateCcw size={14} />
-          </button>
+            <span className="sr-only">Очистить</span>
+          </Button>
         )}
       </div>
     </div>
@@ -1003,14 +1001,14 @@ function ExtractDemo() {
       </div>
 
       <div className="flex items-center gap-2">
-        <button
+        <Button
+          variant="author"
+          icon={extract.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileSearch size={14} />}
           onClick={submit}
           disabled={!text.trim() || extract.isPending}
-          className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700 disabled:opacity-60"
         >
-          {extract.isPending ? <Loader2 size={14} className="animate-spin" /> : <FileSearch size={14} />}
           Извлечь параметры
-        </button>
+        </Button>
         {extract.data && (
           <div className="ml-auto text-xs text-stone-500">
             Найдено: <b className="text-stone-800">{extract.data.count}</b>
@@ -1347,14 +1345,14 @@ function BuildRegulationPanel({
             <div className="text-[11px] text-stone-500">
               После создания откроется редактор для уточнения порогов и flow.
             </div>
-            <button
+            <Button
+              variant="author"
+              icon={isPending ? <Loader2 size={14} className="animate-spin" /> : <PackagePlus size={14} />}
               onClick={onCreate}
               disabled={!canCreate}
-              className="inline-flex items-center gap-1.5 rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isPending ? <Loader2 size={14} className="animate-spin" /> : <PackagePlus size={14} />}
               Создать регламент
-            </button>
+            </Button>
           </div>
 
           {error && (

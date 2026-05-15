@@ -1,11 +1,31 @@
 import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import cytoscape, { type Core, type ElementDefinition, type NodeSingular } from 'cytoscape'
 import cola from 'cytoscape-cola'
+import {
+  AlertCircle,
+  ArrowRight,
+  type LucideIcon,
+  FileText,
+  Sliders,
+  Shield,
+  Tag,
+} from 'lucide-react'
 import { api, type CyNode } from '@/lib/api'
 import { asCytoscapeLayout } from '@/lib/cytoscape-cola-types'
-import { Tabs, type TabDef } from '@/components/ui'
+import { Badge, Button, Tabs, type TabDef } from '@/components/ui'
+
+// Иконки для типов узлов графа. Совпадают семантически с цветами TYPE_COLOR
+// (Regulation=teal/FileText, Parameter=green/Sliders, Constraint=gray/Shield,
+// Recommendation=orange/AlertCircle, Source=light-gray/Tag).
+const TYPE_ICON: Record<string, LucideIcon> = {
+  Regulation: FileText,
+  Parameter: Sliders,
+  Constraint: Shield,
+  Recommendation: AlertCircle,
+  Source: Tag,
+}
 
 cytoscape.use(cola)
 
@@ -175,36 +195,66 @@ export function GraphView() {
             </div>
           )}
         </div>
-        <aside className="w-80 shrink-0 overflow-y-auto border-l border-stone-200 bg-white p-3 text-sm">
-          {selected ? (
-            <div className="space-y-2">
-              <div className="text-xs uppercase tracking-wide text-stone-500">{selected.type}</div>
-              <div className="text-base font-semibold leading-snug">{selected.label}</div>
-              {selected.description && (
-                <div className="whitespace-pre-line break-words text-sm leading-relaxed text-stone-700">
-                  {selected.description}
+        <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-l border-stone-200 bg-white text-sm">
+          {selected ? (() => {
+            const Icon = TYPE_ICON[selected.type]
+            const color = TYPE_COLOR[selected.type] ?? '#94A3B8'
+            const domainLabel = selected.domain
+              ? domains.find((d) => d.id === selected.domain)?.label || selected.domain
+              : null
+            return (
+              <>
+                {/* Шапка детали узла — icon-pill в стиле Node-RED-блока на canvas'е. */}
+                <header className="flex items-center gap-3 border-b border-stone-200 bg-stone-50/60 px-4 py-3">
+                  {Icon && (
+                    <div
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-white"
+                      style={{ backgroundColor: color }}
+                    >
+                      <Icon size={18} />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-stone-500">
+                      {selected.type}
+                    </div>
+                    <div className="truncate text-sm font-semibold text-stone-900" title={selected.label}>
+                      {selected.label}
+                    </div>
+                  </div>
+                </header>
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-3">
+                  {selected.description && (
+                    <div className="whitespace-pre-line break-words text-sm leading-relaxed text-stone-700">
+                      {selected.description}
+                    </div>
+                  )}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {domainLabel && <Badge tone="info">{domainLabel}</Badge>}
+                    <Badge tone="neutral">{selected.type}</Badge>
+                  </div>
+                  <div className="border-t border-stone-100 pt-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-wide text-stone-500">
+                      Идентификатор
+                    </div>
+                    <code className="mt-0.5 block break-all rounded bg-stone-100 px-1.5 py-1 font-mono text-[11px] text-stone-700">
+                      {selected.id}
+                    </code>
+                  </div>
+                  {selected.regulation_id && selected.type === 'Regulation' && (
+                    <Link to={`/regulations/${selected.regulation_id}/flow`} className="block">
+                      <Button variant="primary" size="sm" iconRight={<ArrowRight size={13} />}>
+                        Открыть в редакторе
+                      </Button>
+                    </Link>
+                  )}
                 </div>
-              )}
-              {selected.domain && (
-                <div className="text-xs">
-                  <span className="text-stone-500">домен: </span>
-                  <span className="rounded bg-primary/10 px-1 py-0.5 text-primary">
-                    {domains.find((d) => d.id === selected.domain)?.label || selected.domain}
-                  </span>
-                </div>
-              )}
-              <div className="break-all font-mono text-xs text-stone-400">{selected.id}</div>
-              {selected.regulation_id && selected.type === 'Regulation' && (
-                <a
-                  href={`/regulations/${selected.regulation_id}/flow`}
-                  className="mt-2 inline-block rounded-md bg-primary px-2 py-1 text-xs text-white"
-                >
-                  Открыть в редакторе →
-                </a>
-              )}
+              </>
+            )
+          })() : (
+            <div className="flex flex-1 items-center justify-center px-4 py-8 text-center text-stone-500">
+              Кликните по узлу для деталей.
             </div>
-          ) : (
-            <div className="text-stone-500">Кликните по узлу для деталей.</div>
           )}
         </aside>
       </div>
