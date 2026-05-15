@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import cytoscape, { type Core, type ElementDefinition, type NodeSingular } from 'cytoscape'
@@ -6,14 +6,25 @@ import cola from 'cytoscape-cola'
 import {
   AlertCircle,
   ArrowRight,
+  LayoutGrid,
+  Lock,
   type LucideIcon,
   FileText,
+  RotateCcw,
   Sliders,
   Shield,
   Tag,
+  Unlock,
 } from 'lucide-react'
 import { api, type CyNode } from '@/lib/api'
 import { asCytoscapeLayout } from '@/lib/cytoscape-cola-types'
+import {
+  clearPositions,
+  countPositions,
+  loadPositions,
+  type PositionMap,
+  savePositions,
+} from '@/lib/graphPositions'
 import { Badge, Button, Tabs, type TabDef } from '@/components/ui'
 
 // Иконки для типов узлов графа. Совпадают семантически с цветами TYPE_COLOR
@@ -42,6 +53,12 @@ export function GraphView() {
   const ref = useRef<HTMLDivElement>(null)
   const cyRef = useRef<Core | null>(null)
   const [selected, setSelected] = useState<CyNode['data'] | null>(null)
+  // Locked-режим: пользователь зафиксировал позиции вручную. cola-layout
+  // не пересчитывает координаты, только применяет сохранённые из localStorage.
+  // Изменения per-node (drag) автосохраняются при locked=false тоже —
+  // toggle меняет только поведение cola (применять/не применять).
+  const [locked, setLocked] = useState<boolean>(false)
+  const [savedCount, setSavedCount] = useState<number>(0)
 
   // Список доменов для табов
   const { data: domains = [] } = useQuery({
@@ -69,6 +86,41 @@ export function GraphView() {
     enabled: domains.length === 0 || !!activeDomain,
   })
 
+  // Применить сохранённые позиции к узлам Cytoscape. Если узла нет в map —
+  // оставляем default (его расставит cola-layout).
+  const applySavedPositions = useCallback(
+    (cy: Core, saved: PositionMap): number => {
+      let applied = 0
+      cy.nodes().forEach((n) => {
+        const pos = saved[n.id()]
+        if (pos) {
+          n.position(pos)
+          applied += 1
+        }
+      })
+      return applied
+    },
+    [],
+  )
+
+  // Обработчик dragfree: автосохранение позиций при отпускании узла.
+  // Сохраняем ВСЕ текущие позиции (не только перетащенный), чтобы
+  // при следующей загрузке весь pin-граф восстанавливался целиком.
+  const handleDragFree = useCallback(
+    (domainKey: string | null) => {
+      const cy = cyRef.current
+      if (!cy) return
+      const positions: PositionMap = {}
+      cy.nodes().forEach((n) => {
+        const p = n.position()
+        positions[n.id()] = { x: p.x, y: p.y }
+      })
+      savePositions(domainKey, positions)
+      setSavedCount(Object.keys(positions).length)
+    },
+    [],
+  )
+
   // Cytoscape init / re-render at каждое изменение data
   useEffect(() => {
     if (!ref.current || !data) return
@@ -76,14 +128,38 @@ export function GraphView() {
       ...data.nodes.map((n) => ({ group: 'nodes' as const, data: n.data })),
       ...data.edges.map((e) => ({ group: 'edges' as const, data: e.data })),
     ]
+    const saved = loadPositions(activeDomain)
+    const hasSaved = Object.keys(saved).length > 0
+    setSavedCount(Object.keys(saved).length)
+    // При первой загрузке домена с сохранёнными позициями — заходим в lock-режим
+    // автоматически. Юзер уже потратил время на ручную раскладку, не нужно
+    // ломать её каждым refresh.
+    if (hasSaved) setLocked(true)
+
+    // Layout: если есть saved и locked — используем 'preset' (применит position
+    // из node data, не двигает узлы); иначе cola-layout пересчитывает с нуля.
+    // preset — встроенный layout cytoscape, не нужен сторонний helper.
+    const layoutOpts = hasSaved && locked
+      ? ({ name: 'preset', fit: true } as cytoscape.LayoutOptions)
+      : asCytoscapeLayout({ name: 'cola', animate: true })
 
     if (cyRef.current) {
       cyRef.current.elements().remove()
       cyRef.current.add(elements)
-      // R7.2 (Sigma-audit): cola-layout type-safe через asCytoscapeLayout helper.
-      cyRef.current.layout(asCytoscapeLayout({ name: 'cola', animate: true })).run()
+      if (hasSaved) applySavedPositions(cyRef.current, saved)
+      cyRef.current.layout(layoutOpts).run()
       setSelected(null)
       return
+    }
+
+    // Применим позиции через element.position в data — Cytoscape учтёт их
+    // при инициализации (особенно важно для preset-layout).
+    if (hasSaved) {
+      for (const el of elements) {
+        if (el.group === 'nodes' && el.data?.id && saved[el.data.id as string]) {
+          ;(el as ElementDefinition).position = saved[el.data.id as string]
+        }
+      }
     }
 
     const cy = cytoscape({
@@ -122,7 +198,7 @@ export function GraphView() {
           style: { 'border-color': '#1A202C', 'border-width': 2 },
         },
       ],
-      layout: asCytoscapeLayout({ name: 'cola', animate: true }),
+      layout: layoutOpts,
       wheelSensitivity: 0.2,
     })
 
@@ -130,13 +206,46 @@ export function GraphView() {
     cy.on('tap', (evt) => {
       if (evt.target === cy) setSelected(null)
     })
+    // Drag-end: автосохранение раскладки в localStorage.
+    cy.on('dragfree', 'node', () => handleDragFree(activeDomain))
 
     cyRef.current = cy
     return () => {
       cy.destroy()
       cyRef.current = null
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data])
+
+  // Toolbar handlers
+  const onToggleLock = useCallback(() => {
+    setLocked((prev) => !prev)
+  }, [])
+
+  const onResetPositions = useCallback(() => {
+    const ok = window.confirm(
+      'Сбросить ручную раскладку графа для этого домена?\nУзлы вернутся к автоматической раскладке (cola-layout).',
+    )
+    if (!ok) return
+    clearPositions(activeDomain)
+    setSavedCount(0)
+    setLocked(false)
+    const cy = cyRef.current
+    if (cy) {
+      cy.layout(asCytoscapeLayout({ name: 'cola', animate: true })).run()
+    }
+  }, [activeDomain])
+
+  const onRerunLayout = useCallback(() => {
+    const cy = cyRef.current
+    if (!cy) return
+    cy.layout(asCytoscapeLayout({ name: 'cola', animate: true })).run()
+  }, [])
+
+  // Re-sync savedCount при смене домена (новый файл в localStorage)
+  useEffect(() => {
+    setSavedCount(countPositions(activeDomain))
+  }, [activeDomain])
 
   const switchDomain = (id: string | null) => {
     if (id === null) {
@@ -158,7 +267,7 @@ export function GraphView() {
     <div className="flex h-full flex-col">
       {/* Domain-навигация. Не PageHeader — GraphView это full-bleed canvas-экран,
           без title/description. Только сам переключатель доменов сверху. */}
-      <div className="flex items-center gap-3 border-b border-stone-200 bg-white px-4 py-2 text-sm">
+      <div className="flex flex-wrap items-center gap-3 border-b border-stone-200 bg-white px-4 py-2 text-sm">
         <span className="text-xs uppercase tracking-wide text-stone-500">Домен</span>
         <Tabs
           tabs={domainTabs}
@@ -166,6 +275,49 @@ export function GraphView() {
           onChange={(id) => switchDomain(id === ALL_KEY ? null : id)}
           tone="primary"
         />
+        {/* Toolbar справа: ручная раскладка графа. Per-domain в localStorage. */}
+        <div className="ml-auto flex items-center gap-1.5">
+          {savedCount > 0 && (
+            <Badge tone={locked ? 'info' : 'neutral'}>
+              {savedCount} позиций сохранено
+            </Badge>
+          )}
+          <Button
+            variant={locked ? 'secondary' : 'ghost'}
+            size="sm"
+            icon={locked ? <Lock size={13} className="text-primary" /> : <Unlock size={13} />}
+            onClick={onToggleLock}
+            disabled={savedCount === 0}
+            title={
+              savedCount === 0
+                ? 'Сначала перетащите узлы — позиции сохранятся автоматически'
+                : locked
+                  ? 'Закреплено: cola-layout не двигает узлы'
+                  : 'Свободно: cola-layout пересчитывает раскладку'
+            }
+          >
+            {locked ? 'Закреплено' : 'Закрепить'}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<LayoutGrid size={13} />}
+            onClick={onRerunLayout}
+            title="Запустить auto-layout (cola) заново — не сбрасывает сохранённые позиции"
+          >
+            Авто-укладка
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<RotateCcw size={13} />}
+            onClick={onResetPositions}
+            disabled={savedCount === 0}
+            title="Удалить сохранённую раскладку для этого домена"
+          >
+            Сбросить
+          </Button>
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1">
