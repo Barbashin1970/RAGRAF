@@ -69,9 +69,15 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
         """
     )
     # Идемпотентная миграция для существующих DB (без drop'а данных).
-    # DuckDB поддерживает ADD COLUMN IF NOT EXISTS начиная с 0.9 — для нас ок.
+    # Проверяем существующие колонки через PRAGMA, добавляем только недостающие.
+    # DuckDB ADD COLUMN IF NOT EXISTS поддерживается с 0.9, но безопаснее идти
+    # через introspection — работает на любой версии.
+    # PRAGMA table_info → (cid, name, type, notnull, dflt_value, pk).
+    # Имя колонки в row[1], не row[0] (cid — целочисленный индекс).
+    existing = {row[1] for row in c.execute("PRAGMA table_info('regulations')").fetchall()}
     for col in ("source_document", "source_clause", "valid_from", "valid_to"):
-        c.execute(f"ALTER TABLE regulations ADD COLUMN IF NOT EXISTS {col} VARCHAR")
+        if col not in existing:
+            c.execute(f"ALTER TABLE regulations ADD COLUMN {col} VARCHAR")
     c.execute(
         """
         CREATE TABLE IF NOT EXISTS parameters (
