@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   CheckSquare,
+  FileSearch,
   FileText,
   Loader2,
   Plus,
@@ -10,9 +11,10 @@ import {
   Trash2,
   Upload,
 } from 'lucide-react'
-import { api, type DocumentsListResponse, type UserDocument } from '@/lib/api'
+import { api, type UserDocument } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui'
+import { DocumentAnalysisModal } from './DocumentAnalysisModal'
 
 /**
  * NotebookLM-style панель источников: левая колонка студии аналитика.
@@ -34,6 +36,7 @@ export function DocumentsPanel() {
   const qc = useQueryClient()
   const fileRef = useRef<HTMLInputElement>(null)
   const [errMsg, setErrMsg] = useState<string | null>(null)
+  const [analyzeDocId, setAnalyzeDocId] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['sandbox-documents'],
@@ -141,6 +144,7 @@ export function DocumentsPanel() {
             doc={d}
             onToggle={(enabled) => toggle.mutate({ docId: d.doc_id, enabled })}
             onDelete={() => del.mutate(d.doc_id)}
+            onAnalyze={() => setAnalyzeDocId(d.doc_id)}
             busy={toggle.isPending || del.isPending}
           />
         ))}
@@ -156,6 +160,14 @@ export function DocumentsPanel() {
           </span>
         </div>
       </footer>
+
+      {/* Cross-corpus анализ документа против регламентов */}
+      {analyzeDocId && (() => {
+        const doc = docs.find((d) => d.doc_id === analyzeDocId)
+        return doc ? (
+          <DocumentAnalysisModal doc={doc} onClose={() => setAnalyzeDocId(null)} />
+        ) : null
+      })()}
     </aside>
   )
 }
@@ -186,11 +198,13 @@ function DocumentRow({
   doc,
   onToggle,
   onDelete,
+  onAnalyze,
   busy,
 }: {
   doc: UserDocument
   onToggle: (enabled: boolean) => void
   onDelete: () => void
+  onAnalyze: () => void
   busy: boolean
 }) {
   const ext = useMemo(() => {
@@ -251,14 +265,24 @@ function DocumentRow({
           )}
         </div>
       </div>
-      <button
-        onClick={onDelete}
-        disabled={busy}
-        className="shrink-0 rounded p-1 text-stone-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100"
-        title="Удалить источник"
-      >
-        <Trash2 size={12} />
-      </button>
+      <div className="flex shrink-0 flex-col gap-1">
+        <button
+          onClick={onAnalyze}
+          disabled={busy}
+          className="rounded p-1 text-violet-400 opacity-0 transition hover:bg-violet-50 hover:text-violet-700 group-hover:opacity-100"
+          title="Анализ связей с регламентами по всем доменам"
+        >
+          <FileSearch size={12} />
+        </button>
+        <button
+          onClick={onDelete}
+          disabled={busy}
+          className="rounded p-1 text-stone-300 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100"
+          title="Удалить источник"
+        >
+          <Trash2 size={12} />
+        </button>
+      </div>
     </div>
   )
 }

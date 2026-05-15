@@ -361,6 +361,11 @@ export const api = {
         `/api/sandbox/documents/${encodeURIComponent(docId)}`,
         { method: 'DELETE' },
       ),
+    analyzeDocument: (docId: string) =>
+      request<DocumentAnalysisResult>(
+        `/api/sandbox/documents/${encodeURIComponent(docId)}/analyze`,
+        { method: 'POST' },
+      ),
   },
 }
 
@@ -384,6 +389,34 @@ export interface DocumentsListResponse {
     max_file_size_bytes: number
     current_count: number
     enabled_count: number
+  }
+}
+
+export interface DocumentAnalysisDomainSlice {
+  domain: string
+  regulation_count: number
+  total_hits: number
+}
+
+export interface DocumentAnalysisRegulation {
+  regulation_id: string
+  name: string
+  domain: string
+  hits: number
+  max_score: number
+  chunk_examples: string[]
+}
+
+export interface DocumentAnalysisResult {
+  doc_id: string
+  filename: string
+  domain_spectrum: DocumentAnalysisDomainSlice[]
+  regulations: DocumentAnalysisRegulation[]
+  summary: string
+  stats: {
+    chunks_analyzed: number
+    regulations_matched: number
+    avg_hits_per_chunk: number
   }
 }
 

@@ -1,0 +1,1 @@
+{"version":"2.1.9","results":[[":frontend/src/lib/sliderDomain.test.ts",{"duration":6.205916000000002,"failed":false}],[":frontend/src/lib/rulesDsl.test.ts",{"duration":5.893833000000029,"failed":false}],[":frontend/src/lib/domains.test.ts",{"duration":3.4301250000000323,"failed":false}],[":frontend/src/lib/nanoid.test.ts",{"duration":4.267749999999978,"failed":false}]]}

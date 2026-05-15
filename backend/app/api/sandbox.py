@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from app.services import document_store, fixtures, regulation_store, sandbox, templates
+from app.services import document_analysis, document_store, fixtures, regulation_store, sandbox, templates
 from app.services.flow_storage import save_flow
 from app.services.templates import ensure_unique_source_id, slugify
 
@@ -281,3 +281,17 @@ def sandbox_delete_document(doc_id: str) -> dict[str, str]:
     if not document_store.delete_document(doc_id):
         raise HTTPException(status_code=404, detail=f"Документ {doc_id} не найден")
     return {"doc_id": doc_id, "status": "deleted"}
+
+
+@router.post("/sandbox/documents/{doc_id}/analyze")
+async def sandbox_analyze_document(doc_id: str) -> dict[str, Any]:
+    """Cross-corpus анализ документа против корпуса регламентов.
+
+    Возвращает «картину по доменам» (сколько регламентов каждого домена
+    затронуто) + список релевантных регламентов с числом совпадений +
+    LLM-summary. Время: ~5 сек retrieval + 10-30 сек LLM (qwen2.5:7b на M2).
+    """
+    try:
+        return await document_analysis.analyze_document(doc_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
