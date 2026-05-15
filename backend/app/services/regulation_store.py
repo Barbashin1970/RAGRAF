@@ -109,6 +109,39 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
     )
     c.execute("CREATE INDEX IF NOT EXISTS idx_hist_src ON regulation_history(source_id, created_at DESC)")
 
+    # ── Документы аналитика (загруженные PDF/DOCX как контекст для Q&A) ──
+    # Лимит — 10 документов на пользователя (single-user instance). Хранение
+    # одной таблицей вместе с метаданными; chunks отдельно для семантического
+    # поиска через bge-m3 embeddings (NotebookLM-style layout).
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_documents (
+            doc_id        VARCHAR PRIMARY KEY,
+            filename      VARCHAR NOT NULL,
+            mime_type     VARCHAR NOT NULL,
+            size_bytes    INTEGER NOT NULL,
+            uploaded_at   TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            enabled       BOOLEAN NOT NULL DEFAULT TRUE,
+            total_chunks  INTEGER NOT NULL DEFAULT 0,
+            char_count    INTEGER NOT NULL DEFAULT 0,
+            error         VARCHAR
+        )
+        """
+    )
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS document_chunks (
+            chunk_id      VARCHAR PRIMARY KEY,
+            doc_id        VARCHAR NOT NULL,
+            chunk_index   INTEGER NOT NULL,
+            text          VARCHAR NOT NULL,
+            embedding     JSON,
+            FOREIGN KEY (doc_id) REFERENCES user_documents(doc_id)
+        )
+        """
+    )
+    c.execute("CREATE INDEX IF NOT EXISTS idx_chunks_doc ON document_chunks(doc_id, chunk_index)")
+
 
 # ---- Public API -------------------------------------------------------
 

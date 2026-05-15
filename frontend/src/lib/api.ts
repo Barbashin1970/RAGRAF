@@ -333,7 +333,58 @@ export const api = {
         { method: 'POST', body: JSON.stringify(payload) },
         sandboxCreateFromParamsResponseSchema,
       ),
+    // Documents (NotebookLM-style контекст для Q&A)
+    listDocuments: () =>
+      request<DocumentsListResponse>(`/api/sandbox/documents`),
+    uploadDocument: async (file: File): Promise<UserDocument> => {
+      const fd = new FormData()
+      fd.append('file', file)
+      // FormData нельзя через JSON-обёртку request() — fetch напрямую.
+      const r = await fetch(`/api/sandbox/documents/upload`, { method: 'POST', body: fd })
+      if (!r.ok) {
+        let detail = `HTTP ${r.status}`
+        try {
+          const j = await r.json()
+          if (j?.detail) detail = j.detail
+        } catch { /* ignore */ }
+        throw new Error(detail)
+      }
+      return r.json() as Promise<UserDocument>
+    },
+    toggleDocument: (docId: string, enabled: boolean) =>
+      request<UserDocument>(
+        `/api/sandbox/documents/${encodeURIComponent(docId)}`,
+        { method: 'PATCH', body: JSON.stringify({ enabled }) },
+      ),
+    deleteDocument: (docId: string) =>
+      request<{ doc_id: string; status: string }>(
+        `/api/sandbox/documents/${encodeURIComponent(docId)}`,
+        { method: 'DELETE' },
+      ),
   },
+}
+
+// Documents (NotebookLM-style) — типы для контекста аналитика.
+export interface UserDocument {
+  doc_id: string
+  filename: string
+  mime_type: string
+  size_bytes: number
+  uploaded_at: string
+  enabled: boolean
+  total_chunks: number
+  char_count: number
+  error: string | null
+}
+
+export interface DocumentsListResponse {
+  documents: UserDocument[]
+  limits: {
+    max_documents: number
+    max_file_size_bytes: number
+    current_count: number
+    enabled_count: number
+  }
 }
 
 // Node-RED-style: каждый тип узла имеет свою иконку. В palette (Toolbox) и на

@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
-from app.services import fixtures, regulation_store, sandbox, templates
+from app.services import document_store, fixtures, regulation_store, sandbox, templates
 from app.services.flow_storage import save_flow
 from app.services.templates import ensure_unique_source_id, slugify
 
@@ -222,3 +222,62 @@ def sandbox_create_from_params(req: CreateFromParamsRequest) -> dict[str, Any]:
         "domain": reg.domain,
         "parameters_count": len(reg.parameters),
     }
+
+
+# ── Documents (NotebookLM-style контекст для Q&A) ────────────────────
+
+
+class DocumentToggleRequest(BaseModel):
+    enabled: bool
+
+
+@router.get("/sandbox/documents")
+def sandbox_list_documents() -> dict[str, Any]:
+    """Список загруженных аналитиком документов.
+
+    Каждый документ имеет toggle `enabled` — включён ли в контекст Q&A.
+    NotebookLM-паттерн: 1–3 источника включены одновременно для конкретного
+    вопроса; UI показывает предупреждение про скорость при 2+ enabled
+    (контекст растёт линейно, qwen2.5:7b на M2 уже неспешный).
+    """
+    docs = document_store.list_documents()
+    return {
+        "documents": docs,
+        "limits": {
+            "max_documents": document_store.MAX_DOCUMENTS,
+            "max_file_size_bytes": document_store.MAX_FILE_SIZE,
+            "current_count": len(docs),
+            "enabled_count": sum(1 for d in docs if d["enabled"]),
+        },
+    }
+
+
+@router.post("/sandbox/documents/upload", status_code=201)
+async def sandbox_upload_document(file: UploadFile = File(...)) -> dict[str, Any]:
+    """Загрузить PDF или DOCX. Запускает полный пайплайн parse → chunk → embed."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Имя файла обязательно")
+    data = await file.read()
+    mime = file.content_type or "application/octet-stream"
+    try:
+        meta = await document_store.add_document(file.filename, mime, data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return meta
+
+
+@router.patch("/sandbox/documents/{doc_id}")
+def sandbox_toggle_document(doc_id: str, req: DocumentToggleRequest) -> dict[str, Any]:
+    """Включить / выключить документ из контекста Q&A."""
+    doc = document_store.toggle_document(doc_id, req.enabled)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=f"Документ {doc_id} не найден")
+    return doc
+
+
+@router.delete("/sandbox/documents/{doc_id}")
+def sandbox_delete_document(doc_id: str) -> dict[str, str]:
+    """Удалить документ и все его chunks."""
+    if not document_store.delete_document(doc_id):
+        raise HTTPException(status_code=404, detail=f"Документ {doc_id} не найден")
+    return {"doc_id": doc_id, "status": "deleted"}

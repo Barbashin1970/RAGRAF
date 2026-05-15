@@ -31,6 +31,7 @@ import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { DOMAIN_VISUALS, getDomainVisual } from '@/lib/domains'
 import { Badge, Button, PageBody, PageHeader, PageShell, Tabs, type TabDef } from '@/components/ui'
+import { DocumentsPanel } from './DocumentsPanel'
 
 type Tab = 'search' | 'extract'
 
@@ -198,10 +199,20 @@ export function SandboxScreen() {
         </div>
       </PageHeader>
 
-      <PageBody>
-        {tab === 'search' && <SearchDemo />}
-        {tab === 'extract' && <ExtractDemo />}
-      </PageBody>
+      {tab === 'search' ? (
+        // NotebookLM-style: левая колонка с источниками + центр с чатом.
+        // Только для диалога — на вкладке «Извлечь параметры» документы не нужны.
+        <div className="flex min-h-0 flex-1">
+          <DocumentsPanel />
+          <PageBody>
+            <SearchDemo />
+          </PageBody>
+        </div>
+      ) : (
+        <PageBody>
+          <ExtractDemo />
+        </PageBody>
+      )}
     </PageShell>
   )
 }
