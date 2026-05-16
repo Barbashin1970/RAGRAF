@@ -256,8 +256,14 @@ async def add_document(filename: str, mime_type: str, data: bytes) -> dict[str, 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 [
+                    # enabled=False по дефолту — opt-in модель: пользователь
+                    # сам включает галку в DocumentsPanel когда документ нужен
+                    # в контексте. Раньше дефолт был True — это раздувало
+                    # prompt при первом «Привет» (LLM получала весь корпус +
+                    # все загруженные доки сразу). Теперь fresh-chat пустой
+                    # до явного выбора пользователя.
                     doc_id, filename, mime_type, len(data), now,
-                    True, len(chunks), len(text),
+                    False, len(chunks), len(text),
                     None if embeddings else "embeddings_unavailable",
                 ],
             )
@@ -285,7 +291,7 @@ async def add_document(filename: str, mime_type: str, data: bytes) -> dict[str, 
         "mime_type": mime_type,
         "size_bytes": len(data),
         "uploaded_at": now.isoformat(),
-        "enabled": True,
+        "enabled": False,
         "total_chunks": len(chunks),
         "char_count": len(text),
         "error": None if embeddings else "embeddings_unavailable",

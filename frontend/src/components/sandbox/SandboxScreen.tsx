@@ -20,6 +20,7 @@ import {
   Send,
   Settings2,
   Sliders,
+  Square,
   Sparkles,
   User,
   Wand2,
@@ -179,8 +180,23 @@ function LLMStatusDot() {
 }
 
 /** Подвал развёрнутой панели с полной инфой про LLM. */
-function LLMStatusFooter() {
+function LLMStatusFooter({
+  regulationsTotal,
+  regulationsEnabled,
+}: {
+  regulationsTotal: number
+  regulationsEnabled: number
+}) {
   const { data, isError } = useLLMStatus()
+  // Параллельно подтягиваем кол-во ВКЛЮЧЁННЫХ документов — это даёт цельную
+  // картинку «что сейчас в контексте» рядом с числом регламентов из индекса.
+  // Кэш React Query шерится с ContextPanel, лишних запросов не плодим.
+  const { data: docs } = useQuery({
+    queryKey: ['sandbox-documents'],
+    queryFn: () => api.sandbox.listDocuments(),
+  })
+  const docsEnabled = docs?.limits.enabled_count ?? 0
+  const docsTotal = docs?.limits.current_count ?? 0
   if (isError || !data) return null
 
   const tone = llmStatusTone(data)
@@ -229,14 +245,47 @@ function LLMStatusFooter() {
             {data.embed_model}
           </code>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-stone-500">Индекс:</span>
-          <b className="text-stone-800">{data.index_size}</b>
-          <span className="text-stone-500">рег.</span>
+        <div
+          className="flex items-center gap-1.5"
+          title={
+            regulationsTotal === 0
+              ? `В корпусе ${data.index_size} регламентов в индексе.`
+              : regulationsEnabled === regulationsTotal
+                ? `Все ${regulationsTotal} регламентов включены в контекст чата.`
+                : `${regulationsEnabled} из ${regulationsTotal} регламентов включены (галки в левой панели). Отключённые не попадают в retrieval.`
+          }
+        >
+          <span className="text-stone-500">Регл.:</span>
+          <b
+            className={cn(
+              regulationsEnabled > 0 ? 'text-stone-800' : 'text-stone-400',
+            )}
+          >
+            {regulationsEnabled}
+          </b>
+          {regulationsTotal > 0 && regulationsEnabled !== regulationsTotal && (
+            <span className="text-stone-400">/ {regulationsTotal}</span>
+          )}
           {data.index_size > 0 && !data.index_fresh && (
             <span title="индекс устарел — пересоберётся при следующем запросе">
               <RotateCcw size={9} className="text-amber-500" />
             </span>
+          )}
+        </div>
+        <div
+          className="flex items-center gap-1.5"
+          title={
+            docsTotal === 0
+              ? 'Документы аналитика не загружены — слева вкладка «Документы», кнопка «+ Источник»'
+              : `${docsEnabled} из ${docsTotal} документов включены в контекст чата (галки в левой панели)`
+          }
+        >
+          <span className="text-stone-500">Док.:</span>
+          <b className={cn(docsEnabled > 0 ? 'text-stone-800' : 'text-stone-400')}>
+            {docsEnabled}
+          </b>
+          {docsTotal > 0 && docsTotal !== docsEnabled && (
+            <span className="text-stone-400">/ {docsTotal}</span>
           )}
         </div>
       </div>
@@ -296,10 +345,20 @@ function SearchDemo() {
   // Доп-инструкция «стиль/тон/формат» — приклеивается к встроенному
   // system-промпту на бэке. Не заменяет анти-галлюц правила, только добавляет.
   const [extraSystemPrompt, setExtraSystemPrompt] = useState<string>('')
-  // Регламенты, ИСКЛЮЧЁННЫЕ из retrieval'а для этого чата. Set-семантика:
-  // обычный сценарий — пустой (все включены, дефолтное поведение).
+  // Регламенты, ИСКЛЮЧЁННЫЕ из retrieval'а для этого чата. Set-семантика.
+  // Дефолт: ВСЕ регламенты выключены (opt-in модель — пользователь сам
+  // решает что подмешать в контекст). Раньше было «все включены» — это
+  // делало первый «Привет» медленным, потому что LLM тащила весь корпус.
   // Live state, без persistence — на каждый новый чат начинается с нуля.
+  // Заполняется реально после загрузки списка регламентов (см. useEffect ниже).
   const [disabledRegulationIds, setDisabledRegulationIds] = useState<Set<string>>(() => new Set())
+  // Маркер «дефолт ещё не применён» — чтобы не перезатереть выбор пользователя
+  // при повторных перерисовках. Раз применили — больше не применяем автоматически.
+  const defaultsAppliedRef = useRef(false)
+  // AbortController текущего in-flight chat-запроса. Хранится в ref'е чтобы
+  // мутация и обработчик «Стоп» видели один и тот же экземпляр, и чтобы при
+  // re-render'ах не пересоздавался.
+  const abortRef = useRef<AbortController | null>(null)
   // Активный пресет (id). null = «свой текст» / не выбран. Не персистится —
   // пресеты применяются по клику, дальше пользователь может править руками.
   const [activePresetId, setActivePresetId] = useState<string | null>('default')
@@ -328,38 +387,82 @@ function SearchDemo() {
     }
     return ids
   }, [regsRaw])
+
+  // Применяем дефолт «все регламенты отключены» ОДИН РАЗ после первой загрузки
+  // корпуса. Если пользователь потом включает галки — не трогаем (флаг
+  // defaultsAppliedRef уже true, useEffect больше не сработает по существу).
+  useEffect(() => {
+    if (defaultsAppliedRef.current) return
+    if (allRegulationIds.length === 0) return
+    defaultsAppliedRef.current = true
+    setDisabledRegulationIds(new Set(allRegulationIds))
+  }, [allRegulationIds])
+
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
+  type ChatVars = {
+    history: Array<{ role: 'user' | 'assistant'; content: string }>
+    /** Для стартового «Привет, что ты умеешь?» — принудительно отключаем
+     *  retrieval регламентов на ЭТОТ запрос, не трогая UI-state. Бэк попадёт
+     *  в LEAN-ветку, ответ намного быстрее. */
+    forceSkipRegulations?: boolean
+  }
   const chat = useMutation({
-    mutationFn: (history: Array<{ role: 'user' | 'assistant'; content: string }>) =>
-      api.sandbox.chat(history, {
-        top_k: topK,
-        temperature,
-        max_tokens: maxTokens,
-        num_ctx: numCtx,
-        extra_system_prompt: extraSystemPrompt.trim() || undefined,
-        disabled_regulation_ids: disabledRegulationIds.size > 0
+    mutationFn: ({ history, forceSkipRegulations }: ChatVars) => {
+      // Создаём новый AbortController на каждый запрос. Старый (если был)
+      // уже отработал — useMutation не отстреливает параллельные запросы,
+      // он ждёт завершения предыдущего.
+      const controller = new AbortController()
+      abortRef.current = controller
+      const effectiveDisabled = forceSkipRegulations
+        ? allRegulationIds
+        : disabledRegulationIds.size > 0
           ? Array.from(disabledRegulationIds)
-          : undefined,
-      }),
+          : undefined
+      return api.sandbox.chat(
+        history,
+        {
+          top_k: topK,
+          temperature,
+          max_tokens: maxTokens,
+          num_ctx: numCtx,
+          extra_system_prompt: extraSystemPrompt.trim() || undefined,
+          disabled_regulation_ids: effectiveDisabled,
+        },
+        controller.signal,
+      )
+    },
     onSuccess: (data) => {
+      abortRef.current = null
       setTurns((t) => [
         ...t,
         { role: 'assistant', content: data.answer, sources: data.sources, mode: data.mode },
       ])
     },
     onError: (err) => {
+      abortRef.current = null
+      // AbortError специально — пользователь нажал «Стоп», не показываем
+      // как красную ошибку, а спокойным curated-сообщением.
+      const e = err as Error
+      const wasAborted = e.name === 'AbortError' || /aborted/i.test(e.message)
       setTurns((t) => [
         ...t,
         {
           role: 'assistant',
-          content: `❌ Ошибка: ${(err as Error).message}`,
+          content: wasAborted
+            ? '⏹ Запрос остановлен. Попробуй уменьшить контекст или переформулировать.'
+            : `❌ Ошибка: ${e.message}`,
           sources: [],
           mode: 'mock',
         },
       ])
     },
   })
+
+  const stop = () => {
+    abortRef.current?.abort()
+    abortRef.current = null
+  }
 
   // Авто-скролл вниз при появлении нового сообщения.
   useEffect(() => {
@@ -368,14 +471,17 @@ function SearchDemo() {
     }
   }, [turns, chat.isPending])
 
-  const send = (text?: string) => {
+  const send = (text?: string, opts?: { forceSkipRegulations?: boolean }) => {
     const content = (text ?? input).trim()
     if (!content || chat.isPending) return
     const next: ChatTurn[] = [...turns, { role: 'user', content }]
     setTurns(next)
     setInput('')
     // Передаём в API только plain {role, content} — без sources/mode.
-    chat.mutate(next.map((m) => ({ role: m.role, content: m.content })))
+    chat.mutate({
+      history: next.map((m) => ({ role: m.role, content: m.content })),
+      forceSkipRegulations: opts?.forceSkipRegulations,
+    })
   }
 
   const reset = () => {
@@ -463,7 +569,11 @@ function SearchDemo() {
           className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-stone-50/30 px-4 py-4"
         >
           {turns.length === 0 && !chat.isPending && (
-            <EmptyChatHint onPick={send} examples={CHAT_EXAMPLES} />
+            <EmptyChatHint
+              onPick={(text) => send(text)}
+              onWarmup={() => send(WARMUP_QUERY, { forceSkipRegulations: true })}
+              examples={CHAT_EXAMPLES}
+            />
           )}
           {turns.map((t, i) => (
             <ChatBubble key={i} turn={t} />
@@ -493,14 +603,25 @@ function SearchDemo() {
               disabled={chat.isPending}
               className="min-h-[42px] max-h-32 flex-1 resize-none rounded-md border border-stone-200 bg-white px-3 py-2 text-sm focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300 disabled:opacity-60"
             />
-            <Button
-              variant="author"
-              icon={chat.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-              onClick={() => send()}
-              disabled={!input.trim() || chat.isPending}
-            >
-              Отправить
-            </Button>
+            {chat.isPending ? (
+              <Button
+                variant="danger"
+                icon={<Square size={14} className="fill-current" />}
+                onClick={stop}
+                title="Остановить генерацию принудительно"
+              >
+                Стоп
+              </Button>
+            ) : (
+              <Button
+                variant="author"
+                icon={<Send size={14} />}
+                onClick={() => send()}
+                disabled={!input.trim()}
+              >
+                Отправить
+              </Button>
+            )}
             {turns.length > 0 && (
               <Button
                 variant="ghost"
@@ -548,6 +669,8 @@ function SearchDemo() {
         onApplyPreset={applyPreset}
         onSaveAsPreset={saveCurrentAsPreset}
         onDeletePreset={deleteUserPreset}
+        regulationsTotal={allRegulationIds.length}
+        regulationsEnabled={Math.max(0, allRegulationIds.length - disabledRegulationIds.size)}
       />
     </div>
   )
@@ -602,6 +725,8 @@ function ChatSettingsPanel({
   onApplyPreset,
   onSaveAsPreset,
   onDeletePreset,
+  regulationsTotal,
+  regulationsEnabled,
 }: {
   extraSystemPrompt: string
   onExtraSystemPromptChange: (s: string) => void
@@ -618,6 +743,8 @@ function ChatSettingsPanel({
   onApplyPreset: (p: SystemPromptPreset) => void
   onSaveAsPreset: (label: string) => void
   onDeletePreset: (id: string) => void
+  regulationsTotal: number
+  regulationsEnabled: number
 }) {
   const [collapsed, setCollapsed] = useState<boolean>(() => loadCollapsed())
   const toggleCollapsed = () => {
@@ -833,7 +960,10 @@ function ChatSettingsPanel({
       {/* Подвал с инфой про LLM-стек — переехал сюда из шапки страницы,
           чтобы не зашумлять основной экран. Когда панель свёрнута, точка
           из этого подвала показывается в w-8 полоске (см. ветку collapsed). */}
-      <LLMStatusFooter />
+      <LLMStatusFooter
+        regulationsTotal={regulationsTotal}
+        regulationsEnabled={regulationsEnabled}
+      />
     </aside>
   )
 }
@@ -1012,11 +1142,25 @@ function ParamSlider({
   )
 }
 
+// Стартовый промпт-разогрев: формулировка задаёт LLM чёткие правила,
+// чтобы ответ был структурным и адекватным независимо от состояния retrieval'а
+// (есть/нет регламентов в контексте). Side-effect — Ollama подгружает модель
+// qwen2.5:7b в RAM (~4.4 ГБ), следующие запросы будут быстрее.
+const WARMUP_QUERY =
+  'Привет! Расскажи кратко (3-4 пункта, без цитирования регламентов) что ты ' +
+  'умеешь как ИИ-помощник аналитика в RAGRAF: над какими данными работаешь, ' +
+  'какие задачи решаешь, и как пользоваться пресетами справа («Резюме документа», ' +
+  '«Извлечь параметры», «Сравнить регламенты», «Краткий ответ»).'
+
 function EmptyChatHint({
   onPick,
+  onWarmup,
   examples,
 }: {
   onPick: (text: string) => void
+  /** Warmup отправляется с принудительно отключённым retrieval'ом —
+   *  это быстрый путь даже если у пользователя по дефолту включены все регламенты. */
+  onWarmup: () => void
   examples: string[]
 }) {
   return (
@@ -1025,8 +1169,26 @@ function EmptyChatHint({
         <Bot size={22} className="text-violet-700" />
       </div>
       <div className="mb-1 text-sm font-medium text-stone-800">Диалог пуст</div>
-      <div className="mb-4 text-xs text-stone-500">
-        Задай вопрос про регламенты — или начни с примера ниже.
+      <div className="mb-4 max-w-md text-xs text-stone-500">
+        Начни с приветствия — это заодно прогреет LLM в память. Или задай вопрос
+        про регламенты, выбрав один из примеров.
+      </div>
+
+      {/* Главная стартовая кнопка — крупная, в виолетовом стиле Author Layer.
+          Первый запрос грузит qwen2.5:7b в RAM (~4.4 ГБ, 30-60 сек на M2 Air);
+          дальше всё быстро. Регламенты на этот запрос принудительно отключены
+          (forceSkipRegulations=true), чтобы LEAN-ветка ответила быстро. */}
+      <button
+        onClick={onWarmup}
+        className="mb-4 inline-flex items-center gap-2 rounded-md bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-violet-700"
+        title="Отправляет приветствие + прогревает LLM (первый ответ 30-60 сек, дальше быстрее). Регламенты на это сообщение пропускаются — быстрее ответ."
+      >
+        <Sparkles size={14} />
+        Привет, что ты умеешь?
+      </button>
+
+      <div className="mb-1.5 text-[10px] uppercase tracking-wide text-stone-400">
+        или примеры
       </div>
       <div className="flex max-w-md flex-wrap justify-center gap-1.5">
         {examples.map((q) => (

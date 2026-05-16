@@ -125,7 +125,7 @@ export function RegulationsPanel({ disabledIds, onToggle, onSetMany }: Props) {
               : 'Исключить все регламенты — LLM будет отвечать только по документам'
           }
         >
-          {allOff ? 'Все' : 'Никого'}
+          {allOff ? 'Все' : 'Не включены'}
         </Button>
       </header>
 

@@ -335,10 +335,15 @@ export const api = {
         // Контекстное окно Ollama (`num_ctx`). undefined = дефолт модели.
         num_ctx?: number
       } = {},
+      // AbortSignal для кнопки «Стоп» в чате. Когда LLM крутится дольше чем
+      // юзер готов ждать, abort() обрывает fetch — на бэке вызов к Ollama
+      // продолжится в фоне (его результат отбросится), но юзер сразу увидит
+      // что цикл оборвался.
+      signal?: AbortSignal,
     ) =>
       request(
         `/api/sandbox/chat`,
-        { method: 'POST', body: JSON.stringify({ messages, ...params }) },
+        { method: 'POST', body: JSON.stringify({ messages, ...params }), signal },
         sandboxChatResponseSchema,
       ),
     llmInfo: () => request(`/api/sandbox/llm-info`, undefined, sandboxLlmInfoSchema),
