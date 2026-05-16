@@ -478,27 +478,47 @@ async def chat(
     disabled_set = {rid for rid in (disabled_regulation_ids or []) if isinstance(rid, str)}
     retrieval_top_k = top_k + len(disabled_set)
 
+    # Перф-оптимизация: если ВСЕ регламенты выключены — пропускаем
+    # retrieval целиком. Без неё мы зря дергаем bge-m3 за embedding'ом
+    # query'а, потом считаем cosine, потом всё отфильтровываем в пустоту
+    # (~300-500мс на M2 Air). Особенно заметно в сценарии «Резюме документа».
+    total_regs_in_corpus = len(regulation_store.list_all())
+    skip_regulation_retrieval = (
+        total_regs_in_corpus > 0 and len(disabled_set) >= total_regs_in_corpus
+    )
+
     if not is_real_ragu_available():
         # Mock-режим — используем TF-IDF, embeddings требуют Ollama.
-        hits = semantic_search(query, top_k=retrieval_top_k)
-        hits = [h for h in hits if h.get("regulation_id") not in disabled_set][:top_k]
+        if skip_regulation_retrieval:
+            hits = []
+        else:
+            hits = semantic_search(query, top_k=retrieval_top_k)
+            hits = [h for h in hits if h.get("regulation_id") not in disabled_set][:top_k]
         return {"answer": _mock_chat_answer(query, hits), "sources": hits, "mode": "mock"}
 
-    # Real-режим: семантический retrieval через bge-m3 embeddings. Это
-    # принципиально лучше TF-IDF на русских формулировках с синонимами
-    # («наводнение» ↔ «протечка» ↔ «вода»), и не ловит общие предлоги
-    # вроде «при» / «и» / «в» которые TF-IDF матчит на каждом регламенте.
-    try:
-        from app.services.embedding_index import semantic_search_embeddings
-        hits = await semantic_search_embeddings(query, top_k=retrieval_top_k)
-    except Exception:
-        # Если embeddings отвалились (Ollama офлайн) — fallback на TF-IDF.
-        hits = semantic_search(query, top_k=retrieval_top_k)
-    # Фильтрация после retrieval'а: отсекаем регламенты, которые пользователь
-    # выключил, и ограничиваем до запрошенного top_k.
-    hits = [h for h in hits if h.get("regulation_id") not in disabled_set][:top_k]
+    if skip_regulation_retrieval:
+        hits = []
+    else:
+        # Real-режим: семантический retrieval через bge-m3 embeddings. Это
+        # принципиально лучше TF-IDF на русских формулировках с синонимами
+        # («наводнение» ↔ «протечка» ↔ «вода»), и не ловит общие предлоги
+        # вроде «при» / «и» / «в» которые TF-IDF матчит на каждом регламенте.
+        try:
+            from app.services.embedding_index import semantic_search_embeddings
+            hits = await semantic_search_embeddings(query, top_k=retrieval_top_k)
+        except Exception:
+            # Если embeddings отвалились (Ollama офлайн) — fallback на TF-IDF.
+            hits = semantic_search(query, top_k=retrieval_top_k)
+        # Фильтрация после retrieval'а: отсекаем регламенты, которые пользователь
+        # выключил, и ограничиваем до запрошенного top_k.
+        hits = [h for h in hits if h.get("regulation_id") not in disabled_set][:top_k]
 
-    context = _build_regulation_context(hits) if hits else "(подходящих регламентов в базе не найдено)"
+    # Контекст регламентов — только если они есть. Когда пользователь
+    # сознательно отключил весь корпус (например для «Резюме документа»),
+    # вообще не упоминаем регламенты в промпте — это экономит ~1500 токенов
+    # prefill'а и убирает шум «отвечай только по регламентам» из промпта
+    # документ-only сценариев.
+    context = _build_regulation_context(hits) if hits else ""
 
     # NotebookLM-style: если аналитик включил в контекст загруженные документы
     # (PDF/DOCX), достаём релевантные chunks через bge-m3 и добавляем рядом с
@@ -574,14 +594,9 @@ async def chat(
 5. 1-3 коротких пункта + строка «Источник: <имя регламента> (id)».
 """
 
-    # Усиленный промпт: явный антигаллюцинационный режим, структура, чёткий
-    # анти-template отказ. Адаптируется под тип запроса.
-    #
-    # `extra_system_prompt` (пользовательская доп-инструкция из правой панели
-    # Студии) приклеивается отдельным секцией ВВЕРХУ — там она имеет наибольший
-    # приоритет в восприятии модели, но не вытесняет ни domain_hints, ни
-    # anti-hallucination правила, ни сам retrieval-контекст. Это «add-on», а не
-    # «replace» — иначе пользователь случайно может потерять регламенты в ответе.
+    # `extra_system_prompt` — пользовательская доп-инструкция из правой панели.
+    # Приклеивается ВВЕРХУ системного промпта (там у LLM наивысший приоритет
+    # внимания), но не вытесняет встроенные правила.
     user_persona_block = ""
     if extra_system_prompt and extra_system_prompt.strip():
         user_persona_block = (
@@ -590,7 +605,36 @@ async def chat(
             "=== КОНЕЦ ДОП-ИНСТРУКЦИИ ===\n\n"
         )
 
-    system_prompt = f"""{user_persona_block}Ты — ассистент по техническим регламентам ВУЗа, ТЭЦ и городской инфраструктуры. Цель — БЫТЬ ПОЛЕЗНЫМ, цитируя реальные данные из базы, но не выдумывая.
+    # Адаптивный системный промпт. Раньше всегда лепили regulations-блок
+    # (domain_hints + list/specific rules + context), даже когда регламентов
+    # 0. Это давало +1500 токенов prefill'а ради воздуха и засоряло prompt
+    # запретами вида «отвечай только по регламентам», что мешало doc-only
+    # сценариям (LLM упиралась в «нет регламентов → не могу ответить»).
+    #
+    # Теперь две ветки:
+    #   • LEAN: нет регламентов в контексте → только документы / общий ответ.
+    #   • FULL: регламенты есть → полный антигаллюцинационный режим.
+    if not hits:
+        # LEAN-промпт: без regulation-specific блоков. Используется когда
+        # пользователь снял галки со всех регламентов (типичный сценарий
+        # «Резюме документа»). Экономим ~1500 токенов.
+        if doc_chunks:
+            base_rules = (
+                "Ты — ИИ-ассистент аналитика. Отвечай ТОЛЬКО по содержимому "
+                "приложенных документов. Если в документах нет ответа — так и "
+                "скажи, не выдумывай. Цитируй название файла где уместно."
+            )
+        else:
+            base_rules = (
+                "Ты — ИИ-ассистент аналитика. Регламенты в корпусе пользователь "
+                "отключил, и документы не приложены — поэтому отвечать строго "
+                "не по чему. Скажи об этом коротко и предложи: либо включить "
+                "регламенты слева, либо загрузить документ."
+            )
+        system_prompt = f"{user_persona_block}{base_rules}{doc_context_block}"
+    else:
+        # FULL-промпт: регламенты в контексте → нужны строгие правила цитирования.
+        system_prompt = f"""{user_persona_block}Ты — ассистент по техническим регламентам ВУЗа, ТЭЦ и городской инфраструктуры. Цель — БЫТЬ ПОЛЕЗНЫМ, цитируя реальные данные из базы, но не выдумывая.
 
 ОБЩИЕ ПРАВИЛА:
 - Используй ТОЛЬКО предоставленные регламенты и документы аналитика. Не подмешивай данные из тренировки модели.
@@ -613,10 +657,14 @@ async def chat(
 
     try:
         from openai import AsyncOpenAI
+        # 60 сек слишком мало для qwen2.5:7b на M2 Air — даже на коротком
+        # промпте полный prefill+generation может занять 30-90 сек, на длинном
+        # с num_ctx=16K — 2-3 минуты. 300 сек — практический потолок «пользователь
+        # ещё не успел уйти за кофе».
         client = AsyncOpenAI(
             base_url=settings.openai_base_url or None,
             api_key=settings.openai_api_key or "ollama",
-            timeout=60.0,
+            timeout=300.0,
         )
         # Дефолты подобраны под технические Q&A: temp=0.1 минимизирует галлюцинации,
         # 600 токенов хватает на структурированный ответ из 3-5 пунктов.
@@ -628,14 +676,21 @@ async def chat(
         # в поле `options`. Если num_ctx не задан — Ollama возьмёт дефолт
         # из Modelfile (обычно 2048-4096), что часто маловато для длинных
         # документов.
+        effective_max_tokens = max_tokens if max_tokens is not None else 600
         create_kwargs: dict[str, Any] = {
             "model": settings.ragu_llm_model,
             "messages": llm_messages,
-            "max_tokens": max_tokens if max_tokens is not None else 600,
+            "max_tokens": effective_max_tokens,
             "temperature": temperature if temperature is not None else 0.1,
         }
+        # Ollama-specific options: num_ctx (контекст) + num_predict (явный
+        # лимит вывода). num_predict дублирует max_tokens для OpenAI-совместимого
+        # эндпойнта Ollama — без него Ollama иногда «тянет» дольше чем стандарт
+        # OpenAI ожидает, особенно когда max_tokens у клиента маленький.
+        ollama_options: dict[str, Any] = {"num_predict": effective_max_tokens}
         if num_ctx is not None:
-            create_kwargs["extra_body"] = {"options": {"num_ctx": num_ctx}}
+            ollama_options["num_ctx"] = num_ctx
+        create_kwargs["extra_body"] = {"options": ollama_options}
         resp = await client.chat.completions.create(**create_kwargs)
         answer = (resp.choices[0].message.content or "").strip()
         if not answer:

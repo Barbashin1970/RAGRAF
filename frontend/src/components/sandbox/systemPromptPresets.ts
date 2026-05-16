@@ -65,9 +65,10 @@ export const BUILTIN_PRESETS: SystemPromptPreset[] = [
       disable_all_regulations: true,
       temperature: 0.2,
       max_tokens: 400,
-      // Документ может быть длинным — нужно широкое окно, чтобы LLM
-      // «увидела» больше chunks за один проход.
-      num_ctx: 16384,
+      // 8K хватает с запасом: lean-промпт без regulation-блоков ~1.5K токенов
+      // + 4 doc chunks ~800 токенов + ответ 400 токенов ≈ 2.7K. 16K давал
+      // 2-3 минуты prefill'а на M2 Air ради воздуха.
+      num_ctx: 8192,
     },
     builtin: true,
   },
@@ -102,8 +103,9 @@ export const BUILTIN_PRESETS: SystemPromptPreset[] = [
     effects: {
       temperature: 0.1,
       max_tokens: 800,
-      // Несколько регламентов сразу в контексте — окно побольше.
-      num_ctx: 12288,
+      // 8K хватает на 5-6 регламентов в контексте. Раньше было 12K — лишнее
+      // KV-кэш и медленный prefill на M2 Air.
+      num_ctx: 8192,
     },
     builtin: true,
   },

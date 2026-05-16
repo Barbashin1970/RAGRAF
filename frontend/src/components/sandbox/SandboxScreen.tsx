@@ -1044,17 +1044,41 @@ function EmptyChatHint({
 }
 
 function TypingIndicator() {
+  // Таймер «сколько секунд уже ждём» — на медленной LLM (qwen2.5:7b на M2 Air
+  // легко уходит в минуту-две на больших промптах) пользователь должен видеть
+  // что система работает, а не зависла. Если >30 сек — добавляем подсказку.
+  const [elapsed, setElapsed] = useState(0)
+  useEffect(() => {
+    const start = Date.now()
+    const id = window.setInterval(() => {
+      setElapsed(Math.floor((Date.now() - start) / 1000))
+    }, 1000)
+    return () => window.clearInterval(id)
+  }, [])
+
   return (
     <div className="flex items-start gap-2">
       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100">
         <Bot size={14} className="text-violet-700" />
       </div>
       <div className="rounded-2xl rounded-tl-sm border border-stone-200 bg-white px-4 py-2.5">
-        <div className="flex gap-1">
-          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-400 [animation-delay:-0.3s]" />
-          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-400 [animation-delay:-0.15s]" />
-          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-400" />
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1">
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-400 [animation-delay:-0.3s]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-400 [animation-delay:-0.15s]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-violet-400" />
+          </div>
+          <span className="font-mono text-[10px] text-stone-400 tabular-nums">
+            {elapsed}s
+          </span>
         </div>
+        {elapsed >= 30 && (
+          <div className="mt-1 max-w-[280px] text-[10px] leading-tight text-stone-500">
+            {elapsed >= 90
+              ? 'Очень долго. Возможно стоит уменьшить num_ctx или отключить лишний контекст.'
+              : 'qwen2.5:7b на M2 Air медленный — обычно 30-90 сек на ответ.'}
+          </div>
+        )}
       </div>
     </div>
   )
