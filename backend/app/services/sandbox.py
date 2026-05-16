@@ -214,6 +214,18 @@ _PARAM_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
+# Маркеры «следующее число — это deviation предыдущего параметра, той же единицы».
+# Без этого регекс ловит «5.0 см с максимальным отклонением 0.2 см» как ДВА
+# параметра, а потом «0.2 см» получает плохое имя из fallback'а.
+# Симметрично «100.5 атм при допустимом отклонении 5.5 атм» — «5.5 атм» ловило
+# имя «diameter» через 3-й fallback (поиск в предыдущем абзаце).
+_DEVIATION_MARKER_RE = re.compile(
+    r"(допустим\w*\s+отклонени|максимальн\w*\s+отклонени|"
+    r"отклонени\w+\s+не\s+(?:более|превышает)|"
+    r"с\s+отклонением|при\s+отклонении|погрешност\w+\s+не\s+более)",
+    re.IGNORECASE,
+)
+
 
 def _to_float(s: str | None) -> float | None:
     if s is None:
@@ -343,6 +355,23 @@ def extract_parameters(text: str) -> list[dict[str, Any]]:
         deviation = _to_float(raw_dev)
         if value is None:
             continue
+
+        # Детект: «...при допустимом отклонении 5.5 атм» — текущий матч это
+        # deviation предыдущего параметра, а не новый параметр. Сливаем.
+        # Окно 40 символов слева от числа — туда вмещается «при допустимом
+        # отклонении» / «максимальным отклонением» и т.п.
+        left_for_dev = text[max(0, m.start() - 40) : m.start()]
+        is_deviation_continuation = bool(_DEVIATION_MARKER_RE.search(left_for_dev))
+
+        if is_deviation_continuation and found:
+            prev = found[-1]
+            if prev["unit"] == unit and prev.get("deviation") is None:
+                prev["deviation"] = value
+                # Confidence чуть выше — мы поняли структуру «ref + отдельный deviation».
+                prev["confidence"] = round(min(1.0, prev["confidence"] + 0.05), 2)
+                # Расширим source_text включив и deviation-кусок.
+                prev["source_text"] = _enclosing_sentence(text, m.start(), m.end()) or prev["source_text"]
+                continue
 
         # Многоуровневый поиск имени: окно 80 → предложение → предыдущее
         # предложение. Подробнее см. `_guess_name_with_fallback`.

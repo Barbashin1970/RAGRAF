@@ -113,6 +113,33 @@ def test_extract_finds_multiple_params(client):
     assert "flowRate" in names
 
 
+def test_extract_merges_separate_deviation_clause(client):
+    """Регрессия: «100.5 атм при допустимом отклонении 5.5 атм» должно дать
+    один параметр pressure с deviation=5.5, а не два (где второй имеет
+    кривое имя из fallback-chain'а)."""
+    text = (
+        "Регламент устанавливает: номинальный диаметр 5.0 см с максимальным "
+        "отклонением 0.2 см. Давление в трубопроводе поддерживается на уровне "
+        "100.5 атм при допустимом отклонении 5.5 атм."
+    )
+    r = client.post("/api/sandbox/extract-parameters", json={"text": text})
+    extracted = r.json()["extracted"]
+    by_name = {e["suggested_name"]: e for e in extracted}
+    assert "diameter" in by_name
+    assert by_name["diameter"]["value"] == 5.0
+    assert by_name["diameter"]["deviation"] == 0.2
+    assert by_name["diameter"]["unit"] == "см"
+    assert "pressure" in by_name
+    assert by_name["pressure"]["value"] == 100.5
+    assert by_name["pressure"]["deviation"] == 5.5
+    assert by_name["pressure"]["unit"] == "атм"
+    # Не должно быть параметров вроде «параметр_2» с unit=см или unit=атм
+    # которые на самом деле deviation'ы.
+    assert all(not e["suggested_name"].startswith("параметр_") for e in extracted)
+    # Итого только 2 параметра, не 4.
+    assert len(extracted) == 2
+
+
 def test_extract_pm25_with_unit(client):
     text = "Норма ВОЗ по PM2.5 составляет 35 мкг/м³ за сутки."
     r = client.post("/api/sandbox/extract-parameters", json={"text": text})

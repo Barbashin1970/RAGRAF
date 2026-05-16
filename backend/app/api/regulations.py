@@ -210,6 +210,64 @@ async def update_regulation_raw(source_id: str, turtle: str):
         raise HTTPException(status_code=502, detail=f"Upstream: {e}") from e
 
 
+# ── SIGMA Export ──────────────────────────────────────────────────────────
+
+
+@router.get("/regulations/{source_id}/export-bundle")
+def export_regulation_bundle(source_id: str):
+    """Экспорт одного регламента в SIGMA-совместимом ZIP-bundle.
+
+    Содержит `data.ttl` (OWL-инстанс), `shapes.ttl` (SHACL валидация под состав
+    параметров) и `manifest.json` (метадата RAGRAF: версия формата, история,
+    SIGMA-compliance поля). Подробнее — см. `services/sigma_export.py` и
+    README §SIGMA export.
+
+    Returns `application/zip`. Не требует upstream — берёт данные из локального
+    DuckDB напрямую.
+    """
+    from fastapi.responses import Response
+    from app.services import sigma_export
+
+    try:
+        zip_bytes = sigma_export.build_regulation_bundle(source_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from e
+
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={
+            # Имя файла — `<source_id>-sigma.zip`. Содержит RU-символы? Нет,
+            # source_id всегда ASCII slug, экранировать не надо.
+            "Content-Disposition": f'attachment; filename="{source_id}-sigma.zip"',
+        },
+    )
+
+
+@router.get("/sigma-export/corpus")
+def export_corpus_bundle(domain: str | None = None):
+    """Batch-экспорт всего корпуса (или одного домена) в один SIGMA-bundle.
+
+    Параметр `?domain=heating` фильтрует. Без него — весь корпус.
+    Внутри ZIP'а — папка на каждый регламент + `corpus_manifest.json` на корне.
+
+    Путь не `/regulations/export-all` (конфликтнул бы с `{source_id}` маршрутом —
+    FastAPI смэтчил бы `export-all` как source_id), поэтому отдельный prefix.
+    """
+    from fastapi.responses import Response
+    from app.services import sigma_export
+
+    zip_bytes, _manifest = sigma_export.build_corpus_bundle(domain=domain)
+    suffix = f"-{domain}" if domain else ""
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="ragraf-sigma-corpus{suffix}.zip"',
+        },
+    )
+
+
 @router.delete("/regulations/{source_id}")
 async def delete_regulation(source_id: str, confirm: bool = False) -> dict[str, Any]:
     """Безопасное удаление регламента.

@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   BookOpen,
   Boxes,
+  Download,
   FileText,
   ListTree,
   Loader2,
@@ -190,6 +191,17 @@ export function RegulationList() {
               className="w-full rounded-md border border-stone-200 bg-white py-1.5 pl-8 pr-3 text-sm placeholder:text-stone-400 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary/40"
             />
           </div>
+          <Button
+            variant="ghost"
+            icon={<Download size={14} className="text-emerald-600" />}
+            onClick={() => {
+              // Batch SIGMA export. Прямая GET-навигация — браузер качает ZIP.
+              window.location.href = '/api/sigma-export/corpus'
+            }}
+            title="Скачать ZIP со всем корпусом регламентов в SIGMA-совместимом формате (data.ttl + shapes.ttl на каждый)"
+          >
+            Экспорт в СИГМУ
+          </Button>
           <Button
             variant="secondary"
             icon={<Boxes size={14} />}

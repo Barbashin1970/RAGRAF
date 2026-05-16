@@ -158,11 +158,19 @@ def regulation_to_turtle(reg: Regulation) -> str:
     REG_CLASS = REG_NS["Regulation"]
     g.add((REG_CLASS, RDF.type, OWL.Class))
 
-    # Стандартные мета-свойства
+    # Стандартные мета-свойства. SIGMA-compliance поля (sourceDocument,
+    # sourceClause, validFrom, validTo) — из ТЗ СИГМА §4.1.3: «каждое правило
+    # должно быть связано с источником (нормативный акт + пункт), периодом
+    # действия и историей изменений». Сериализуются всегда (чтобы shapes.ttl
+    # их валидировал), значения проставляются только если в DuckDB есть.
     for prop_name, rng in (
         ("name", XSD.string),
         ("date", XSD.date),
         ("recommendation", XSD.string),
+        ("sourceDocument", XSD.string),
+        ("sourceClause", XSD.string),
+        ("validFrom", XSD.date),
+        ("validTo", XSD.date),
     ):
         pred = REG_NS[prop_name]
         g.add((pred, RDF.type, OWL.DatatypeProperty))
@@ -198,6 +206,82 @@ def regulation_to_turtle(reg: Regulation) -> str:
         text = reg.recommendations[0].text or ""
         if text:
             g.add((instance, REG_NS["recommendation"], Literal(text)))
+
+    # SIGMA-compliance: source_document / source_clause / valid_from / valid_to.
+    # Сериализуем только заполненные — иначе появятся пустые литералы которые
+    # SHACL отвергнет как несоответствующие xsd:date/xsd:string.
+    if reg.source_document:
+        g.add((instance, REG_NS["sourceDocument"], Literal(reg.source_document)))
+    if reg.source_clause:
+        g.add((instance, REG_NS["sourceClause"], Literal(reg.source_clause)))
+    if reg.valid_from:
+        g.add((instance, REG_NS["validFrom"], Literal(reg.valid_from, datatype=XSD.date)))
+    if reg.valid_to:
+        g.add((instance, REG_NS["validTo"], Literal(reg.valid_to, datatype=XSD.date)))
+
+    return g.serialize(format="turtle")
+
+
+def regulation_to_shacl_shapes(reg: Regulation) -> str:
+    """Сгенерировать SHACL-форму валидации для конкретного регламента.
+
+    Аналог `<reg>.shapes.ttl` из СИГМЫ (см. Rules-Management.pdf). Форма
+    декларирует обязательные поля и типы данных под текущий состав параметров
+    регламента. Используется в bundle-экспорте — СИГМА при загрузке валидирует
+    data.ttl против этой формы.
+    """
+    from rdflib import BNode, Graph, Literal, Namespace
+    from rdflib.namespace import RDF, SH, XSD
+
+    g = Graph()
+    REG_NS = Namespace("http://regulations.local/ontology#")
+    g.bind("", REG_NS)
+    g.bind("sh", SH)
+    g.bind("xsd", XSD)
+    g.bind("rdf", RDF)
+
+    shape_uri = REG_NS["RegulationShape"]
+    g.add((shape_uri, RDF.type, SH.NodeShape))
+    g.add((shape_uri, SH.targetClass, REG_NS["Regulation"]))
+
+    def add_property(
+        path: str,
+        datatype,
+        *,
+        min_count: int = 1,
+        min_inclusive: float | None = None,
+    ) -> None:
+        # Each property — отдельный анонимный BNode под sh:property.
+        prop = BNode()
+        g.add((shape_uri, SH.property, prop))
+        g.add((prop, SH.path, REG_NS[path]))
+        g.add((prop, SH.datatype, datatype))
+        g.add((prop, SH.minCount, Literal(min_count)))
+        if min_inclusive is not None:
+            g.add((prop, SH.minInclusive, Literal(float(min_inclusive))))
+
+    # Обязательные мета-поля. name + date — присутствуют всегда.
+    add_property("name", XSD.string)
+    add_property("date", XSD.date)
+    # Recommendation: SIGMA в фикстуре делает обязательным; делаем тоже.
+    add_property("recommendation", XSD.string)
+
+    # SIGMA-compliance — по ТЗ §4.1.3 должны быть. Делаем «soft required»
+    # (min_count=0) чтобы старые регламенты без этих полей не падали при
+    # экспорте. Когда заполнено — валидация на datatype отработает.
+    for path, dt in (
+        ("sourceDocument", XSD.string),
+        ("sourceClause", XSD.string),
+        ("validFrom", XSD.date),
+        ("validTo", XSD.date),
+    ):
+        add_property(path, dt, min_count=0)
+
+    # Параметры: каждый — decimal с min_inclusive=0 (нет отрицательных давлений),
+    # парный *Deviation тоже decimal ≥ 0. Reusing Rules-Management.pdf convention.
+    for p in reg.parameters:
+        add_property(p.name, XSD.decimal, min_inclusive=0.0)
+        add_property(f"{p.name}Deviation", XSD.decimal, min_inclusive=0.0)
 
     return g.serialize(format="turtle")
 

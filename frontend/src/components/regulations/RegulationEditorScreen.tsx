@@ -11,6 +11,7 @@ import {
   ChevronUp,
   CircleSlash,
   CopyCheck,
+  Download,
   FileCode2,
   Flag,
   GitCommit,
@@ -132,6 +133,21 @@ export function RegulationEditorScreen() {
           {archive.isPending ? 'Архивирую…' : 'Архивировать'}
         </Button>
       )}
+      {/* Экспорт регламента в SIGMA-bundle (data.ttl + shapes.ttl + manifest.json).
+          Прямая GET-навигация — браузер сам качает ZIP, не нужен mutation/state.
+          Если на регламенте есть несохранённые правки (dirty) — отдадим
+          закоммиченную в DuckDB версию, не draft. Так что не блокируем по dirty. */}
+      <Button
+        size="sm"
+        variant="ghost"
+        icon={<Download size={13} className="text-emerald-600" />}
+        onClick={() => {
+          window.location.href = `/api/regulations/${encodeURIComponent(id)}/export-bundle`
+        }}
+        title="Скачать ZIP с data.ttl + shapes.ttl + manifest.json для загрузки в СИГМУ"
+      >
+        Экспорт в СИГМУ
+      </Button>
       <Button
         size="sm"
         variant={showHistory ? 'secondary' : 'ghost'}

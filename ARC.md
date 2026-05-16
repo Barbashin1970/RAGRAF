@@ -1040,6 +1040,75 @@ flowchart TB
 
 ---
 
+## 16.3 Интеграция с СИГМОЙ — экспорт регламентов
+
+Главный output RAGRAF для производственного использования — **bundle регламента в SIGMA-совместимом формате**. Это закрывает контур «среда разработки → платформенный контур» из ТЗ СИГМА §1.
+
+**Положение в архитектуре**: RAGRAF (локальный, M-серия Mac) → ZIP-bundle → большая СИГМА (Apache Jena, Linux-сервер).
+
+### 16.3.1 Что соответствует формату СИГМЫ
+
+Из [Rules-Management.pdf](Rules-Management.pdf) известно что СИГМА ожидает на вход пару Turtle-файлов:
+
+| Файл | Содержание | Источник в RAGRAF |
+|---|---|---|
+| `<id>.data.ttl` | OWL-инстанс регламента: декларация `:Regulation` + properties + значения | `regulation_to_turtle()` в `services/turtle_bridge.py` |
+| `<id>.shapes.ttl` | SHACL-форма валидации: `sh:NodeShape`, `sh:targetClass :Regulation`, обязательные поля + типы данных | `regulation_to_shacl_shapes()` в `services/turtle_bridge.py` |
+
+При загрузке в СИГМУ происходит автоматическая валидация data.ttl против shapes.ttl ([ТЗ §4.1.3](TZ_RAGRAF.md)).
+
+### 16.3.2 SIGMA-compliance поля
+
+ТЗ §4.1.3 требует: «каждое правило должно быть связано с источником (нормативный акт + пункт), периодом действия и историей изменений».
+
+RAGRAF хранит эти поля в DuckDB ([Regulation schema](backend/app/schemas/domain.py)):
+
+| RAGRAF поле | Turtle property | DuckDB колонка |
+|---|---|---|
+| `source_document` | `:sourceDocument` (xsd:string) | `regulations.source_document` |
+| `source_clause` | `:sourceClause` (xsd:string) | `regulations.source_clause` |
+| `valid_from` | `:validFrom` (xsd:date) | `regulations.valid_from` |
+| `valid_to` | `:validTo` (xsd:date) | `regulations.valid_to` |
+
+В SHACL форме они помечены `sh:minCount 0` (soft required) — чтобы старые регламенты без заполненных полей не падали при экспорте; когда поле заполнено, валидация типа отработает.
+
+### 16.3.3 Реализация
+
+[services/sigma_export.py](backend/app/services/sigma_export.py) — сборщик bundle:
+
+```python
+build_regulation_bundle(source_id) -> bytes  # один регламент → ZIP
+build_corpus_bundle(domain=None) -> (bytes, manifest)  # batch
+```
+
+Внутри: вытащить `Regulation` из DuckDB → `regulation_to_turtle()` → `regulation_to_shacl_shapes()` → запаковать в ZIP с `manifest.json` (метадата для трассировки, не парсится СИГМОЙ).
+
+API endpoints в [api/regulations.py](backend/app/api/regulations.py):
+- `GET /api/regulations/{id}/export-bundle` — один регламент
+- `GET /api/sigma-export/corpus?domain=heating` — batch (отдельный prefix чтобы не конфликтнуть с `{source_id}` маршрутами)
+
+UI: кнопка «Экспорт в СИГМУ» в шапке Regulation Editor и в toolbar `/regulations`. Прямая GET-навигация — браузер качает ZIP без отдельного state'а.
+
+### 16.3.4 Что НЕ экспортируется
+
+| Не отдаём в СИГМУ | Почему |
+|---|---|
+| `flow.json` (Rule DSL) | Проприетарный node-based формат RAGRAF. СИГМА исполняет регламенты через SHACL + recommendation. Flow — RAGRAF-only для визуального редактирования. |
+| `regulation_history` snapshots | RAGRAF audit-trail. СИГМА ведёт свою историю. Версионирование в `manifest.json` остаётся для round-trip обратно. |
+| Документы аналитика (PDF/DOCX) | Сырые источники, не часть онтологии. |
+| RAGU prompt overrides | Локальная конфигурация LLM-стека. |
+
+### 16.3.5 Round-trip обратно в RAGRAF (backlog)
+
+Сейчас bundle экспортируется в одну сторону. Полный круг (RAGRAF → СИГМА → RAGRAF) требует:
+1. Endpoint `POST /api/regulations/import-bundle` — принимает ZIP
+2. Парсер manifest.json + data.ttl (через `parse_regulation_turtle()` который уже есть)
+3. Импорт в DuckDB как новый регламент с реконструкцией истории
+
+Это [Backlog §16.1](ARC.md) — нужно когда возникнет сценарий «забрать обновления из СИГМЫ обратно в локальную студию».
+
+---
+
 ## 17. Ссылки
 
 | Документ                                          | Содержание                                                  |

@@ -384,6 +384,111 @@ RAGU_ENABLED=true
 
 ---
 
+## Экспорт в СИГМУ
+
+RAGRAF — это **локальная среда разработки аналитика** в составе фреймворка СИГМА (см. [ТЗ СИГМА §1](TZ_RAGRAF.md)). Аналитик готовит цифровые регламенты тут (импорт PDF/DOCX → извлечение параметров → редактирование в Form/Flow/Constraint), а потом отдаёт готовые артефакты в большую СИГМУ для исполнения.
+
+СИГМА хранит регламенты как Apache Jena граф (RDF/OWL/SHACL). Каждый регламент = пара файлов:
+- `data.ttl` — OWL-инстанс с property values
+- `shapes.ttl` — SHACL-форма валидации
+
+При загрузке СИГМА автоматически валидирует `data.ttl` против `shapes.ttl` ([Rules-Management.pdf](Rules-Management.pdf), [ТЗ §4.1.3](TZ_RAGRAF.md)).
+
+### Структура bundle
+
+**Один регламент** (`GET /api/regulations/{id}/export-bundle`):
+
+```
+<source_id>/
+├── data.ttl          # OWL-инстанс: name, date, recommendation, параметры + *Deviation,
+│                     # SIGMA-compliance поля (sourceDocument, sourceClause, validFrom/To)
+├── shapes.ttl        # SHACL-форма: targetClass Regulation, обязательные поля + типы данных,
+│                     # min_inclusive=0 для числовых параметров
+└── manifest.json     # RAGRAF-метадата: format_version, exported_at, история, sigma_compliance,
+                      # для round-trip импорта обратно в RAGRAF
+```
+
+**Весь корпус** (`GET /api/sigma-export/corpus?domain=heating`):
+
+```
+ragraf-sigma-corpus.zip
+├── pressure-diameter/
+│   ├── data.ttl
+│   ├── shapes.ttl
+│   └── manifest.json
+├── heat-inlet-breach/
+│   └── ...
+├── ...
+└── corpus_manifest.json  # сводный manifest со списком included/failed
+```
+
+### Что НЕ попадает в экспорт
+
+| Не отдаём | Почему |
+|---|---|
+| `flow.json` (Rule DSL) | Наш проприетарный формат node-based редактора. СИГМА исполняет регламенты по SHACL + recommendation. Flow остаётся RAGRAF-only. |
+| `regulation_history` snapshots | RAGRAF audit-trail. СИГМА ведёт свою историю редакций. Версионирование вынесено в `manifest.json`. |
+| Документы аналитика (PDF/DOCX) | Сырые источники, не часть онтологии. |
+| RAGU prompt overrides | Локальная конфигурация LLM-стека RAGRAF. |
+
+### Пример data.ttl
+
+```turtle
+@prefix : <http://regulations.local/ontology#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:Regulation a owl:Class .
+:pressure a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:pressureDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:PressureDiameterRegulation a :Regulation ;
+    :name "Регламент на допустимые параметры давления и диаметра..." ;
+    :date "2023-10-01"^^xsd:date ;
+    :pressure 20.5 ;
+    :pressureDeviation 1.5 ;
+    :diameter 5.0 ;
+    :diameterDeviation 0.2 ;
+    :recommendation "Остановите систему, проверьте герметичность..." ;
+    :sourceDocument "Постановление № 001/2023" ;
+    :sourceClause "1.2" ;
+    :validFrom "2023-11-01"^^xsd:date .
+```
+
+### Пример shapes.ttl
+
+```turtle
+:RegulationShape a sh:NodeShape ;
+    sh:targetClass :Regulation ;
+    sh:property [ sh:path :name ; sh:datatype xsd:string ; sh:minCount 1 ] ;
+    sh:property [ sh:path :pressure ; sh:datatype xsd:decimal ; sh:minCount 1 ; sh:minInclusive 0.0 ] ;
+    sh:property [ sh:path :pressureDeviation ; sh:datatype xsd:decimal ; sh:minCount 1 ; sh:minInclusive 0.0 ] ;
+    ...
+```
+
+SHACL автоматически генерируется под фактический состав параметров регламента — `min_inclusive=0` для всех (нет отрицательных давлений), `*Deviation` парный к каждому параметру.
+
+### Как пользоваться из UI
+
+- **Один регламент**: открой регламент в Редакторе → кнопка **«Экспорт в СИГМУ»** в шапке (рядом с «История»). Скачается `<source_id>-sigma.zip`.
+- **Весь корпус**: на странице `/regulations` в toolbar — кнопка **«Экспорт в СИГМУ»**. Скачается `ragraf-sigma-corpus.zip`.
+
+### Загрузка в большую СИГМУ
+
+На стороне СИГМЫ (Apache Jena) загрузка bundle'а:
+```bash
+# Распаковать
+unzip pressure-diameter-sigma.zip
+
+# Загрузить в Jena с автоматической валидацией SHACL
+# (псевдокод — зависит от CLI вашей сборки СИГМЫ)
+jena-load --validate-shacl pressure-diameter/data.ttl pressure-diameter/shapes.ttl
+```
+
+`manifest.json` не парсится Jena — это исключительно для трассировки/audit'а на стороне СИГМЫ (откуда пришёл, какой версии, история редакций в RAGRAF).
+
+---
+
 ## Тесты
 
 Три уровня; запускать после крупных правок чтобы ловить регрессию.
@@ -460,6 +565,8 @@ npm run test:watch      # watch-mode
 | `GET` | `/api/regulations/{id}/raw` | Сырой Turtle регламента (для отладки, читается из DuckDB после правок) |
 | `PUT` | `/api/regulations/{id}/raw` | Записать сырой Turtle в upstream |
 | `DELETE` | `/api/regulations/{id}` | Очистить регламент |
+| `GET` | `/api/regulations/{id}/export-bundle` | **SIGMA-bundle ZIP** одного регламента: `data.ttl` + `shapes.ttl` + `manifest.json` |
+| `GET` | `/api/sigma-export/corpus?domain=heating` | **Batch SIGMA-bundle** всего корпуса (или одного домена) в одном ZIP |
 
 ### Rule Flow
 
