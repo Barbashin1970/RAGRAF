@@ -1,5 +1,5 @@
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { Activity, Beaker, BookOpen, ExternalLink, FileJson, ListTree, PlayCircle } from 'lucide-react'
+import { Activity, Beaker, BookOpen, ExternalLink, FileJson, ListTree, PlayCircle, Sparkles } from 'lucide-react'
 import { GraphView } from '@/components/graph/GraphView'
 import { RegulationList } from '@/components/regulations/RegulationList'
 import { RegulationEditorScreen } from '@/components/regulations/RegulationEditorScreen'
@@ -7,6 +7,7 @@ import { FlowEditorScreen } from '@/components/flow/FlowEditorScreen'
 import { ConstraintEditorScreen } from '@/components/constraints/ConstraintEditorScreen'
 import { SandboxScreen } from '@/components/sandbox/SandboxScreen'
 import { SandboxBacklog } from '@/components/sandbox/SandboxBacklog'
+import { RaguStudioScreen } from '@/components/ragu/RaguStudioScreen'
 import { cn } from '@/lib/cn'
 
 function NavLink({ to, icon: Icon, label }: { to: string; icon: typeof Activity; label: string }) {
@@ -134,6 +135,7 @@ export default function App() {
           <NavLink to="/sandbox" icon={Beaker} label="Студия аналитика" />
           <NavLink to="/regulations" icon={ListTree} label="Регламенты" />
           <NavLink to="/graph" icon={Activity} label="Граф связей" />
+          <NavLink to="/ragu" icon={Sparkles} label="RAGU Studio" />
           <ExecutionPlaceholder />
         </nav>
         <div className="ml-auto flex items-center gap-2">
@@ -154,6 +156,7 @@ export default function App() {
           <Route path="/graph" element={<GraphView />} />
           <Route path="/sandbox" element={<SandboxScreen />} />
           <Route path="/sandbox/backlog" element={<SandboxBacklog />} />
+          <Route path="/ragu" element={<RaguStudioScreen />} />
           <Route path="*" element={<div className="p-6 text-stone-500">Страница не найдена</div>} />
         </Routes>
       </main>

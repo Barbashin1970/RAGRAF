@@ -384,6 +384,65 @@ export const api = {
         { method: 'POST' },
       ),
   },
+  ragu: {
+    listPrompts: () =>
+      request<{ available: boolean; prompts: RaguPrompt[] }>(`/api/ragu/prompts`),
+    getPrompt: (name: string) =>
+      request<RaguPromptDetail>(`/api/ragu/prompts/${encodeURIComponent(name)}`),
+    savePromptOverride: (name: string, payload: { template: string; role?: 'user' | 'system' | 'ai'; comment?: string }) =>
+      request<{ ok: boolean; override: RaguPromptOverride }>(
+        `/api/ragu/prompts/${encodeURIComponent(name)}`,
+        { method: 'PUT', body: JSON.stringify(payload) },
+      ),
+    deletePromptOverride: (name: string) =>
+      request<{ ok: boolean; name: string; status: string }>(
+        `/api/ragu/prompts/${encodeURIComponent(name)}`,
+        { method: 'DELETE' },
+      ),
+    getConfig: () => request<RaguConfig>(`/api/ragu/config`),
+  },
+}
+
+// ── RAGU Studio types ──────────────────────────────────────────────────
+
+export interface RaguPrompt {
+  name: string
+  description: string
+  default_template: string
+  role: 'user' | 'system' | 'ai'
+  pydantic_schema: string
+  variables: string[]
+  message_count: number
+  has_override: boolean
+  override_updated_at: string | null
+  override_comment: string | null
+}
+
+export interface RaguPromptOverride {
+  name: string
+  template: string
+  role: string
+  comment: string | null
+  updated_at: string
+}
+
+export interface RaguPromptDetail extends RaguPrompt {
+  override_template: string | null
+  override_role: string | null
+  override_comment: string | null
+  override_updated_at: string | null
+}
+
+export interface RaguConfig {
+  ragu_enabled: boolean
+  llm_model: string
+  embed_model: string
+  base_url: string | null
+  storage_folder: string
+  available: boolean
+  builder_defaults: Record<string, unknown> | null
+  language: string | null
+  prompt_count?: number
 }
 
 // Documents (NotebookLM-style) — типы для контекста аналитика.

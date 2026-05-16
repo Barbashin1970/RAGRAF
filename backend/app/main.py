@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import datasets, flow, graph, regulations, sandbox, shacl, search, validate, versions
+from app.api import datasets, flow, graph, ragu, regulations, sandbox, shacl, search, validate, versions
 from app.config import settings
 from app.services import regulation_store
 
@@ -144,3 +144,4 @@ app.include_router(shacl.router, prefix="/api", tags=["shacl"])
 app.include_router(graph.router, prefix="/api", tags=["graph"])
 app.include_router(search.router, prefix="/api", tags=["search"])
 app.include_router(sandbox.router, prefix="/api", tags=["sandbox"])
+app.include_router(ragu.router, prefix="/api", tags=["ragu"])

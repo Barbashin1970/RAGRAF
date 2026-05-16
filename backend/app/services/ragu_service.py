@@ -94,7 +94,13 @@ def get_knowledge_graph() -> Any:
 def search(query: str, mode: str = "local") -> dict[str, Any]:
     """Sync. RAGU search engines синхронные. Если в будущем RAGU добавит
     async API — обернём в `async def` с `await engine.asearch(query)` или
-    в `await asyncio.to_thread(engine.search, query)`."""
+    в `await asyncio.to_thread(engine.search, query)`.
+
+    Перед вызовом `engine.search(...)` применяем все пользовательские
+    overrides промптов (из DuckDB) через `ragu_prompts.apply_overrides_to`.
+    Так пользователь может править системные промпты RAGU из UI без форка
+    библиотеки.
+    """
     _ensure_enabled()
     kg = get_knowledge_graph()
     try:
@@ -107,6 +113,10 @@ def search(query: str, mode: str = "local") -> dict[str, Any]:
         else:
             from ragu.search_engine import NaiveSearchEngine  # type: ignore
             engine = NaiveSearchEngine(kg)
+        # Применяем overrides из DuckDB — list возвращённых имён можно
+        # отдать клиенту в дебаг-целях, но search возвращает чисто response.
+        from app.services import ragu_prompts
+        ragu_prompts.apply_overrides_to(engine)
         result = engine.search(query)
         return {
             "response": getattr(result, "response", str(result)),

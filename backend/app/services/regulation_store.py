@@ -142,6 +142,23 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
     )
     c.execute("CREATE INDEX IF NOT EXISTS idx_chunks_doc ON document_chunks(doc_id, chunk_index)")
 
+    # ── Overrides RAGU-промптов ─────────────────────────────────────────
+    # RAGU 0.0.2 хранит 18 системных Jinja2-промптов в коде. Чтобы аналитик
+    # мог менять их без форка библиотеки, держим overrides здесь — при старте
+    # каждого search engine применяем через RaguGenerativeModule.update_prompt.
+    # comment — для аудита «кто и зачем поправил».
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS ragu_prompt_overrides (
+            name        VARCHAR PRIMARY KEY,
+            template    TEXT NOT NULL,
+            role        VARCHAR NOT NULL DEFAULT 'user',
+            comment     VARCHAR,
+            updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
     # ── Пользовательские домены ─────────────────────────────────────────
     # Аналитик может создать новый домен из UI, в т.ч. в сценарии bootstrap'а
     # корпуса с нуля (загрузили PDF → анализ не нашёл соседей → создаём домен
