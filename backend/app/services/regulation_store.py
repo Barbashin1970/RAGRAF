@@ -75,7 +75,15 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
     # PRAGMA table_info → (cid, name, type, notnull, dflt_value, pk).
     # Имя колонки в row[1], не row[0] (cid — целочисленный индекс).
     existing = {row[1] for row in c.execute("PRAGMA table_info('regulations')").fetchall()}
-    for col in ("source_document", "source_clause", "valid_from", "valid_to"):
+    # Колонки добавлялись инкрементально (SIGMA-compliance + позже PROV-O attachment).
+    # ADD COLUMN-цикл идемпотентен: запускается на каждом старте, добавляет только
+    # отсутствующие столбцы. Старые БД получают новые поля без миграции данных.
+    for col in (
+        "source_document", "source_clause", "valid_from", "valid_to",
+        # PROV-O attachment (документ-основание для traceability):
+        "source_url", "source_excerpt", "source_file_path",
+        "source_checksum", "source_mime_type",
+    ):
         if col not in existing:
             c.execute(f"ALTER TABLE regulations ADD COLUMN {col} VARCHAR")
     c.execute(
@@ -204,7 +212,9 @@ def list_all() -> list[dict[str, Any]]:
                    CASE WHEN r.recommendation IS NULL OR r.recommendation = '' THEN 0 ELSE 1 END AS recs_count,
                    r.recommendation_priority,
                    r.valid_to,
-                   r.source_document
+                   r.source_document,
+                   r.source_file_path,
+                   r.source_url
             FROM regulations r
             ORDER BY r.domain, r.source_id
             """
@@ -222,6 +232,10 @@ def list_all() -> list[dict[str, Any]]:
             "priority": int(r[5]) if r[5] is not None else None,
             "valid_to": r[6],
             "source_document": r[7],
+            # PROV-O attachment indicators — UI рисует badge «📎 источник
+            # прикреплён» если есть локальный файл или внешняя ссылка.
+            "source_file_path": r[8],
+            "source_url": r[9],
         }
         for r in rows
     ]
@@ -233,7 +247,8 @@ def get(source_id: str) -> Regulation | None:
         head = c.execute(
             """
             SELECT source_id, name, domain, date, version, status, recommendation, recommendation_priority,
-                   source_document, source_clause, valid_from, valid_to
+                   source_document, source_clause, valid_from, valid_to,
+                   source_url, source_excerpt, source_file_path, source_checksum, source_mime_type
             FROM regulations WHERE source_id = ?
             """,
             [source_id],
@@ -285,6 +300,11 @@ def get(source_id: str) -> Regulation | None:
         source_clause=head[9],
         valid_from=head[10],
         valid_to=head[11],
+        source_url=head[12],
+        source_excerpt=head[13],
+        source_file_path=head[14],
+        source_checksum=head[15],
+        source_mime_type=head[16],
     )
 
 
@@ -318,9 +338,11 @@ def save(
                 INSERT INTO regulations (
                     source_id, name, domain, date, version, status,
                     recommendation, recommendation_priority, updated_at,
-                    source_document, source_clause, valid_from, valid_to
+                    source_document, source_clause, valid_from, valid_to,
+                    source_url, source_excerpt, source_file_path,
+                    source_checksum, source_mime_type
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (source_id) DO UPDATE SET
                     name = EXCLUDED.name,
                     domain = EXCLUDED.domain,
@@ -333,12 +355,19 @@ def save(
                     source_document = EXCLUDED.source_document,
                     source_clause = EXCLUDED.source_clause,
                     valid_from = EXCLUDED.valid_from,
-                    valid_to = EXCLUDED.valid_to
+                    valid_to = EXCLUDED.valid_to,
+                    source_url = EXCLUDED.source_url,
+                    source_excerpt = EXCLUDED.source_excerpt,
+                    source_file_path = EXCLUDED.source_file_path,
+                    source_checksum = EXCLUDED.source_checksum,
+                    source_mime_type = EXCLUDED.source_mime_type
                 """,
                 [
                     reg.id, reg.name, reg.domain, reg.date, reg.version, reg.status,
                     rec_text, rec_priority, now,
                     reg.source_document, reg.source_clause, reg.valid_from, reg.valid_to,
+                    reg.source_url, reg.source_excerpt, reg.source_file_path,
+                    reg.source_checksum, reg.source_mime_type,
                 ],
             )
             # Полная замена параметров (упрощённая стратегия — drop+insert).

@@ -72,6 +72,24 @@ class Regulation(BaseModel):
     source_clause: str | None = None
     valid_from: str | None = None
     valid_to: str | None = None
+    # PROV-O attachment: документ-основание (вариант B — локальный кэш).
+    # Сценарий: аналитик оцифровал бумажный приказ в цифровой регламент и
+    # хочет иметь возможность вернуться к оригиналу для самопроверки и
+    # обоснования значений параметров перед заказчиком.
+    #   - source_url:      внешняя ссылка (Yandex Disk, intranet, mailto:...)
+    #   - source_excerpt:  фрагмент текста-цитата, объясняющий откуда взялись
+    #                      конкретные значения (например 20.5 атм и 1.5 отклонение)
+    #   - source_file_path: относительный путь в `data/source_documents/{id}/`
+    #                      когда оригинал загружен локально (опционально)
+    #   - source_checksum: sha256 локального файла — поймать подмену оригинала
+    #                      между сессиями и при reimport bundle'а
+    #   - source_mime_type: media type загруженного файла (UI решает как превьюшить)
+    # Сериализуются в data.ttl через PROV-O (prov:wasDerivedFrom + prov:Entity).
+    source_url: str | None = None
+    source_excerpt: str | None = None
+    source_file_path: str | None = None
+    source_checksum: str | None = None
+    source_mime_type: str | None = None
 
 
 # --- Rule DSL -----------------------------------------------------------

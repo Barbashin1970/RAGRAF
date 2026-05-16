@@ -57,6 +57,32 @@ export const regulationSchema = z.object({
   parameters: z.array(parameterSchema),
   constraints: z.array(constraintSchema),
   recommendations: z.array(recommendationSchema),
+  // SIGMA-compliance + PROV-O attachment
+  source_document: z.string().nullable().optional(),
+  source_clause: z.string().nullable().optional(),
+  valid_from: z.string().nullable().optional(),
+  valid_to: z.string().nullable().optional(),
+  source_url: z.string().nullable().optional(),
+  source_excerpt: z.string().nullable().optional(),
+  source_file_path: z.string().nullable().optional(),
+  source_checksum: z.string().nullable().optional(),
+  source_mime_type: z.string().nullable().optional(),
+})
+
+export const sourceUploadResponseSchema = z.object({
+  ok: z.boolean(),
+  filename: z.string(),
+  size: z.number(),
+  checksum: z.string(),
+  mime_type: z.string(),
+  path: z.string(),
+})
+
+export const sourceVerifyResponseSchema = z.object({
+  matches: z.boolean(),
+  stored_checksum: z.string().nullable().optional(),
+  file_path: z.string().nullable().optional(),
+  reason: z.string().optional(),
 })
 
 export const domainSchema = z.object({

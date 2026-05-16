@@ -78,6 +78,13 @@ export interface Regulation {
   source_clause?: string | null
   valid_from?: string | null
   valid_to?: string | null
+  // PROV-O attachment: документ-основание (Вариант B — локальный кэш).
+  // Подробнее: README §«Документ-основание».
+  source_url?: string | null
+  source_excerpt?: string | null
+  source_file_path?: string | null   // относительный путь от DATA_DIR (read-only из UI)
+  source_checksum?: string | null    // sha256:<hex>
+  source_mime_type?: string | null
 }
 
 export interface Domain {
@@ -136,6 +143,8 @@ import {
   searchResponseSchema,
   shaclImportResponseSchema,
   sigmaImportResponseSchema,
+  sourceUploadResponseSchema,
+  sourceVerifyResponseSchema,
   validationResultSchema,
 } from './schemas'
 import { z } from 'zod'
@@ -229,6 +238,39 @@ export const api = {
       request(`/api/regulations/${encodeURIComponent(id)}/publish`, { method: 'POST' }, regulationSchema),
     archive: (id: string) =>
       request(`/api/regulations/${encodeURIComponent(id)}/archive`, { method: 'POST' }, regulationSchema),
+    /**
+     * Загрузить документ-основание (PDF / DOCX / etc.) для регламента.
+     * Backend сохранит файл в `data/source_documents/{id}/`, посчитает SHA-256
+     * и пропишет путь/хеш/mime в Regulation. Один регламент = один attachment.
+     */
+    uploadSourceDocument: async (id: string, file: File) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      const r = await fetch(`/api/regulations/${encodeURIComponent(id)}/source-upload`, {
+        method: 'POST', body: fd,
+      })
+      if (!r.ok) {
+        const text = await r.text().catch(() => '')
+        throw new Error(`${r.status} ${r.statusText}: ${text}`)
+      }
+      return sourceUploadResponseSchema.parse(await r.json())
+    },
+    /** URL для прямого скачивания/preview документа (используется как href). */
+    sourceDocumentUrl: (id: string) =>
+      `/api/regulations/${encodeURIComponent(id)}/source-document`,
+    /** Удалить только локальный кэш файла (URL/цитата сохраняются). */
+    deleteSourceDocument: (id: string) =>
+      request<{ ok: boolean; removed: boolean }>(
+        `/api/regulations/${encodeURIComponent(id)}/source-document`,
+        { method: 'DELETE' },
+      ),
+    /** Сверить SHA-256 локального файла с записанным в БД. */
+    verifySourceDocument: (id: string) =>
+      request(
+        `/api/regulations/${encodeURIComponent(id)}/source-verify`,
+        undefined,
+        sourceVerifyResponseSchema,
+      ),
     /**
      * Импорт SIGMA-bundle (ZIP) обратно в RAGRAF.
      *

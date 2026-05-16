@@ -7,21 +7,29 @@ import {
   BookOpen,
   CalendarClock,
   Calendar,
+  Check,
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   CircleSlash,
   CopyCheck,
   Download,
+  ExternalLink,
   FileCode2,
+  FileText,
   Flag,
   GitCommit,
   Hash,
   History,
   Info,
+  Link2,
+  Loader2,
   type LucideIcon,
   ListTodo,
   MessageSquare,
+  Paperclip,
   Plus,
+  Quote,
   Ruler,
   RotateCcw,
   Save,
@@ -32,6 +40,7 @@ import {
   Target,
   Timer,
   Trash2,
+  Upload,
 } from 'lucide-react'
 import { api, type Parameter, type Regulation } from '@/lib/api'
 import { nanoid } from '@/lib/nanoid'
@@ -371,6 +380,12 @@ function FormView({
           </FormRow>
         </div>
       </Section>
+
+      {/* Документ-основание — PROV-O attachment (вариант B: URL + цитата +
+          локальный кэш). Сценарий: оцифровали бумажный приказ, держим PDF
+          под рукой для самопроверки «откуда взялись 20.5 атм» перед
+          заказчиком. См. README §«Документ-основание». */}
+      <SourceAttachmentSection draft={draft} setDraft={setDraft} />
 
       {/* Параметры */}
       <Section
@@ -991,6 +1006,179 @@ function DiffDetail({ id, versionId }: { id: string; versionId: string }) {
         ))}
       </ul>
     </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────
+// Source attachment (PROV-O: документ-основание)
+// ──────────────────────────────────────────────────────────
+
+function SourceAttachmentSection({
+  draft,
+  setDraft,
+}: {
+  draft: Regulation
+  setDraft: (r: Regulation) => void
+}) {
+  const id = draft.id
+  const qc = useQueryClient()
+  const hasFile = !!draft.source_file_path
+
+  // Mutations: upload / delete / verify. После каждой — invalidate чтобы
+  // редактор подхватил новые поля (path/checksum/mime).
+  const upload = useMutation({
+    mutationFn: (f: File) => api.regulations.uploadSourceDocument(id, f),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['regulation', id] }),
+  })
+  const remove = useMutation({
+    mutationFn: () => api.regulations.deleteSourceDocument(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['regulation', id] }),
+  })
+  const verify = useMutation({
+    mutationFn: () => api.regulations.verifySourceDocument(id),
+  })
+
+  const filename = draft.source_file_path?.split('/').pop() ?? ''
+
+  return (
+    <Section
+      title={<SectionTitle icon={Paperclip} label="Документ-основание" />}
+      description="Где живёт оригинал приказа/постановления и текст-цитата, из которой выведены значения параметров. Используется для самопроверки и обоснования перед заказчиком (PROV-O: prov:wasDerivedFrom)."
+      elevated
+    >
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <FormRow label="Ссылка на оригинал" icon={Link2}>
+          <div className="flex gap-1">
+            <input
+              value={draft.source_url ?? ''}
+              onChange={(e) => setDraft({ ...draft, source_url: e.target.value || null })}
+              placeholder="https://disk.yandex.ru/i/abc123 или intranet-URL"
+              className={tx}
+            />
+            {draft.source_url && (
+              <a
+                href={draft.source_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Открыть оригинал в новой вкладке"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-stone-300 bg-white text-stone-600 transition hover:border-primary/40 hover:text-primary"
+              >
+                <ExternalLink size={14} />
+              </a>
+            )}
+          </div>
+        </FormRow>
+        <FormRow label="Локальная копия (PDF / DOCX)" icon={FileText}>
+          {hasFile ? (
+            <div className="flex flex-wrap items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50/60 px-2 py-1.5 text-xs">
+              <FileText size={14} className="shrink-0 text-emerald-600" />
+              <a
+                href={api.regulations.sourceDocumentUrl(id)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-w-0 flex-1 truncate font-medium text-emerald-800 hover:underline"
+                title={`Открыть ${filename}`}
+              >
+                {filename}
+              </a>
+              <button
+                onClick={() => verify.mutate()}
+                disabled={verify.isPending}
+                className="inline-flex items-center gap-1 rounded border border-stone-300 bg-white px-1.5 py-0.5 text-[10px] font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+                title="Сверить SHA-256 локального файла с записанным хешем"
+              >
+                {verify.isPending ? <Loader2 size={10} className="animate-spin" /> : <Check size={10} />}
+                Сверить
+              </button>
+              <button
+                onClick={() => remove.mutate()}
+                disabled={remove.isPending}
+                className="inline-flex items-center gap-1 rounded border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                title="Удалить только локальный файл; URL и цитата сохранятся"
+              >
+                <Trash2 size={10} />
+                Удалить файл
+              </button>
+            </div>
+          ) : (
+            <label
+              className={cn(
+                'flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-xs text-stone-600 transition hover:border-primary/40 hover:bg-primary/5',
+                upload.isPending && 'cursor-wait opacity-60',
+              )}
+            >
+              {upload.isPending ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              {upload.isPending ? 'Загрузка…' : 'Загрузить файл (PDF / DOCX / изображение, до 25 МБ)'}
+              <input
+                type="file"
+                accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,image/*,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  if (f) upload.mutate(f)
+                  e.currentTarget.value = ''
+                }}
+              />
+            </label>
+          )}
+        </FormRow>
+      </div>
+
+      <FormRow label="Текст-цитата (откуда взялись значения)" icon={Quote}>
+        <textarea
+          rows={4}
+          value={draft.source_excerpt ?? ''}
+          onChange={(e) => setDraft({ ...draft, source_excerpt: e.target.value || null })}
+          placeholder="Например: «Давление в трубопроводе должно поддерживаться на уровне 20.5 атм, при этом допустимое отклонение по давлению не должно превышать 1.5 атм.»"
+          className={cn(tx, 'leading-relaxed font-serif')}
+        />
+      </FormRow>
+
+      {/* Inline-статусы по mutations: вместо модалок — лёгкие баннеры. */}
+      {upload.isError && (
+        <div className="mt-2 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-xs text-rose-700">
+          Не удалось загрузить файл: {(upload.error as Error).message}
+        </div>
+      )}
+      {verify.data && (
+        <div
+          className={cn(
+            'mt-2 inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs',
+            verify.data.matches
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+              : 'border-amber-200 bg-amber-50 text-amber-800',
+          )}
+        >
+          {verify.data.matches ? (
+            <>
+              <CheckCircle2 size={12} /> Файл соответствует записанному хешу — оригинал не изменён
+            </>
+          ) : (
+            <>
+              <AlertTriangle size={12} /> Хеш не сошёлся
+              {verify.data.reason === 'no_local_file' && ' — локальный файл отсутствует'}
+              {verify.data.reason !== 'no_local_file' && ' — оригинал мог быть подменён, перезагрузите файл'}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Read-only метадата — checksum и mime, для прозрачности. */}
+      {(draft.source_checksum || draft.source_mime_type) && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-stone-500">
+          {draft.source_mime_type && (
+            <span>
+              <b>тип:</b> <code className="rounded bg-stone-100 px-1">{draft.source_mime_type}</code>
+            </span>
+          )}
+          {draft.source_checksum && (
+            <span title={draft.source_checksum}>
+              <b>хеш:</b> <code className="rounded bg-stone-100 px-1 font-mono">{draft.source_checksum.slice(0, 18)}…</code>
+            </span>
+          )}
+        </div>
+      )}
+    </Section>
   )
 }
 

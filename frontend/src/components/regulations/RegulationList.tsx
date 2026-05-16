@@ -12,6 +12,7 @@ import {
   Loader2,
   type LucideIcon,
   Network,
+  Paperclip,
   Pencil,
   Plus,
   Search,
@@ -47,6 +48,9 @@ interface RegRow {
   priority?: 1 | 2 | 3 | null
   valid_to?: string | null
   source_document?: string | null
+  // PROV-O attachment indicators (на карточке показываем только наличие, не значение).
+  has_source_file?: boolean
+  has_source_url?: boolean
 }
 
 function extractRow(d: unknown): RegRow | null {
@@ -70,6 +74,8 @@ function extractRow(d: unknown): RegRow | null {
       priority: pr,
       valid_to: typeof o.valid_to === 'string' ? o.valid_to : null,
       source_document: typeof o.source_document === 'string' ? o.source_document : null,
+      has_source_file: typeof o.source_file_path === 'string' && o.source_file_path.length > 0,
+      has_source_url: typeof o.source_url === 'string' && o.source_url.length > 0,
     }
   }
   return null
@@ -495,6 +501,19 @@ function RegulationCard({ reg, visual }: { reg: RegRow; visual: DomainVisual }) 
               <span className="inline-flex items-center gap-1 italic" title="Нормативный документ">
                 <BookOpen size={11} className="text-stone-400" />
                 {reg.source_document}
+              </span>
+            )}
+            {(reg.has_source_file || reg.has_source_url) && (
+              <span
+                className="inline-flex items-center gap-1 text-emerald-700"
+                title={
+                  reg.has_source_file
+                    ? 'Прикреплён локальный документ-основание (PDF/DOCX) — нажми «Редактор», чтобы открыть'
+                    : 'Указана внешняя ссылка на документ-основание'
+                }
+              >
+                <Paperclip size={11} className="text-emerald-500" />
+                источник {reg.has_source_file ? 'прикреплён' : '— ссылка'}
               </span>
             )}
           </div>

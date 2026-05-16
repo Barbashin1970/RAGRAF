@@ -77,8 +77,14 @@ PARAM_UNITS: dict[str, str] = {
     "current": "А",
 }
 
-# Свойства, которые относятся к самому регламенту, а не к параметрам
-META_PROPS = {"name", "date", "recommendation", "version", "status"}
+# Свойства, которые относятся к самому регламенту, а не к параметрам.
+# Включает SIGMA-compliance поля — они описывают сам регламент (метаданные
+# источника / срока), не его параметры. Без явного исключения парсер бы
+# пытался прочитать их как числовые параметры.
+META_PROPS = {
+    "name", "date", "recommendation", "version", "status",
+    "sourceDocument", "sourceClause", "validFrom", "validTo",
+}
 
 
 # ---- Serializers ------------------------------------------------------
@@ -219,6 +225,49 @@ def regulation_to_turtle(reg: Regulation) -> str:
     if reg.valid_to:
         g.add((instance, REG_NS["validTo"], Literal(reg.valid_to, datatype=XSD.date)))
 
+    # PROV-O attachment: документ-основание (источник, из которого аналитик
+    # извлёк цифровой регламент). W3C-стандарт provenance — Apache Jena парсит
+    # `prov:` нативно, не нужно объяснять команде платформы. Сериализуем только
+    # когда хоть одно поле заполнено — иначе появляется лишний blank entity.
+    has_source = any([
+        reg.source_url, reg.source_excerpt, reg.source_file_path,
+        reg.source_checksum,
+    ])
+    if has_source:
+        from rdflib import URIRef
+        from rdflib.namespace import Namespace as _NS
+
+        PROV = _NS("http://www.w3.org/ns/prov#")
+        g.bind("prov", PROV)
+
+        # `:Source_<instance>` — стабильный URI основания. Делаем именованный
+        # узел (не BNode), чтобы при reimport ссылка сохранялась как identity.
+        instance_local = _instance_local_name(reg.id).removesuffix("Regulation")
+        source_uri = REG_NS[f"Source_{instance_local}"]
+        g.add((source_uri, RDF.type, PROV.Entity))
+        g.add((instance, PROV.wasDerivedFrom, source_uri))
+
+        # Метаданные источника — на самом узле `:Source_*`. Так SPARQL по
+        # `prov:wasDerivedFrom` сразу даёт URL/excerpt без двух join'ов.
+        if reg.source_document:
+            g.add((source_uri, RDFS.label, Literal(reg.source_document)))
+        if reg.source_url:
+            # URL обязан быть валидным IRI; иначе rdflib бросит исключение,
+            # SIGMA откажется парсить. Если ввели не-URL (например "Yandex Disk
+            # папка/файл") — сериализуем как строку.
+            try:
+                g.add((source_uri, REG_NS["sourceUrl"], URIRef(reg.source_url)))
+            except Exception:
+                g.add((source_uri, REG_NS["sourceUrl"], Literal(reg.source_url)))
+        if reg.source_excerpt:
+            g.add((source_uri, REG_NS["sourceExcerpt"], Literal(reg.source_excerpt)))
+        if reg.source_checksum:
+            g.add((source_uri, REG_NS["sourceChecksum"], Literal(reg.source_checksum)))
+        if reg.source_mime_type:
+            g.add((source_uri, REG_NS["sourceMimeType"], Literal(reg.source_mime_type)))
+        # source_file_path локальный — в Turtle НЕ выгружаем (это путь внутри
+        # RAGRAF, СИГМЕ не нужен). Зато добавим в manifest.json через sigma_export.
+
     return g.serialize(format="turtle")
 
 
@@ -258,7 +307,11 @@ def regulation_to_shacl_shapes(reg: Regulation) -> str:
         g.add((prop, SH.datatype, datatype))
         g.add((prop, SH.minCount, Literal(min_count)))
         if min_inclusive is not None:
-            g.add((prop, SH.minInclusive, Literal(float(min_inclusive))))
+            # Явный xsd:decimal — иначе `Literal(0.0)` сериализуется как
+            # `0e+00` (xsd:double). Apache Jena принимает оба, но PDF-форма
+            # СИГМЫ показывает `0.0` (см. Rules-Management.pdf, sh:minInclusive),
+            # поэтому выводим в том же виде.
+            g.add((prop, SH.minInclusive, Literal(str(float(min_inclusive)), datatype=XSD.decimal)))
 
     # Обязательные мета-поля. name + date — присутствуют всегда.
     add_property("name", XSD.string)
@@ -396,6 +449,28 @@ def parse_regulation_turtle(
             )
         )
 
+    # PROV-O attachment: ищем prov:wasDerivedFrom → :Source_* и оттуда тянем
+    # URL/excerpt/checksum/mimeType. URI предиката проверяем по local name —
+    # граф может прийти с любым префиксом для prov:.
+    source_url: str | None = None
+    source_excerpt: str | None = None
+    source_checksum: str | None = None
+    source_mime_type: str | None = None
+    for _, p, o in g.triples((reg_subject, None, None)):
+        if _local_name(p) == "wasDerivedFrom":
+            # Нашли источник — собираем его свойства.
+            for _, sp, so in g.triples((o, None, None)):
+                name = _local_name(sp)
+                if name == "sourceUrl":
+                    source_url = str(so)
+                elif name == "sourceExcerpt":
+                    source_excerpt = str(so)
+                elif name == "sourceChecksum":
+                    source_checksum = str(so)
+                elif name == "sourceMimeType":
+                    source_mime_type = str(so)
+            break
+
     return Regulation(
         id=source_id,
         name=props.get("name") or _local_name(reg_subject) or source_id,
@@ -405,6 +480,14 @@ def parse_regulation_turtle(
         parameters=parameters,
         constraints=parse_shapes_turtle(shapes_turtle) if shapes_turtle else [],
         recommendations=recommendations,
+        source_document=props.get("sourceDocument"),
+        source_clause=props.get("sourceClause"),
+        valid_from=props.get("validFrom"),
+        valid_to=props.get("validTo"),
+        source_url=source_url,
+        source_excerpt=source_excerpt,
+        source_checksum=source_checksum,
+        source_mime_type=source_mime_type,
     )
 
 

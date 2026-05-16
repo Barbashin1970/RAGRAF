@@ -70,10 +70,44 @@ def _build_manifest(source_id: str, ragraf_version: str = "0.0.2") -> dict[str, 
             "valid_from": reg.valid_from,
             "valid_to": reg.valid_to,
         },
+        # PROV-O attachment metadata. URL/excerpt/checksum дублируются в data.ttl
+        # как `prov:wasDerivedFrom`, но manifest даёт быстрый структурный доступ
+        # без парсинга RDF — удобно инженеру СИГМЫ для проверки целостности.
+        # `source_file` ставится отдельно сборщиком если файл реально включён в ZIP.
+        "source_attachment": {
+            "url": reg.source_url,
+            "excerpt": reg.source_excerpt,
+            "checksum": reg.source_checksum,
+            "mime_type": reg.source_mime_type,
+            "file": None,  # путь внутри ZIP, заполняется в build_*_bundle
+        },
         # Не отдаём в СИГМУ flow.json (наш проприетарный Rule DSL). Только
         # помечаем для самопроверки при re-import.
         "ragraf_only_files": ["flow.json (не экспортируется в СИГМУ)"],
     }
+
+
+def _add_source_file(zf, source_id: str, reg, manifest: dict[str, Any]) -> None:
+    """Опционально добавить локальный документ-основание в bundle.
+
+    Кладём как `<source_id>/source.<ext>` рядом с data.ttl/shapes.ttl. В
+    manifest['source_attachment']['file'] пишем относительный путь внутри ZIP
+    + сохраняем checksum для self-verification на стороне СИГМЫ.
+
+    Если файла нет (только URL/цитата) — пропускаем. URL и хеш уже в
+    data.ttl через prov:, СИГМА получит ссылку.
+    """
+    from app.services import source_documents
+
+    if not reg.source_file_path:
+        return
+    path = source_documents.resolve_path(reg.source_file_path)
+    if path is None:
+        return
+    suffix = path.suffix or ".bin"
+    arc_path = f"{source_id}/source{suffix}"
+    zf.writestr(arc_path, path.read_bytes())
+    manifest["source_attachment"]["file"] = arc_path
 
 
 async def _resolve_shapes_ttl(source_id: str, reg) -> str:
@@ -115,6 +149,9 @@ async def build_regulation_bundle(source_id: str) -> bytes:
         # можно положить рядом без коллизий имён.
         zf.writestr(f"{source_id}/data.ttl", data_ttl)
         zf.writestr(f"{source_id}/shapes.ttl", shapes_ttl)
+        _add_source_file(zf, source_id, reg, manifest)
+        # manifest пишем ПОСЛЕ source-файла — потому что _add_source_file
+        # обновляет в нём `source_attachment.file` если файл есть.
         zf.writestr(
             f"{source_id}/manifest.json",
             json.dumps(manifest, ensure_ascii=False, indent=2),
@@ -151,6 +188,7 @@ async def build_corpus_bundle(domain: str | None = None) -> tuple[bytes, dict[st
                 manifest = _build_manifest(sid)
                 zf.writestr(f"{sid}/data.ttl", data_ttl)
                 zf.writestr(f"{sid}/shapes.ttl", shapes_ttl)
+                _add_source_file(zf, sid, reg, manifest)
                 zf.writestr(
                     f"{sid}/manifest.json",
                     json.dumps(manifest, ensure_ascii=False, indent=2),
@@ -212,22 +250,28 @@ def _parse_bundle_zip(zip_bytes: bytes) -> dict[str, dict[str, Any]]:
             else:
                 folder = parts[0]
                 fname = parts[-1]
-            if folder == "_root_" and fname not in ("data.ttl", "shapes.ttl", "manifest.json"):
+            known_text_files = ("data.ttl", "shapes.ttl", "manifest.json")
+            is_source_file = fname.startswith("source.")  # source.pdf / source.docx / etc.
+            if folder == "_root_" and fname not in known_text_files:
+                continue
+            if not (fname in known_text_files or is_source_file):
                 continue
             entry = bundles.setdefault(folder, {})
-            try:
-                content = zf.read(info).decode("utf-8", errors="ignore")
-            except Exception:
-                continue
+            raw_bytes = zf.read(info)
             if fname == "data.ttl":
-                entry["data_ttl"] = content
+                entry["data_ttl"] = raw_bytes.decode("utf-8", errors="ignore")
             elif fname == "shapes.ttl":
-                entry["shapes_ttl"] = content
+                entry["shapes_ttl"] = raw_bytes.decode("utf-8", errors="ignore")
             elif fname == "manifest.json":
                 try:
-                    entry["manifest"] = json.loads(content)
+                    entry["manifest"] = json.loads(raw_bytes.decode("utf-8", errors="ignore"))
                 except Exception:
                     entry["manifest"] = {}
+            elif is_source_file:
+                # Документ-основание — храним сырые байты для последующей записи
+                # на диск. Имя сохраняем чтобы восстановить расширение.
+                entry["source_filename"] = fname
+                entry["source_bytes"] = raw_bytes
     return bundles
 
 
@@ -270,6 +314,26 @@ async def import_bundle(zip_bytes: bytes, *, push_shapes: bool = True) -> dict[s
         except Exception as e:
             failed.append({"source_id": source_id, "reason": f"parse_regulation: {e}"})
             continue
+
+        # Документ-основание: если в bundle лежал `source.<ext>` — кладём его
+        # в `<DATA_DIR>/source_documents/{source_id}/`, обновляем checksum и
+        # путь в regulation. URL/excerpt уже распарсены из data.ttl через PROV-O.
+        source_bytes = files.get("source_bytes")
+        source_filename = files.get("source_filename")
+        if source_bytes and source_filename:
+            try:
+                from app.services import source_documents
+
+                meta = source_documents.save_upload(source_id, source_filename, source_bytes)
+                reg.source_file_path = meta["path"]
+                reg.source_checksum = meta["checksum"]
+                # MIME из manifest, если есть; иначе fallback на расширение.
+                manifest_attach = (manifest or {}).get("source_attachment") or {}
+                reg.source_mime_type = manifest_attach.get("mime_type") or meta["mime_type"]
+            except Exception:
+                # Файл недоступен — это не критично, метаданные из data.ttl
+                # (URL/excerpt) сохранятся всё равно.
+                pass
 
         # Сохраняем в DuckDB как обычную правку. Комментарий идёт в history —
         # сразу видно что версия пришла из импорта.

@@ -210,6 +210,122 @@ async def update_regulation_raw(source_id: str, turtle: str):
         raise HTTPException(status_code=502, detail=f"Upstream: {e}") from e
 
 
+# ── Source document (документ-основание, PROV-O attachment) ─────────────
+
+
+@router.post("/regulations/{source_id}/source-upload")
+async def upload_source_document(
+    source_id: str, file: UploadFile = File(...)
+) -> dict[str, Any]:
+    """Загрузить документ-основание для регламента.
+
+    Файл сохраняется в `<DATA_DIR>/source_documents/{source_id}/<filename>`,
+    считается SHA-256, метадата (путь / хеш / mime) записывается в Regulation.
+    Один регламент = один attachment (старый файл удаляется при перезаписи).
+    """
+    from app.services import source_documents
+
+    reg = regulation_store.get(source_id)
+    if reg is None:
+        raise HTTPException(status_code=404, detail=f"Регламент '{source_id}' не найден")
+
+    body = await file.read()
+    if not body:
+        raise HTTPException(status_code=400, detail="Пустой файл")
+    try:
+        meta = source_documents.save_upload(source_id, file.filename or "source.bin", body)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+
+    # Обновляем поля регламента — MIME из браузера или из расширения.
+    reg.source_file_path = meta["path"]
+    reg.source_checksum = meta["checksum"]
+    reg.source_mime_type = file.content_type or meta["mime_type"]
+    regulation_store.save(reg, author="anonymous", comment="Документ-основание прикреплён")
+
+    return {
+        "ok": True,
+        "filename": meta["filename"],
+        "size": meta["size"],
+        "checksum": meta["checksum"],
+        "mime_type": reg.source_mime_type,
+        "path": meta["path"],
+    }
+
+
+@router.get("/regulations/{source_id}/source-document")
+def download_source_document(source_id: str):
+    """Отдать сам файл-основание для preview/скачивания.
+
+    Поток через `FileResponse` — для PDF браузер откроет inline, для прочего
+    предложит скачать. Если файла нет — 404 (даже если URL во внешнем ресурсе
+    указан, отдать его мы не можем).
+    """
+    from fastapi.responses import FileResponse
+    from app.services import source_documents
+
+    reg = regulation_store.get(source_id)
+    if reg is None:
+        raise HTTPException(status_code=404, detail="Регламент не найден")
+    if not reg.source_file_path:
+        raise HTTPException(status_code=404, detail="Локальный документ-основание не загружен")
+
+    path = source_documents.resolve_path(reg.source_file_path)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Файл-основание отсутствует на диске")
+
+    return FileResponse(
+        path,
+        media_type=reg.source_mime_type or "application/octet-stream",
+        filename=path.name,
+    )
+
+
+@router.delete("/regulations/{source_id}/source-document")
+def delete_source_document(source_id: str) -> dict[str, Any]:
+    """Удалить локальный кэш документа-основания (URL и цитата остаются).
+
+    Удобно когда оригинал переехал во внешний DMS и хранить копию локально
+    больше не нужно. История изменений Regulation покажет момент удаления.
+    """
+    from app.services import source_documents
+
+    reg = regulation_store.get(source_id)
+    if reg is None:
+        raise HTTPException(status_code=404, detail="Регламент не найден")
+
+    removed = source_documents.delete_for_regulation(source_id)
+    # Чистим поля только если файл был — URL/цитату оставляем как метадату.
+    reg.source_file_path = None
+    reg.source_checksum = None
+    reg.source_mime_type = None
+    regulation_store.save(reg, author="anonymous", comment="Документ-основание удалён (URL/цитата сохранены)")
+    return {"ok": True, "removed": removed}
+
+
+@router.get("/regulations/{source_id}/source-verify")
+def verify_source_document(source_id: str) -> dict[str, Any]:
+    """Сверить SHA-256 локального файла с записанным в БД.
+
+    Если кто-то заменил PDF на диске вне UI — хеш разойдётся и метод вернёт
+    `{matches: false}`. UI показывает это как «оригинал был изменён —
+    перезагрузите для подтверждения».
+    """
+    from app.services import source_documents
+
+    reg = regulation_store.get(source_id)
+    if reg is None:
+        raise HTTPException(status_code=404, detail="Регламент не найден")
+    if not reg.source_file_path:
+        return {"matches": False, "reason": "no_local_file"}
+    matches = source_documents.verify_checksum(reg.source_file_path, reg.source_checksum)
+    return {
+        "matches": matches,
+        "stored_checksum": reg.source_checksum,
+        "file_path": reg.source_file_path,
+    }
+
+
 # ── SIGMA Export ──────────────────────────────────────────────────────────
 
 
@@ -340,6 +456,10 @@ async def delete_regulation(source_id: str, confirm: bool = False) -> dict[str, 
 
     deleted_from_store = regulation_store.delete(source_id)
     deleted_flow = save_flow_module_delete(source_id)
+    # Локальный документ-основание (если был) — тоже чистим. URL/цитата
+    # были в регламенте, который уже удалён.
+    from app.services import source_documents
+    deleted_source_doc = source_documents.delete_for_regulation(source_id)
 
     upstream_status: str | None = None
     if getattr(settings, "writeback_upstream", False):
@@ -354,6 +474,7 @@ async def delete_regulation(source_id: str, confirm: bool = False) -> dict[str, 
         "regulation_id": source_id,
         "deleted_from_store": deleted_from_store,
         "deleted_flow_files": deleted_flow,
+        "deleted_source_document": deleted_source_doc,
         "fixture_backed": fixture_backed,
         "upstream_status": upstream_status,
         "note": (

@@ -1098,7 +1098,27 @@ UI: кнопка «Экспорт в СИГМУ» в шапке Regulation Edito
 | Документы аналитика (PDF/DOCX) | Сырые источники, не часть онтологии. |
 | RAGU prompt overrides | Локальная конфигурация LLM-стека. |
 
-### 16.3.5 Round-trip обратно в RAGRAF (реализовано 2026-05-17)
+### 16.3.5 Документ-основание (PROV-O attachment, реализовано 2026-05-17)
+
+Сценарий: аналитик оцифровывает бумажный приказ в цифровой регламент. Чтобы потом можно было сверить откуда взялись конкретные значения параметров (20.5 атм, 5.0 см), храним:
+
+- `source_url` — внешняя ссылка (Yandex Disk / intranet)
+- `source_excerpt` — цитата-фрагмент
+- `source_file_path` — относительный путь в `<DATA_DIR>/source_documents/{id}/`
+- `source_checksum` — `sha256:<hex>`
+- `source_mime_type`
+
+**Стратегия — вариант B** (см. README §«Документ-основание»): URL + цитата + локальный кэш файла. Лимит 25 МБ. Файл хранится в `data/source_documents/{source_id}/<filename>` (один регламент = одна папка, чистка через `shutil.rmtree` при удалении регламента).
+
+**Сериализация в bundle** ([turtle_bridge.py](backend/app/services/turtle_bridge.py) `regulation_to_turtle`): через W3C PROV-O — `prov:wasDerivedFrom` от инстанса регламента → именованный узел `:Source_<instance>` с метаданными. Apache Jena парсит `prov:` нативно. Локальный файл попадает в ZIP как `<source_id>/source.<ext>` ([sigma_export.py](backend/app/services/sigma_export.py) `_add_source_file`), путь дублируется в `manifest.json['source_attachment']['file']`.
+
+**Round-trip.** При импорте bundle обратно `import_bundle` извлекает `source.<ext>` из ZIP, кладёт его в `<DATA_DIR>/source_documents/{id}/` через `source_documents.save_upload()` (пересчитывая checksum). PROV-O в data.ttl парсится `parse_regulation_turtle()` — URL/excerpt/checksum попадают в Regulation. Тест [test_source_document_round_trip](backend/tests/test_sigma_export.py) подтверждает: после export→delete→import файл на диске и хеш проходит verify.
+
+**Безопасность.** `source_documents.resolve_path()` проверяет что путь не вышел за DATA_DIR (защита от подсунутого `../../etc/passwd` в БД). При загрузке имя файла санитизируется до basename.
+
+**REST:** `POST /source-upload` · `GET /source-document` · `DELETE /source-document` · `GET /source-verify` ([backend/app/api/regulations.py](backend/app/api/regulations.py)). UI — секция «Документ-основание» в `RegulationEditorScreen.FormView` + badge «📎 источник прикреплён» в `RegulationList`.
+
+### 16.3.6 Round-trip обратно в RAGRAF (реализовано 2026-05-17)
 
 СИГМА ещё в разработке, поэтому правка регламентов остаётся в RAGRAF. Реализован полный круг RAGRAF → СИГМА → RAGRAF.
 

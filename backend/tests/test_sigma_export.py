@@ -179,6 +179,85 @@ async def test_every_seeded_regulation_has_validation_shape(store):
             assert "sh:property" in ttl
 
 
+async def test_source_document_round_trip(store, heat_reg, tmp_path):
+    """PROV-O attachment должен пережить export → import.
+
+    Сценарий: аналитик прикрепил PDF-приказ → выгрузил bundle → импортировал
+    обратно. Файл должен оказаться в `data/source_documents/{id}/`, URL +
+    цитата + checksum — в новой Regulation, PROV-O — в data.ttl.
+    """
+    from app.services import source_documents
+
+    # 1. Прикрепляем источник к регламенту
+    pdf_bytes = b"%PDF-1.4 fake pdf with regulation text..."
+    meta = source_documents.save_upload("heat-inlet-breach", "order-001-2023.pdf", pdf_bytes)
+    heat_reg.source_url = "https://disk.yandex.ru/i/abc123"
+    heat_reg.source_excerpt = "Давление в трубопроводе должно поддерживаться на уровне 20.5 атм."
+    heat_reg.source_file_path = meta["path"]
+    heat_reg.source_checksum = meta["checksum"]
+    heat_reg.source_mime_type = "application/pdf"
+    store.save(heat_reg)
+
+    # 2. Экспортируем bundle — должен содержать source.pdf + PROV-O в data.ttl
+    zip_bytes = await sigma_export.build_regulation_bundle("heat-inlet-breach")
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+        names = {i.filename for i in zf.infolist()}
+        assert "heat-inlet-breach/source.pdf" in names
+
+        manifest = json.loads(zf.read("heat-inlet-breach/manifest.json"))
+        assert manifest["source_attachment"]["url"] == "https://disk.yandex.ru/i/abc123"
+        assert manifest["source_attachment"]["checksum"].startswith("sha256:")
+        assert manifest["source_attachment"]["file"] == "heat-inlet-breach/source.pdf"
+
+        data_ttl = zf.read("heat-inlet-breach/data.ttl").decode()
+        # PROV-O сериализация (rdflib биндит prov: автоматически)
+        assert "wasDerivedFrom" in data_ttl
+        assert "disk.yandex.ru/i/abc123" in data_ttl
+        assert "Давление в трубопроводе" in data_ttl
+
+    # 3. Удаляем регламент и его source-папку — импорт должен восстановить
+    store.delete("heat-inlet-breach")
+    source_documents.delete_for_regulation("heat-inlet-breach")
+
+    report = await sigma_export.import_bundle(zip_bytes)
+    assert report["total_failed"] == 0
+
+    restored = store.get("heat-inlet-breach")
+    assert restored is not None
+    assert restored.source_url == "https://disk.yandex.ru/i/abc123"
+    assert "Давление в трубопроводе" in (restored.source_excerpt or "")
+    assert restored.source_checksum is not None and restored.source_checksum.startswith("sha256:")
+    # Файл должен быть на диске и проходить hash-verify
+    assert source_documents.verify_checksum(restored.source_file_path, restored.source_checksum)
+
+
+async def test_source_excerpt_only_without_file(store, heat_reg):
+    """Вариант когда есть только URL + цитата без локального файла.
+
+    Bundle не должен пытаться положить несуществующий файл, но PROV-O
+    в data.ttl и метадата в manifest должны быть.
+    """
+    heat_reg.source_url = "https://intranet.example/orders/001-2023.pdf"
+    heat_reg.source_excerpt = "Номинальный диаметр составляет 5.0 см."
+    # ни source_file_path ни source_checksum не заполнены
+    store.save(heat_reg)
+
+    zip_bytes = await sigma_export.build_regulation_bundle("heat-inlet-breach")
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+        names = {i.filename for i in zf.infolist()}
+        # source.<ext> отсутствует — это нормально
+        assert not any(n.endswith("/source.pdf") or n.endswith("/source.bin") for n in names)
+
+        manifest = json.loads(zf.read("heat-inlet-breach/manifest.json"))
+        assert manifest["source_attachment"]["url"] == "https://intranet.example/orders/001-2023.pdf"
+        assert manifest["source_attachment"]["file"] is None
+
+        data_ttl = zf.read("heat-inlet-breach/data.ttl").decode()
+        assert "wasDerivedFrom" in data_ttl
+        assert "intranet.example" in data_ttl
+        assert "Номинальный диаметр" in data_ttl
+
+
 async def test_bundle_export_uses_real_shapes_when_available(store, heat_reg, monkeypatch):
     """Если upstream/fixture отдаёт SHACL — он попадает в bundle as-is.
 
