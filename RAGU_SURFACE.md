@@ -110,6 +110,73 @@ kg.get_summaries([summary_ids])  # CommunitySummary[] (LLM-generated title+findi
 
 Если переключить `language` на лету — все следующие LLM-вызовы будут на другом языке.
 
+## 6. Рекомендованные модели в RAGU (что мы НЕ используем)
+
+В [README RAGU](external/RAGU/README.md) и [docs/ru/ragu_components.md](external/RAGU/docs/ru/ragu_components.md) приведены конкретные модели для всех слоёв пайплайна. Важно понимать что они там по дефолту, чтобы знать на что апгрейдиться при росте корпуса.
+
+### 6.1 Модели по умолчанию (cloud-LLM сценарий)
+
+```python
+llm = LLMOpenAI(client=client, model_name="mistralai/mistral-medium-3")
+embedder = EmbedderOpenAI(client=client, model_name="emb-qwen/qwen3-embedding-8b", dim=4096)
+```
+
+Альтернатива из русской документации:
+```python
+llm = LLMOpenAI(client=client, model_name="gpt-4o-mini")
+embedder = EmbedderOpenAI(client=client, model_name="text-embedding-3-large", dim=3072)
+```
+
+Обе конфигурации требуют **cloud API key** — не для локального запуска.
+
+### 6.2 RAGU-lm — специализированная модель для русского NER
+
+Самая интересная находка. У RAGU есть **собственная** дообученная модель: [RaguTeam/RAGU-lm](https://huggingface.co/RaguTeam/RAGU-lm).
+
+- **База**: Qwen-3-0.6B (всего 600M параметров — компактнее некуда)
+- **Fine-tuned на**: NEREL — русскоязычный датасет именованных сущностей (PERSON, ORGANIZATION, LOCATION, ...)
+- **Пайплайн**: 4 стадии через `RaguLmArtifactExtractor`:
+  1. Extract unnormalized entities from text
+  2. Normalize entities into canonical forms
+  3. Generate entity descriptions
+  4. Extract relations based on entity-pair inner products
+
+**Бенчмарк** (из README RAGU, на датасете NEREL):
+
+| Модель | F1 (Entities) | F1 (Relations) |
+|---|---|---|
+| Qwen-2.5-14B-Instruct | 0.32 | 0.69 |
+| **RAGU-lm (Qwen-3-0.6B)** | **0.6** | **0.71** |
+| Small-model pipeline | 0.74 | 0.75 |
+
+То есть **0.6B специализированная модель почти в 2× точнее по сущностям** чем универсальная 14B модель. Это контр-интуитивный результат и сильный аргумент: для NER на русском **дообученная маленькая модель бьёт большую общую**.
+
+**Запуск**: только через vLLM (Ollama не поддерживает этот формат напрямую):
+```bash
+sudo vllm serve RaguTeam/ragu-lm --max_model_len 4096
+```
+
+```python
+from ragu.triplet.ragu_lm_artifact_extractor import RaguLmArtifactExtractor
+llm = LLMOpenAI(client=client, model_name="RaguTeam/ragu-lm")
+pipeline = RaguLmArtifactExtractor(llm=llm)
+entities, relations = await pipeline.extract(chunks)
+```
+
+### 6.3 Почему RAGRAF не использует RAGU-lm (сейчас)
+
+1. **vLLM плохо на macOS** — нет нативной Metal-поддержки, нужен Linux-сервер с CUDA или Docker. Наш target — M-серия Mac локально.
+2. **Корпус 6-50 регламентов**, граф знаний строится из Turtle/DuckDB напрямую (subj-predicate-obj от руки в Constraint Editor). LLM-extraction не нужен — у нас уже есть структурированный источник.
+3. **RAGU-lm специализирован под NEREL-онтологию** (PERSON, ORG, LOC). Наши регламенты говорят о технических сущностях — давление, температура, регламент. Качество fine-tune'а на нашем домене неизвестно — нужен бенчмарк.
+
+### 6.4 Когда стоит апгрейдиться на RAGU-lm
+
+- **Корпус ≥50 регламентов** + хочется автоматически вытаскивать сущности из произвольных PDF/DOCX через `RaguLmArtifactExtractor`
+- **Появилась Linux-машина или GPU-сервер** где можно крутить vLLM
+- **Расширение онтологии** на технические сущности (нужен fine-tune RAGU-lm на нашем датасете — или замена на model, обученный под наш домен)
+
+Это Tier 3 фича — см. §«Графовая инспекция» в этом документе.
+
 ---
 
 # Что предлагаю встроить в UI

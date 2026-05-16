@@ -579,6 +579,21 @@ flowchart LR
 - Windows: `C:\Users\<user>\.ollama\models\`
 - Сменить путь: `export OLLAMA_MODELS=/custom/path` перед `ollama serve`
 
+### 7.2.1 Почему наш стэк отличается от рекомендованного в RAGU
+
+RAGU в своей [документации](external/RAGU/README.md) и [docs/ru/ragu_components.md](external/RAGU/docs/ru/ragu_components.md) рекомендует другой набор моделей. Сравнение:
+
+| Слой | RAGU рекомендует | RAGRAF использует | Обоснование выбора |
+|---|---|---|---|
+| **LLM (генерация)** | `mistralai/mistral-medium-3` (cloud) или `gpt-4o-mini` (cloud) | `qwen2.5:7b-instruct-q4_K_M` (Ollama, локально) | Mistral и GPT — закрытые cloud-API: требуют интернет, ключи, биллинг, данные уходят на чужой сервер. Для НГУ/ТЭЦ-кейса с конфиденциальными регламентами — неприемлемо. Локальная Ollama даёт сравнимое качество ответов на наших коротких русскоязычных Q&A. |
+| **Embedder** | `emb-qwen/qwen3-embedding-8b` (4096-d) или `text-embedding-3-large` (3072-d, cloud) | `bge-m3` (1024-d, Ollama) | Qwen3-embedding-8b не имеет нативной Ollama-сборки (нужен vLLM/transformers — heavy на macOS). bge-m3 поддерживает русский, multi-lingual, всего 1.2 ГБ, отлично индексирует короткие тексты регламентов. На 6 регламентах разница в качестве retrieval'а незаметна. |
+| **NER / Extraction** | **`RaguTeam/RAGU-lm`** (Qwen-3-0.6B, fine-tuned на NEREL, через vLLM) — даёт F1=0.6 по сущностям против 0.32 у Qwen-2.5-14B-Instruct | Не используется — наш `sandbox.chat` строит retrieval напрямую через bge-m3, без artifact extraction'а | RAGU-lm — лучший выбор для **строительства графа знаний** из больших корпусов. У нас 6 регламентов, граф собирается из Turtle/DuckDB напрямую (subj-predicate-obj от руки), LLM-extraction не нужен. **При росте корпуса до 50+ регламентов и при необходимости автоматически вытаскивать сущности из загруженных PDF/DOCX** — стоит интегрировать `RaguLmArtifactExtractor` (см. [RAGU_SURFACE.md](RAGU_SURFACE.md) Tier 3). vLLM на macOS работает плохо (нет Metal-поддержки), потребует Linux-машину или Docker. |
+| **Runtime** | vLLM (для local моделей) или cloud REST | Ollama 0.23+ | Ollama проще: brew install, фоновый сервис, native Metal на M-серии, готовые GGUF-биндинги. vLLM требует отдельной конфигурации, GPU/CUDA на Linux. На M2 Air alternative нет. |
+
+**Краткий итог**: RAGU оптимизирован под cloud-LLM (Mistral/GPT) или vLLM-сценарий с большими корпусами и автоматическим extraction'ом. RAGRAF — локально-first для M-серии Mac, малый корпус (6-50 регламентов), извлечение сущностей делается через RAGU-промпты (без RAGU-lm). При переходе к большим объёмам и необходимости NER из произвольных документов — апгрейд через RAGU-lm/vLLM на Linux-машине (backlog).
+
+См. также [RAGU_SURFACE.md](RAGU_SURFACE.md) — там разобран весь публичный API RAGU и какие куски мы используем / могли бы использовать.
+
 ### 7.3 EmbeddingIndex и batched rebuild
 
 `EmbeddingIndex` ([embedding_index.py](backend/app/services/embedding_index.py)) — in-memory кэш с сигнатурой ревалидации:
