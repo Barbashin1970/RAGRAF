@@ -449,6 +449,9 @@ async def chat(
     top_k: int = 4,
     temperature: float | None = None,
     max_tokens: int | None = None,
+    extra_system_prompt: str | None = None,
+    disabled_regulation_ids: list[str] | None = None,
+    num_ctx: int | None = None,
 ) -> dict[str, Any]:
     """Conversational Q&A: retrieval (mock TF-IDF) → LLM-grounded answer (Ollama).
 
@@ -468,9 +471,17 @@ async def chat(
 
     query = last_user["content"].strip()
 
+    # Набор регламентов, отключённых пользователем из левой панели «Регламенты».
+    # Они исключаются из retrieval'а — сценарий «отвечай только по документам» или
+    # «не лезь в этот домен». Запросим retrieval с запасом (top_k * 2 + len(disabled))
+    # чтобы после фильтрации осталось ≈top_k результатов.
+    disabled_set = {rid for rid in (disabled_regulation_ids or []) if isinstance(rid, str)}
+    retrieval_top_k = top_k + len(disabled_set)
+
     if not is_real_ragu_available():
         # Mock-режим — используем TF-IDF, embeddings требуют Ollama.
-        hits = semantic_search(query, top_k=top_k)
+        hits = semantic_search(query, top_k=retrieval_top_k)
+        hits = [h for h in hits if h.get("regulation_id") not in disabled_set][:top_k]
         return {"answer": _mock_chat_answer(query, hits), "sources": hits, "mode": "mock"}
 
     # Real-режим: семантический retrieval через bge-m3 embeddings. Это
@@ -479,10 +490,13 @@ async def chat(
     # вроде «при» / «и» / «в» которые TF-IDF матчит на каждом регламенте.
     try:
         from app.services.embedding_index import semantic_search_embeddings
-        hits = await semantic_search_embeddings(query, top_k=top_k)
+        hits = await semantic_search_embeddings(query, top_k=retrieval_top_k)
     except Exception:
         # Если embeddings отвалились (Ollama офлайн) — fallback на TF-IDF.
-        hits = semantic_search(query, top_k=top_k)
+        hits = semantic_search(query, top_k=retrieval_top_k)
+    # Фильтрация после retrieval'а: отсекаем регламенты, которые пользователь
+    # выключил, и ограничиваем до запрошенного top_k.
+    hits = [h for h in hits if h.get("regulation_id") not in disabled_set][:top_k]
 
     context = _build_regulation_context(hits) if hits else "(подходящих регламентов в базе не найдено)"
 
@@ -562,7 +576,21 @@ async def chat(
 
     # Усиленный промпт: явный антигаллюцинационный режим, структура, чёткий
     # анти-template отказ. Адаптируется под тип запроса.
-    system_prompt = f"""Ты — ассистент по техническим регламентам ВУЗа, ТЭЦ и городской инфраструктуры. Цель — БЫТЬ ПОЛЕЗНЫМ, цитируя реальные данные из базы, но не выдумывая.
+    #
+    # `extra_system_prompt` (пользовательская доп-инструкция из правой панели
+    # Студии) приклеивается отдельным секцией ВВЕРХУ — там она имеет наибольший
+    # приоритет в восприятии модели, но не вытесняет ни domain_hints, ни
+    # anti-hallucination правила, ни сам retrieval-контекст. Это «add-on», а не
+    # «replace» — иначе пользователь случайно может потерять регламенты в ответе.
+    user_persona_block = ""
+    if extra_system_prompt and extra_system_prompt.strip():
+        user_persona_block = (
+            "=== ПОЛЬЗОВАТЕЛЬСКАЯ ДОП-ИНСТРУКЦИЯ (стиль/тон/формат) ===\n"
+            f"{extra_system_prompt.strip()}\n"
+            "=== КОНЕЦ ДОП-ИНСТРУКЦИИ ===\n\n"
+        )
+
+    system_prompt = f"""{user_persona_block}Ты — ассистент по техническим регламентам ВУЗа, ТЭЦ и городской инфраструктуры. Цель — БЫТЬ ПОЛЕЗНЫМ, цитируя реальные данные из базы, но не выдумывая.
 
 ОБЩИЕ ПРАВИЛА:
 - Используй ТОЛЬКО предоставленные регламенты и документы аналитика. Не подмешивай данные из тренировки модели.
@@ -594,12 +622,21 @@ async def chat(
         # 600 токенов хватает на структурированный ответ из 3-5 пунктов.
         # Клиент может переопределить через UI-слайдеры — клампы уже валидированы
         # в API-схеме (sandbox.py ChatRequest).
-        resp = await client.chat.completions.create(
-            model=settings.ragu_llm_model,
-            messages=llm_messages,
-            max_tokens=max_tokens if max_tokens is not None else 600,
-            temperature=temperature if temperature is not None else 0.1,
-        )
+        #
+        # Ollama-specific опции (num_ctx — контекстное окно) пробрасываются
+        # через extra_body. OpenAI-совместимый эндпойнт Ollama принимает их
+        # в поле `options`. Если num_ctx не задан — Ollama возьмёт дефолт
+        # из Modelfile (обычно 2048-4096), что часто маловато для длинных
+        # документов.
+        create_kwargs: dict[str, Any] = {
+            "model": settings.ragu_llm_model,
+            "messages": llm_messages,
+            "max_tokens": max_tokens if max_tokens is not None else 600,
+            "temperature": temperature if temperature is not None else 0.1,
+        }
+        if num_ctx is not None:
+            create_kwargs["extra_body"] = {"options": {"num_ctx": num_ctx}}
+        resp = await client.chat.completions.create(**create_kwargs)
         answer = (resp.choices[0].message.content or "").strip()
         if not answer:
             answer = "(LLM вернула пустой ответ — попробуй переформулировать)"

@@ -30,11 +30,28 @@ class ChatRequest(BaseModel):
     серверные дефолты (0.1 и 600). Клампы здесь и есть линия защиты —
     клиенту не доверяем, потому что temperature > 1.5 даёт неконтролируемые
     бредовые ответы, а max_tokens > 4000 может на phi3 уронить контекст.
+
+    `extra_system_prompt` — пользовательская доп-инструкция (из правой панели
+    «Системный промпт» в Студии). Приклеивается к встроенному system-промпту,
+    не заменяет его — иначе LLM потеряет регламентный контекст и анти-галлюц
+    правила. Длина ограничена 4 КБ чтобы не раздувать prompt-eval.
     """
     messages: list[ChatMessage] = Field(..., min_length=1)
     top_k: int = Field(4, ge=1, le=10)
     temperature: float | None = Field(None, ge=0.0, le=1.5)
     max_tokens: int | None = Field(None, ge=50, le=4000)
+    extra_system_prompt: str | None = Field(None, max_length=4000)
+    # Регламенты, исключённые из retrieval'а для этого запроса (галки сняты в
+    # левой панели). Длина 0..200 чтобы не дать клиенту прислать монстр-список.
+    # Пустой список = всё включено (дефолтное поведение).
+    disabled_regulation_ids: list[str] = Field(default_factory=list, max_length=200)
+    # Размер контекстного окна Ollama (`num_ctx`). Управляет тем сколько
+    # токенов модель может «увидеть» — это вход + выход. По умолчанию None,
+    # Ollama берёт значение из Modelfile (обычно 2048-4096), что часто мало
+    # для длинных документов. Верхняя планка 32K — теоретически qwen2.5
+    # тянет 128K через rope-scaling, но на M2 Air это съест всю RAM и
+    # генерация превратится в часы.
+    num_ctx: int | None = Field(None, ge=512, le=32768)
 
 
 class ExtractRequest(BaseModel):
@@ -87,6 +104,9 @@ async def sandbox_chat(req: ChatRequest) -> dict[str, Any]:
         top_k=req.top_k,
         temperature=req.temperature,
         max_tokens=req.max_tokens,
+        extra_system_prompt=req.extra_system_prompt,
+        disabled_regulation_ids=req.disabled_regulation_ids,
+        num_ctx=req.num_ctx,
     )
 
 

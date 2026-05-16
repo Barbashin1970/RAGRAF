@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
@@ -23,7 +24,7 @@ import {
 } from 'lucide-react'
 import { api, type RaguConfig, type RaguPrompt } from '@/lib/api'
 import { cn } from '@/lib/cn'
-import { Badge, Button, PageBody, PageHeader, PageShell } from '@/components/ui'
+import { Badge, Button, PageShell } from '@/components/ui'
 
 /**
  * RAGU Studio — каталог системных промптов RAGU + debug-панель.
@@ -121,10 +122,18 @@ const VARIABLE_HINTS: Record<string, string> = {
   second_normalized_entity: 'Вторая сущность в паре (для ragu_lm_relation_description).',
 }
 
-export function RaguStudioScreen() {
+/**
+ * Контент RAGU Studio без обёртки PageShell/PageHeader — встраивается
+ * как 3-й таб внутри Студии аналитика. Standalone-маршрут /ragu редиректит
+ * в `/sandbox?tab=ragu` (см. App.tsx), так что fullscreen-вариант (RaguStudioScreen
+ * ниже) теперь не используется в роутах, но оставлен для возможной интеграции
+ * в другие места приложения.
+ */
+export function RaguStudioContent() {
   const [selected, setSelected] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [helpOpen, setHelpOpen] = useState(false)
+  const [whatIsOpen, setWhatIsOpen] = useState(false)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['ragu-prompts'],
@@ -158,39 +167,56 @@ export function RaguStudioScreen() {
   const overridesCount = prompts.filter((p) => p.has_override).length
 
   return (
-    <PageShell>
-      <PageHeader
-        icon={Sparkles}
-        tone="author"
-        title="RAGU Studio"
-        badges={
-          <>
-            <Badge tone="info" uppercase>Prompt Layer</Badge>
-            <Badge tone="neutral">graph_ragu 0.0.2</Badge>
-            {overridesCount > 0 && (
-              <span title={`У ${overridesCount} промптов есть твои переопределения. Они применяются на следующем /api/search.`}>
-                <Badge tone="warning">{overridesCount} overrides</Badge>
-              </span>
-            )}
-          </>
-        }
-        description="Системные промпты RAGU (extraction, search, summarization) и текущая конфигурация. Перепиши любой промпт без форка библиотеки — следующий /api/search применит твою версию."
-        actions={
+    <div className="flex h-full min-h-0 flex-1 flex-col">
+      {/* Toolbar секции RAGU Studio: бейджи + 3 info-кнопки в одной строке.
+          Раньше эти кнопки жили в шапке Студии аналитики — переехали сюда
+          вместе с RAGU Studio чтобы не зашумлять основной экран чата. */}
+      <div className="flex flex-wrap items-center gap-2 border-b border-stone-200 bg-white px-6 py-3">
+        <div className="flex items-center gap-1.5 text-sm font-semibold text-stone-800">
+          <Sparkles size={14} className="text-violet-600" /> RAGU Studio
+        </div>
+        <Badge tone="info" uppercase>Prompt Layer</Badge>
+        <Badge tone="neutral">graph_ragu 0.0.2</Badge>
+        {overridesCount > 0 && (
+          <span title={`У ${overridesCount} промптов есть твои переопределения. Они применяются на следующем /api/search.`}>
+            <Badge tone="warning">{overridesCount} overrides</Badge>
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-2">
+          <Button
+            variant="author"
+            size="sm"
+            icon={<BookOpen size={13} />}
+            onClick={() => setWhatIsOpen((v) => !v)}
+            aria-expanded={whatIsOpen}
+            title="Краткая справка: что такое RAGU и зачем она в связке с RAGRAF"
+          >
+            Что такое RAGU?
+          </Button>
+          <Link to="/sandbox/backlog" title="Бэклог: следующие RAGU-сценарии">
+            <Button variant="secondary" size="sm" icon={<Lightbulb size={13} className="text-amber-600" />}>
+              Бэклог демо
+            </Button>
+          </Link>
           <Button
             variant="secondary"
             size="sm"
-            icon={<HelpCircle size={14} />}
+            icon={<HelpCircle size={13} />}
             onClick={() => setHelpOpen(true)}
             title="Что это за экран и как им пользоваться"
           >
             Как это работает
           </Button>
-        }
-      />
+        </div>
+      </div>
+
+      {whatIsOpen && (
+        <WhatIsRaguPanel onClose={() => setWhatIsOpen(false)} />
+      )}
 
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
 
-      <PageBody>
+      <div className="min-h-0 flex-1 overflow-auto px-6 py-4">
         {config && <ConfigPanel config={config} />}
 
         {isLoading && (
@@ -274,8 +300,65 @@ export function RaguStudioScreen() {
             </section>
           </div>
         )}
-      </PageBody>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Standalone-страница RAGU Studio, обёрнутая в PageShell+PageHeader.
+ * Сейчас не используется в роутах (/ragu редиректит в /sandbox?tab=ragu),
+ * но оставлена как fallback на случай если понадобится отдельный полноэкранный
+ * вариант.
+ */
+export function RaguStudioScreen() {
+  return (
+    <PageShell>
+      <RaguStudioContent />
     </PageShell>
+  )
+}
+
+/**
+ * Раскрывающаяся плашка «Что такое RAGU?» — раньше жила в шапке Студии
+ * аналитики. Переехала в RAGU Studio как контекстная информация.
+ */
+function WhatIsRaguPanel({ onClose }: { onClose: () => void }) {
+  return (
+    <div className="border-b border-violet-200 bg-gradient-to-br from-violet-50/80 to-white px-6 py-3 text-xs text-stone-700">
+      <div className="mb-1 flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-violet-700">
+          <BookOpen size={12} /> RAGU + RAGRAF — что это и зачем
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={onClose}
+          aria-label="Скрыть справку"
+          className="h-6 w-6 p-0 text-violet-400 hover:text-violet-700"
+        >
+          <X size={12} />
+        </Button>
+      </div>
+      <p className="leading-relaxed">
+        <b>RAGU</b> — движок <i>GraphRAG</i>, который понимает технические тексты:
+        приказы, регламенты, СНиПы, ГОСТы. Из произвольного документа он вытаскивает
+        <b> параметры с диапазонами</b>, ищет похожие документы <b>по смыслу запроса</b>{' '}
+        (а не по совпадению слов), и связывает регламенты в <b>граф знаний</b> — где
+        видно, что один параметр живёт в нескольких регламентах разных ведомств.
+      </p>
+      <p className="mt-1.5 leading-relaxed">
+        <b>RAGRAF</b> — визуальный редактор и виз-карта поверх этих данных:
+        слайдеры, Rule DSL Flow, SHACL-ограничения, версионирование.
+      </p>
+      <div className="mt-2 border-t border-violet-100 pt-2 text-[11px] text-stone-500">
+        Полная версия с примерами и обоснованием — на{' '}
+        <Link to="/sandbox/backlog" className="font-medium text-violet-700 underline-offset-2 hover:underline">
+          странице бэклога
+        </Link>
+        .
+      </div>
+    </div>
   )
 }
 

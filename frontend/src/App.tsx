@@ -1,5 +1,5 @@
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { Activity, Beaker, BookOpen, ExternalLink, FileJson, ListTree, PlayCircle, Sparkles } from 'lucide-react'
+import { Activity, Beaker, BookOpen, ExternalLink, FileJson, ListTree, PlayCircle } from 'lucide-react'
 import { GraphView } from '@/components/graph/GraphView'
 import { RegulationList } from '@/components/regulations/RegulationList'
 import { RegulationEditorScreen } from '@/components/regulations/RegulationEditorScreen'
@@ -135,7 +135,9 @@ export default function App() {
           <NavLink to="/sandbox" icon={Beaker} label="Студия аналитика" />
           <NavLink to="/regulations" icon={ListTree} label="Регламенты" />
           <NavLink to="/graph" icon={Activity} label="Граф связей" />
-          <NavLink to="/ragu" icon={Sparkles} label="RAGU Studio" />
+          {/* RAGU Studio переехала внутрь Студии аналитика как 3-й таб
+              (см. SandboxScreen). Из шапки убрана чтобы навигация была
+              4-уровневой (3 экрана + roadmap), не превращалась в кашу. */}
           <ExecutionPlaceholder />
         </nav>
         <div className="ml-auto flex items-center gap-2">
@@ -156,7 +158,10 @@ export default function App() {
           <Route path="/graph" element={<GraphView />} />
           <Route path="/sandbox" element={<SandboxScreen />} />
           <Route path="/sandbox/backlog" element={<SandboxBacklog />} />
-          <Route path="/ragu" element={<RaguStudioScreen />} />
+          {/* Старый маршрут /ragu теперь редиректит в таб RAGU Studio
+              внутри Студии аналитика. Старые ссылки в коде/документации
+              не ломаются. */}
+          <Route path="/ragu" element={<Navigate to="/sandbox?tab=ragu" replace />} />
           <Route path="*" element={<div className="p-6 text-stone-500">Страница не найдена</div>} />
         </Routes>
       </main>

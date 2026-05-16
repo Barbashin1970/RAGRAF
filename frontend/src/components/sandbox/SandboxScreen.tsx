@@ -3,24 +3,23 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   Beaker,
-  BookOpen,
   Bot,
   Check,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   Circle,
   Cpu,
+  ExternalLink,
   FileSearch,
-  Lightbulb,
   Loader2,
   MessageSquare,
-  Network,
   PackagePlus,
+  Pencil,
   RotateCcw,
-  ScanText,
-  Search,
   Send,
   Settings2,
+  Sliders,
   Sparkles,
   User,
   Wand2,
@@ -31,12 +30,20 @@ import { api } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { DOMAIN_VISUALS, getDomainVisual } from '@/lib/domains'
 import { Badge, Button, PageBody, PageHeader, PageShell, Tabs, type TabDef } from '@/components/ui'
-import { DocumentsPanel } from './DocumentsPanel'
+import { RaguStudioContent } from '@/components/ragu/RaguStudioScreen'
+import { ContextPanel } from './ContextPanel'
+import {
+  BUILTIN_PRESETS,
+  createUserPreset,
+  loadUserPresets,
+  saveUserPresets,
+  type SystemPromptPreset,
+} from './systemPromptPresets'
 
-type Tab = 'search' | 'extract'
+type Tab = 'search' | 'extract' | 'ragu'
 
 function isTab(value: string | null): value is Tab {
-  return value === 'search' || value === 'extract'
+  return value === 'search' || value === 'extract' || value === 'ragu'
 }
 
 export function SandboxScreen() {
@@ -45,9 +52,6 @@ export function SandboxScreen() {
   const [searchParams, setSearchParams] = useSearchParams()
   const initialTab: Tab = isTab(searchParams.get('tab')) ? (searchParams.get('tab') as Tab) : 'search'
   const [tab, setTab] = useState<Tab>(initialTab)
-  // Подробная справка про RAGU+RAGRAF спрятана за кнопкой — раньше она «съедала»
-  // полстраницы поверх рабочего интерфейса.
-  const [showInfo, setShowInfo] = useState(false)
 
   // Если юзер кликает по табу — обновляем query string. Это даёт честный back-button
   // и копируемые ссылки. replace=true чтобы не засорять history стек переключениями.
@@ -62,248 +66,180 @@ export function SandboxScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
 
-  const { data: status } = useQuery({
-    queryKey: ['sandbox-status'],
-    queryFn: () => api.sandbox.status(),
-  })
-
   const tabs: TabDef<Tab>[] = [
     { id: 'search', label: 'Диалог с RAGU', icon: MessageSquare },
     { id: 'extract', label: 'Извлечь параметры', icon: Wand2 },
+    // RAGU Studio переехала в табы из верхней навигации — оба раздела про
+    // одну и ту же сущность («ИИ-помощник аналитика»), теперь они вместе.
+    { id: 'ragu', label: 'RAGU Studio', icon: Sparkles },
   ]
 
   return (
     <PageShell>
+      {/* Шапка стала компактной: длинное описание убрано в tooltip на title,
+          бейдж «RAGU подключён» снят (RAGU теперь дефолтный модуль), кнопки
+          «Что такое RAGU?» и «Бэклог демо» переехали внутрь таба RAGU Studio,
+          LLMStatusBar — в подвал правой панели чата. */}
       <PageHeader
         icon={Beaker}
         tone="author"
         title="Студия аналитика"
-        badges={
-          <>
-            {status?.mode === 'real' ? (
-              <Badge tone="success" dot>RAGU подключён</Badge>
-            ) : (
-              <Badge tone="warning">mock-режим</Badge>
-            )}
-            <Badge tone="author" uppercase>Author Layer</Badge>
-          </>
+        titleTooltip={
+          'ИИ-помощник для разбора документов (приказы, СНиПы, регламенты) и сборки ' +
+          'структурированных регламентов. Сами регламенты живут в разделе «Регламенты», ' +
+          'исполняются в будущем разделе «Исполнение» (runtime, без ИИ — детерминированно по датчикам).'
         }
-        description={
-          <>
-            ИИ-помощник для разбора документов (приказы, СНиПы, регламенты) и сборки
-            структурированных регламентов. Сами регламенты живут в разделе{' '}
-            <Link to="/regulations" className="font-medium text-stone-700 underline-offset-2 hover:underline">
-              «Регламенты»
-            </Link>
-            , исполняются в будущем разделе «Исполнение» (runtime, без ИИ —
-            детерминированно по датчикам).
-            {status?.mode === 'mock' && (
-              <>
-                {' '}Сейчас <b>mock-режим</b> (без LLM-ключей и внешних сервисов) —
-                см. справку справа про переключение на настоящий RAGU.
-              </>
-            )}
-          </>
-        }
-        actions={
-          <div className="hidden items-center gap-2 sm:flex">
-            <Button
-              variant="author"
-              icon={<BookOpen size={14} />}
-              iconRight={
-                <ChevronDown
-                  size={14}
-                  className={cn('transition-transform', showInfo && 'rotate-180')}
-                />
-              }
-              onClick={() => setShowInfo((v) => !v)}
-              aria-expanded={showInfo}
-              title="Краткая справка: что такое RAGU и зачем она в связке с RAGRAF"
-              className={cn(!showInfo && 'bg-violet-500')}
-            >
-              {showInfo ? 'Скрыть' : 'Что такое RAGU?'}
-            </Button>
-            <Link to="/sandbox/backlog" title="Бэклог: следующие RAGU-сценарии">
-              <Button
-                variant="secondary"
-                icon={<Lightbulb size={14} className="text-amber-600" />}
-                iconRight={<ChevronRight size={14} className="text-stone-400" />}
-              >
-                Бэклог демо
-              </Button>
-            </Link>
-          </div>
-        }
+        badges={<Badge tone="author" uppercase>Author Layer</Badge>}
       >
-        {/* Info-блок: появляется только по клику «Что такое RAGU?» — компактная
-            выжимка, полная версия живёт на странице бэклога. */}
-        {showInfo && (
-          <div className="mt-3 rounded-md border border-violet-200 bg-gradient-to-br from-violet-50/80 to-white p-3 text-xs text-stone-700 shadow-sm">
-            <div className="mb-1 flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-violet-700">
-                <BookOpen size={12} /> RAGU + RAGRAF — что это и зачем
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => setShowInfo(false)}
-                aria-label="Скрыть справку"
-                className="h-6 w-6 p-0 text-violet-400 hover:text-violet-700"
-              >
-                <X size={12} />
-              </Button>
-            </div>
-            <p className="leading-relaxed">
-              <b>RAGU</b> — движок <i>GraphRAG</i>, который понимает технические тексты:
-              приказы, регламенты, СНиПы, ГОСТы. Из произвольного документа он вытаскивает
-              <b> параметры с диапазонами</b>, ищет похожие документы <b>по смыслу запроса</b>{' '}
-              (а не по совпадению слов), и связывает регламенты в <b>граф знаний</b> — где
-              видно, что один параметр (скажем <code className="rounded bg-stone-100 px-1">temperature</code>)
-              живёт в 4 регламентах разных ведомств.
-            </p>
-            <p className="mt-1.5 leading-relaxed">
-              <b>RAGRAF</b> — визуальный редактор и виз-карта поверх этих данных: слайдеры,
-              Rule DSL Flow, SHACL-ограничения, версионирование. В связке получается переход{' '}
-              <b>«текст → структурированные данные → калибровка → проверка»</b>:
-              новый приказ разбирается за минуты, противоречия видны на графе, ответ на
-              «что делать если давление упало?» приходит из всей базы, а не из одного документа.
-            </p>
-            <ul className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
-              <li className="flex items-start gap-1.5">
-                <ScanText size={11} className="mt-0.5 shrink-0 text-violet-600" />
-                <span><b>Разбор за минуты:</b> extractor из приказа предлагает 5-10 параметров с уставками и допусками — не нужно вбивать руками.</span>
-              </li>
-              <li className="flex items-start gap-1.5">
-                <Search size={11} className="mt-0.5 shrink-0 text-violet-600" />
-                <span><b>Поиск по смыслу:</b> «куда звонить при пожаре в серверной?» находит регламент даже без слова «пожар» в тексте.</span>
-              </li>
-              <li className="flex items-start gap-1.5">
-                <Network size={11} className="mt-0.5 shrink-0 text-violet-600" />
-                <span><b>Связи между документами:</b> унификация регуляторной базы, поиск противоречий, кросс-доменные параметры.</span>
-              </li>
-            </ul>
-            <div className="mt-2 border-t border-violet-100 pt-2 text-[11px] text-stone-500">
-              Полная версия с примерами и обоснованием — на{' '}
-              <Link to="/sandbox/backlog" className="font-medium text-violet-700 underline-offset-2 hover:underline">
-                странице бэклога
-              </Link>
-              .
-            </div>
-          </div>
-        )}
-
-        <LLMStatusBar />
-
-        <div className="mt-4">
+        <div className="mt-3">
           <Tabs tabs={tabs} active={tab} onChange={setTab} tone="author" />
         </div>
       </PageHeader>
 
-      {tab === 'search' ? (
-        // NotebookLM-style: левая колонка с источниками + центр с чатом.
-        // Только для диалога — на вкладке «Извлечь параметры» документы не нужны.
-        <div className="flex min-h-0 flex-1">
-          <DocumentsPanel />
-          <PageBody>
-            <SearchDemo />
-          </PageBody>
-        </div>
-      ) : (
+      {tab === 'search' && (
+        // LM-Studio-style: 3 колонки внутри вкладки «Диалог».
+        //   ▸ Слева — таб'ы «Документы | Регламенты» (ContextPanel).
+        //   ▸ Центр — чат-история + поле ввода прижато к низу.
+        //   ▸ Справа — collapsible sections: системный промпт + пресеты,
+        //              параметры генерации, RAGU-overrides.
+        // SearchDemo рисует и центр, и правую панель, и оборачивает левую —
+        // потому что disabled-список регламентов держит он как per-chat state.
+        <SearchDemo />
+      )}
+      {tab === 'extract' && (
         <PageBody>
           <ExtractDemo />
         </PageBody>
       )}
+      {tab === 'ragu' && <RaguStudioContent />}
     </PageShell>
   )
 }
 
 // TabButton удалён — замещён `<Tabs>` из @/components/ui (DESIGN_SYSTEM.md §2).
 
-// ── LLM Status Bar ─────────────────────────────────────────────────────
+// ── LLM Status: footer для развёрнутой панели + dot для свёрнутой ─────
 //
-// Короткая полоска с самыми важными фактами про работающий LLM-стек:
-// какая модель, достижима ли Ollama, сколько регламентов проиндексировано.
-// Тёмная side — в шапке Песочницы постоянно на виду; обеспечивает доверие
-// «я знаю что под капотом, ничего не отправляется наружу».
+// Раньше LLMStatusBar занимал полоску в шапке Студии. Теперь:
+//   • Полная информация (модель / embed / индекс) — в подвале правой панели,
+//     когда она развёрнута.
+//   • Когда панель свёрнута — узкая полоска показывает только точку-индикатор:
+//     🟢 загружено в RAM • 🟡 на связи но не в RAM • 🔴 Ollama не отвечает.
+// Поллинг раз в 10 сек — реагируем на загрузку/выгрузку модели в Ollama.
 
-function LLMStatusBar() {
-  const { data, isError } = useQuery({
+function useLLMStatus() {
+  return useQuery({
     queryKey: ['sandbox-llm-info'],
     queryFn: () => api.sandbox.llmInfo(),
-    // Поллим раз в 10 сек чтобы реагировать на загрузку модели в RAM,
-    // ручное переключение модели в .env, разрыв связи с Ollama.
     refetchInterval: 10_000,
   })
+}
 
+type LLMStatusTone = 'ok' | 'warm' | 'cold' | 'mock' | 'unknown'
+
+function llmStatusTone(data: ReturnType<typeof useLLMStatus>['data']): LLMStatusTone {
+  if (!data) return 'unknown'
+  if (data.mode === 'mock') return 'mock'
+  if (!data.llm_reachable) return 'cold'
+  return data.llm_loaded_in_memory ? 'ok' : 'warm'
+}
+
+const TONE_DOT: Record<LLMStatusTone, string> = {
+  ok: 'text-emerald-500',
+  warm: 'text-amber-500',
+  cold: 'text-rose-500',
+  mock: 'text-amber-500',
+  unknown: 'text-stone-300',
+}
+
+function llmStatusLabel(tone: LLMStatusTone): string {
+  switch (tone) {
+    case 'ok':
+      return 'LLM на связи и загружена в RAM — следующий запрос будет быстрым.'
+    case 'warm':
+      return 'Ollama на связи, но модель не в памяти — первый запрос будет медленным.'
+    case 'cold':
+      return 'Ollama не отвечает. Проверь что сервис запущен на base_url.'
+    case 'mock':
+      return 'Mock-режим: без LLM, retrieval по TF-IDF. Включи RAGU_ENABLED=true для реальной LLM.'
+    case 'unknown':
+      return 'Состояние LLM ещё не получено.'
+  }
+}
+
+/** Компактный индикатор для свёрнутой правой панели (одна точка + tooltip). */
+function LLMStatusDot() {
+  const { data } = useLLMStatus()
+  const tone = llmStatusTone(data)
+  return (
+    <div className="flex items-center justify-center px-1 py-1.5" title={llmStatusLabel(tone)}>
+      <Circle size={10} className={cn('fill-current', TONE_DOT[tone])} />
+    </div>
+  )
+}
+
+/** Подвал развёрнутой панели с полной инфой про LLM. */
+function LLMStatusFooter() {
+  const { data, isError } = useLLMStatus()
   if (isError || !data) return null
 
-  // В mock-режиме показываем кратко: «нет LLM, всё локально».
+  const tone = llmStatusTone(data)
   if (data.mode === 'mock') {
     return (
-      <div className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-md border border-amber-200 bg-amber-50/60 px-2.5 py-1.5 text-[11px] text-amber-900">
-        <Cpu size={12} className="text-amber-600" />
-        <span><b>Mock-режим</b>: TF-IDF без LLM, ключи и сети не нужны</span>
-        <span className="text-amber-700/60">·</span>
-        <span>индекс: {data.index_size > 0 ? `${data.index_size} рег.` : 'не построен'}</span>
+      <div className="border-t border-stone-200 bg-amber-50/40 px-3 py-2 text-[10px] text-amber-900">
+        <div className="flex items-center gap-1.5">
+          <Circle size={8} className={cn('fill-current', TONE_DOT[tone])} />
+          <span><b>Mock-режим</b> — без LLM, TF-IDF поиск</span>
+        </div>
+        <div className="mt-0.5 text-amber-700">
+          Индекс: {data.index_size > 0 ? `${data.index_size} рег.` : 'не построен'}
+        </div>
       </div>
     )
   }
 
-  const reachable = data.llm_reachable
-  const loaded = data.llm_loaded_in_memory
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-stone-200 bg-white px-3 py-1.5 text-[11px] text-stone-700">
-      {/* Ollama reachability */}
-      <span className="inline-flex items-center gap-1">
-        <Circle
-          size={8}
-          className={cn(
-            'fill-current',
-            reachable ? 'text-emerald-500' : 'text-rose-500',
+    <div
+      className="border-t border-stone-200 bg-white px-3 py-2 text-[10px] text-stone-700"
+      title={llmStatusLabel(tone)}
+    >
+      <div className="mb-1 flex items-center gap-1.5">
+        <Circle size={8} className={cn('fill-current', TONE_DOT[tone])} />
+        <span className="font-semibold text-stone-800">
+          Ollama:{' '}
+          <span className={tone === 'cold' ? 'text-rose-700' : 'text-emerald-700'}>
+            {data.llm_reachable ? 'на связи' : 'не отвечает'}
+          </span>
+        </span>
+        {data.llm_loaded_in_memory && (
+          <Zap size={10} className="text-amber-500" aria-label="в памяти" />
+        )}
+      </div>
+      <div className="grid grid-cols-1 gap-x-2 gap-y-0.5 leading-tight">
+        <div className="flex items-center gap-1.5">
+          <Cpu size={9} className="text-violet-500" />
+          <span className="text-stone-500">LLM:</span>
+          <code className="truncate rounded bg-violet-50 px-1 font-mono text-[9px] text-violet-800">
+            {data.llm_model}
+          </code>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-stone-500">Embed:</span>
+          <code className="truncate rounded bg-stone-100 px-1 font-mono text-[9px] text-stone-700">
+            {data.embed_model}
+          </code>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-stone-500">Индекс:</span>
+          <b className="text-stone-800">{data.index_size}</b>
+          <span className="text-stone-500">рег.</span>
+          {data.index_size > 0 && !data.index_fresh && (
+            <span title="индекс устарел — пересоберётся при следующем запросе">
+              <RotateCcw size={9} className="text-amber-500" />
+            </span>
           )}
-        />
-        <span className="text-stone-500">Ollama:</span>
-        <b className={reachable ? 'text-emerald-700' : 'text-rose-700'}>
-          {reachable ? 'на связи' : 'не отвечает'}
-        </b>
-      </span>
-      <span className="text-stone-300">·</span>
-
-      {/* LLM модель */}
-      <span className="inline-flex items-center gap-1" title="LLM модель в Ollama">
-        <Cpu size={11} className="text-violet-500" />
-        <span className="text-stone-500">LLM:</span>
-        <code className="rounded bg-violet-50 px-1 font-mono text-[10px] text-violet-800">
-          {data.llm_model}
-        </code>
-        {loaded && (
-          <span title="модель уже загружена в RAM — следующий запрос будет быстрым">
-            <Zap size={10} className="text-amber-500" />
-          </span>
-        )}
-      </span>
-      <span className="text-stone-300">·</span>
-
-      {/* Embedding модель */}
-      <span className="inline-flex items-center gap-1" title="Embedding модель для retrieval">
-        <span className="text-stone-500">Embed:</span>
-        <code className="rounded bg-stone-100 px-1 font-mono text-[10px] text-stone-700">
-          {data.embed_model}
-        </code>
-      </span>
-      <span className="text-stone-300">·</span>
-
-      {/* Index size */}
-      <span className="inline-flex items-center gap-1" title="Сколько регламентов проиндексировано">
-        <span className="text-stone-500">Индекс:</span>
-        <b className="text-stone-800">{data.index_size}</b>
-        <span className="text-stone-500">рег.</span>
-        {data.index_size > 0 && !data.index_fresh && (
-          <span title="индекс устарел — пересоберётся при следующем запросе">
-            <RotateCcw size={10} className="text-amber-500" />
-          </span>
-        )}
-      </span>
+        </div>
+      </div>
     </div>
   )
 }
@@ -333,22 +269,79 @@ type ChatTurn = {
   mode?: 'mock' | 'real'
 }
 
+// Дефолты LLM-параметров — те же что использует бэк когда клиент не передаёт.
+// Заведены в константу, чтобы и слайдеры и кнопка «Сбросить» брали из одного места.
+const DEFAULT_TEMPERATURE = 0.1
+const DEFAULT_TOP_K = 4
+const DEFAULT_MAX_TOKENS = 600
+// Дефолт контекстного окна. Ollama сама по себе использует 2048-4096 — этого
+// мало даже для нескольких регламентов + истории. 8192 — sweet spot:
+// влезает 5-6 регламентов + chat history + ответ, RAM-нагрузка ещё разумная.
+// Для длинных документов поднять до 16384/24576 вручную.
+const DEFAULT_NUM_CTX = 8192
+
 function SearchDemo() {
-  // ChatDemo: переименован остался — роутится из тaba 'search'. Внутри полный
-  // chat с историей: каждый user-турн → API возвращает answer+sources; в UI
-  // показываем как пузырьки, под ответом ассистента — карточки источников.
+  // Чат живёт в LM-Studio-style layout'е:
+  //   • Лента сообщений растягивается на весь центр и скроллится сама.
+  //   • Поле ввода прижато к низу (sticky-style — обычный flex column tail).
+  //   • Справа — панель настроек: системный промпт + параметры генерации.
+  // История держится в памяти — follow-up'ы работают между турнами.
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [input, setInput] = useState('')
-  const [showSettings, setShowSettings] = useState(false)
-  // Параметры генерации. null = «использовать дефолт сервера»; число = override.
-  const [temperature, setTemperature] = useState<number>(0.1)
-  const [topK, setTopK] = useState<number>(4)
-  const [maxTokens, setMaxTokens] = useState<number>(600)
+  // Параметры генерации.
+  const [temperature, setTemperature] = useState<number>(DEFAULT_TEMPERATURE)
+  const [topK, setTopK] = useState<number>(DEFAULT_TOP_K)
+  const [maxTokens, setMaxTokens] = useState<number>(DEFAULT_MAX_TOKENS)
+  const [numCtx, setNumCtx] = useState<number>(DEFAULT_NUM_CTX)
+  // Доп-инструкция «стиль/тон/формат» — приклеивается к встроенному
+  // system-промпту на бэке. Не заменяет анти-галлюц правила, только добавляет.
+  const [extraSystemPrompt, setExtraSystemPrompt] = useState<string>('')
+  // Регламенты, ИСКЛЮЧЁННЫЕ из retrieval'а для этого чата. Set-семантика:
+  // обычный сценарий — пустой (все включены, дефолтное поведение).
+  // Live state, без persistence — на каждый новый чат начинается с нуля.
+  const [disabledRegulationIds, setDisabledRegulationIds] = useState<Set<string>>(() => new Set())
+  // Активный пресет (id). null = «свой текст» / не выбран. Не персистится —
+  // пресеты применяются по клику, дальше пользователь может править руками.
+  const [activePresetId, setActivePresetId] = useState<string | null>('default')
+  const [userPresets, setUserPresets] = useState<SystemPromptPreset[]>(() => loadUserPresets())
+  // Список всех регламентов нужен для эффекта «снять все галки» при выборе
+  // пресета «Резюме документа». Берём из react-query кэша, чтобы не дублить.
+  const { data: regsRaw } = useQuery({
+    queryKey: ['datasets'],
+    queryFn: () => api.datasets.list(),
+  })
+  const allRegulationIds = useMemo<string[]>(() => {
+    if (!regsRaw) return []
+    const arr: unknown[] = Array.isArray(regsRaw)
+      ? regsRaw
+      : 'items' in regsRaw && Array.isArray(regsRaw.items)
+        ? regsRaw.items
+        : []
+    const ids: string[] = []
+    for (const d of arr) {
+      if (typeof d === 'string') ids.push(d)
+      else if (d && typeof d === 'object') {
+        const o = d as Record<string, unknown>
+        const id = (o.id ?? o.source_id ?? o.dataset_id) as string | undefined
+        if (typeof id === 'string') ids.push(id)
+      }
+    }
+    return ids
+  }, [regsRaw])
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   const chat = useMutation({
     mutationFn: (history: Array<{ role: 'user' | 'assistant'; content: string }>) =>
-      api.sandbox.chat(history, { top_k: topK, temperature, max_tokens: maxTokens }),
+      api.sandbox.chat(history, {
+        top_k: topK,
+        temperature,
+        max_tokens: maxTokens,
+        num_ctx: numCtx,
+        extra_system_prompt: extraSystemPrompt.trim() || undefined,
+        disabled_regulation_ids: disabledRegulationIds.size > 0
+          ? Array.from(disabledRegulationIds)
+          : undefined,
+      }),
     onSuccess: (data) => {
       setTurns((t) => [
         ...t,
@@ -391,167 +384,592 @@ function SearchDemo() {
     chat.reset()
   }
 
+  // Признаки «настройки кастомизированы» — для индикаторов-точек в заголовках
+  // секций справа (как в LM-Studio: точка = есть несохранённое/нестандартное).
+  const customSystemPrompt = extraSystemPrompt.trim().length > 0
+  const customGenParams =
+    temperature !== DEFAULT_TEMPERATURE ||
+    topK !== DEFAULT_TOP_K ||
+    maxTokens !== DEFAULT_MAX_TOKENS ||
+    numCtx !== DEFAULT_NUM_CTX
+
+  // Helper'ы для регламентов — переданы в ContextPanel/RegulationsPanel.
+  const toggleRegulation = (id: string, nextDisabled: boolean) => {
+    setDisabledRegulationIds((prev) => {
+      const next = new Set(prev)
+      if (nextDisabled) next.add(id)
+      else next.delete(id)
+      return next
+    })
+    // Ручное переключение «отвязывает» пресет — иначе индикатор соврёт.
+    setActivePresetId(null)
+  }
+  const setManyRegulations = (ids: string[], disabled: boolean) => {
+    setDisabledRegulationIds((prev) => {
+      const next = new Set(prev)
+      for (const id of ids) {
+        if (disabled) next.add(id)
+        else next.delete(id)
+      }
+      return next
+    })
+    setActivePresetId(null)
+  }
+
+  const applyPreset = (preset: SystemPromptPreset) => {
+    setExtraSystemPrompt(preset.template)
+    setActivePresetId(preset.id)
+    const fx = preset.effects
+    if (fx?.disable_all_regulations && allRegulationIds.length > 0) {
+      setDisabledRegulationIds(new Set(allRegulationIds))
+    } else if (preset.id === 'default') {
+      // «Стандарт» — возвращаем включёнными ВСЕ регламенты.
+      setDisabledRegulationIds(new Set())
+    }
+    if (fx?.temperature !== undefined) setTemperature(fx.temperature)
+    if (fx?.max_tokens !== undefined) setMaxTokens(fx.max_tokens)
+    if (fx?.num_ctx !== undefined) setNumCtx(fx.num_ctx)
+  }
+
+  const saveCurrentAsPreset = (label: string) => {
+    const preset = createUserPreset(label, extraSystemPrompt)
+    const next = [...userPresets, preset]
+    setUserPresets(next)
+    saveUserPresets(next)
+    setActivePresetId(preset.id)
+  }
+
+  const deleteUserPreset = (id: string) => {
+    const next = userPresets.filter((p) => p.id !== id)
+    setUserPresets(next)
+    saveUserPresets(next)
+    if (activePresetId === id) setActivePresetId(null)
+  }
+
   return (
-    <div className="mx-auto flex h-full max-w-3xl flex-col">
-      <div className="mb-3 rounded-md border border-blue-100 bg-blue-50/40 px-4 py-3 text-xs text-blue-900">
-        Диалог с RAGU поверх корпуса регламентов. Каждый вопрос → семантический retrieval
-        через embedding-модель (cosine similarity на bge-m3) → ответ от локальной LLM
-        с опорой ТОЛЬКО на найденные документы. История разговора держится в памяти —
-        follow-up'ы вроде «а ночью?» после «куда звонить при пожаре?» работают.
-        Конкретная модель и состояние стека — в полоске под заголовком; параметры
-        генерации (temperature, top-k, лимит длины) — за шестерёнкой справа от «Отправить».
-      </div>
-
-      {/* Лента сообщений */}
-      <div
-        ref={scrollRef}
-        className="min-h-[300px] flex-1 space-y-3 overflow-y-auto rounded-md border border-stone-200 bg-stone-50/40 p-4"
-      >
-        {turns.length === 0 && !chat.isPending && (
-          <EmptyChatHint onPick={send} examples={CHAT_EXAMPLES} />
-        )}
-        {turns.map((t, i) => (
-          <ChatBubble key={i} turn={t} />
-        ))}
-        {chat.isPending && <TypingIndicator />}
-      </div>
-
-      {/* Панель параметров генерации — свернута по умолчанию.
-          Не загромождает основной поток, но всегда доступна одним кликом. */}
-      {showSettings && (
-        <ChatSettings
-          temperature={temperature}
-          topK={topK}
-          maxTokens={maxTokens}
-          onChange={(p) => {
-            if (p.temperature !== undefined) setTemperature(p.temperature)
-            if (p.topK !== undefined) setTopK(p.topK)
-            if (p.maxTokens !== undefined) setMaxTokens(p.maxTokens)
-          }}
-          onReset={() => {
-            setTemperature(0.1)
-            setTopK(4)
-            setMaxTokens(600)
-          }}
-        />
-      )}
-
-      {/* Input bar */}
-      <div className="mt-3 flex items-end gap-2">
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            // Enter без Shift = отправить; Shift+Enter = перенос строки.
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              send()
-            }
-          }}
-          rows={1}
-          placeholder={chat.isPending ? 'Жду ответ от LLM…' : 'Задай вопрос про регламенты (Enter — отправить, Shift+Enter — перенос строки)'}
-          disabled={chat.isPending}
-          className="min-h-[42px] max-h-32 flex-1 resize-none rounded-md border border-stone-200 bg-white px-3 py-2 text-sm focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300 disabled:opacity-60"
-        />
-        <Button
-          variant="author"
-          icon={chat.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-          onClick={() => send()}
-          disabled={!input.trim() || chat.isPending}
+    <div className="flex min-h-0 flex-1">
+      {/* Левая колонка: документы + регламенты как табы */}
+      <ContextPanel
+        disabledRegulationIds={disabledRegulationIds}
+        onToggleRegulation={toggleRegulation}
+        onSetManyRegulations={setManyRegulations}
+      />
+      {/* Центр: чат */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Лента сообщений — flex-1, скроллится сама.
+            Поле ввода ниже прижато к низу (классика всех чатов). */}
+        <div
+          ref={scrollRef}
+          className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-stone-50/30 px-4 py-4"
         >
-          Отправить
-        </Button>
-        <Button
-          variant={showSettings ? 'secondary' : 'ghost'}
-          icon={<Settings2 size={14} />}
-          onClick={() => setShowSettings((v) => !v)}
-          aria-expanded={showSettings}
-          title={showSettings ? 'Скрыть параметры' : 'Параметры генерации (temperature, top-k, max-tokens)'}
-          className={cn(showSettings && 'border-violet-300 bg-violet-50 text-violet-700')}
-        >
-          <span className="sr-only">Параметры</span>
-        </Button>
-        {turns.length > 0 && (
-          <Button
-            variant="ghost"
-            icon={<RotateCcw size={14} />}
-            onClick={reset}
-            disabled={chat.isPending}
-            title="Очистить разговор"
-          >
-            <span className="sr-only">Очистить</span>
-          </Button>
-        )}
+          {turns.length === 0 && !chat.isPending && (
+            <EmptyChatHint onPick={send} examples={CHAT_EXAMPLES} />
+          )}
+          {turns.map((t, i) => (
+            <ChatBubble key={i} turn={t} />
+          ))}
+          {chat.isPending && <TypingIndicator />}
+        </div>
+
+        {/* Input bar — прижат к низу центральной колонки */}
+        <div className="border-t border-stone-200 bg-white px-4 py-3">
+          <div className="flex items-end gap-2">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                // Enter без Shift = отправить; Shift+Enter = перенос строки.
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  send()
+                }
+              }}
+              rows={1}
+              placeholder={
+                chat.isPending
+                  ? 'Жду ответ от LLM…'
+                  : 'Задай вопрос про регламенты (Enter — отправить, Shift+Enter — перенос строки)'
+              }
+              disabled={chat.isPending}
+              className="min-h-[42px] max-h-32 flex-1 resize-none rounded-md border border-stone-200 bg-white px-3 py-2 text-sm focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300 disabled:opacity-60"
+            />
+            <Button
+              variant="author"
+              icon={chat.isPending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+              onClick={() => send()}
+              disabled={!input.trim() || chat.isPending}
+            >
+              Отправить
+            </Button>
+            {turns.length > 0 && (
+              <Button
+                variant="ghost"
+                icon={<RotateCcw size={14} />}
+                onClick={reset}
+                disabled={chat.isPending}
+                title="Очистить разговор"
+              >
+                <span className="sr-only">Очистить</span>
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Правая панель: настройки LLM — LM-Studio-style accordion */}
+      <ChatSettingsPanel
+        extraSystemPrompt={extraSystemPrompt}
+        onExtraSystemPromptChange={(v) => {
+          setExtraSystemPrompt(v)
+          // Ручное редактирование отвязывает пресет — это уже «свой текст».
+          if (activePresetId) setActivePresetId(null)
+        }}
+        customSystemPrompt={customSystemPrompt}
+        temperature={temperature}
+        topK={topK}
+        maxTokens={maxTokens}
+        numCtx={numCtx}
+        customGenParams={customGenParams}
+        onParamsChange={(p) => {
+          if (p.temperature !== undefined) setTemperature(p.temperature)
+          if (p.topK !== undefined) setTopK(p.topK)
+          if (p.maxTokens !== undefined) setMaxTokens(p.maxTokens)
+          if (p.numCtx !== undefined) setNumCtx(p.numCtx)
+          setActivePresetId(null)
+        }}
+        onResetParams={() => {
+          setTemperature(DEFAULT_TEMPERATURE)
+          setTopK(DEFAULT_TOP_K)
+          setMaxTokens(DEFAULT_MAX_TOKENS)
+          setNumCtx(DEFAULT_NUM_CTX)
+        }}
+        presets={[...BUILTIN_PRESETS, ...userPresets]}
+        activePresetId={activePresetId}
+        onApplyPreset={applyPreset}
+        onSaveAsPreset={saveCurrentAsPreset}
+        onDeletePreset={deleteUserPreset}
+      />
     </div>
   )
 }
 
-function ChatSettings({
+// ── LM-Studio-style правый сайдбар настроек чата ─────────────────────────
+//
+// Секции (как в скриншоте LM-Studio):
+//   1. Системный промпт — доп-инструкция «стиль/тон/формат». Приклеивается к
+//      встроенному промпту на бэке, не заменяет анти-галлюц-правила.
+//   2. Параметры генерации — temperature / top-k / max-tokens. Те же что и
+//      раньше под кнопкой ⚙, только теперь раскрываются в боковой панели.
+//   3. RAGU System Prompts — quick-link на RAGU Studio для тех кто хочет
+//      менять не свой ad-hoc промпт, а сам RAGU-уровень.
+//
+// Дизайн: <details> + <summary> для аккордеона (нативно, без зависимостей,
+// каждая секция запоминает своё open/close state).
+
+const COLLAPSE_STORAGE_KEY = 'ragraf:sandbox:right-panel-collapsed'
+
+function loadCollapsed(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(COLLAPSE_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function saveCollapsed(value: boolean): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(COLLAPSE_STORAGE_KEY, value ? '1' : '0')
+  } catch {
+    // ignore — private mode / quota
+  }
+}
+
+function ChatSettingsPanel({
+  extraSystemPrompt,
+  onExtraSystemPromptChange,
+  customSystemPrompt,
   temperature,
   topK,
   maxTokens,
-  onChange,
-  onReset,
+  numCtx,
+  customGenParams,
+  onParamsChange,
+  onResetParams,
+  presets,
+  activePresetId,
+  onApplyPreset,
+  onSaveAsPreset,
+  onDeletePreset,
 }: {
+  extraSystemPrompt: string
+  onExtraSystemPromptChange: (s: string) => void
+  customSystemPrompt: boolean
   temperature: number
   topK: number
   maxTokens: number
-  onChange: (p: { temperature?: number; topK?: number; maxTokens?: number }) => void
-  onReset: () => void
+  numCtx: number
+  customGenParams: boolean
+  onParamsChange: (p: { temperature?: number; topK?: number; maxTokens?: number; numCtx?: number }) => void
+  onResetParams: () => void
+  presets: SystemPromptPreset[]
+  activePresetId: string | null
+  onApplyPreset: (p: SystemPromptPreset) => void
+  onSaveAsPreset: (label: string) => void
+  onDeletePreset: (id: string) => void
 }) {
+  const [collapsed, setCollapsed] = useState<boolean>(() => loadCollapsed())
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev
+      saveCollapsed(next)
+      return next
+    })
+  }
+
+  if (collapsed) {
+    // Свёрнутая полоска: шеврон сверху для раскрытия + точка-индикатор LLM
+    // снизу. Иконка Sliders в середине — чтобы пользователь понимал что это
+    // была за панель (визуальный якорь).
+    return (
+      <aside
+        className="flex w-8 shrink-0 flex-col items-center justify-between border-l border-stone-200 bg-stone-50/40 py-2"
+        aria-label="Свёрнутая панель настроек"
+      >
+        <button
+          onClick={toggleCollapsed}
+          className="flex h-6 w-6 items-center justify-center rounded text-stone-500 transition hover:bg-stone-100 hover:text-stone-800"
+          title="Раскрыть панель настроек"
+          aria-label="Раскрыть панель настроек"
+        >
+          <ChevronLeft size={14} />
+        </button>
+        <div
+          className="flex flex-col items-center gap-2 text-stone-400"
+          title="Настройки LLM скрыты — кликни шеврон сверху"
+        >
+          <Sliders size={13} />
+          {customSystemPrompt && (
+            <span
+              className="h-1.5 w-1.5 rounded-full bg-violet-500"
+              title="Системный промпт переопределён"
+            />
+          )}
+          {customGenParams && (
+            <span
+              className="h-1.5 w-1.5 rounded-full bg-violet-500"
+              title="Параметры генерации отличаются от дефолта"
+            />
+          )}
+        </div>
+        <LLMStatusDot />
+      </aside>
+    )
+  }
+
   return (
-    <div className="mt-3 rounded-md border border-violet-200 bg-violet-50/40 p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-violet-900">
-          <Settings2 size={12} />
-          Параметры генерации
+    <aside className="flex w-80 shrink-0 flex-col overflow-hidden border-l border-stone-200 bg-stone-50/40">
+      <header className="flex items-start justify-between gap-2 border-b border-stone-200 bg-white px-4 py-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-sm font-semibold text-stone-800">
+            <Sliders size={14} className="text-violet-600" />
+            Настройки LLM
+          </div>
+          <p className="mt-1 text-[11px] text-stone-500">
+            Применяются к следующему сообщению. На уже отправленные не влияют.
+          </p>
         </div>
         <button
-          onClick={onReset}
-          className="text-[10px] text-violet-700 underline hover:text-violet-900"
-          title="Вернуть к дефолтам (temp=0.1, top-k=4, max-tokens=600)"
+          onClick={toggleCollapsed}
+          className="mt-0.5 shrink-0 rounded p-1 text-stone-400 transition hover:bg-stone-100 hover:text-stone-800"
+          title="Свернуть панель — даст чату больше места"
+          aria-label="Свернуть панель настроек"
         >
-          Сбросить
+          <ChevronRight size={14} />
         </button>
+      </header>
+
+      <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3">
+        <SettingsSection
+          icon={Pencil}
+          title="Системный промпт"
+          customized={customSystemPrompt}
+          defaultOpen
+        >
+          <PresetPicker
+            presets={presets}
+            activePresetId={activePresetId}
+            onApply={onApplyPreset}
+            onDelete={onDeletePreset}
+          />
+
+          <p className="mt-3 mb-1.5 text-[11px] leading-relaxed text-stone-600">
+            Доп-инструкция «стиль / тон / формат». Приклеивается к встроенному
+            промпту — антигаллюцинация и retrieval-контекст всегда остаются.
+          </p>
+          <textarea
+            value={extraSystemPrompt}
+            onChange={(e) => onExtraSystemPromptChange(e.target.value)}
+            rows={5}
+            maxLength={4000}
+            placeholder={'Выбери пресет выше или напиши свою инструкцию.\n\nПримеры:\n• «Отвечай в одном абзаце, без пунктов»\n• «Цитируй id регламента в скобках»'}
+            className="w-full resize-y rounded border border-stone-200 bg-white px-2.5 py-2 text-xs leading-relaxed text-stone-800 focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300"
+          />
+          <div className="mt-1.5 flex items-center justify-between gap-2 text-[10px] text-stone-500">
+            <span className="shrink-0">{extraSystemPrompt.length} / 4000</span>
+            <div className="flex items-center gap-2">
+              {customSystemPrompt && (
+                <button
+                  onClick={() => {
+                    const label = window.prompt('Название пресета:', 'Мой пресет')
+                    if (label && label.trim()) onSaveAsPreset(label.trim())
+                  }}
+                  className="text-violet-700 underline hover:text-violet-900"
+                  title="Сохранить текущий текст как новый пресет (в localStorage)"
+                >
+                  Сохранить как…
+                </button>
+              )}
+              {customSystemPrompt && (
+                <button
+                  onClick={() => onExtraSystemPromptChange('')}
+                  className="text-stone-500 underline hover:text-stone-700"
+                  title="Очистить — следующий запрос пойдёт без доп-инструкции"
+                >
+                  Очистить
+                </button>
+              )}
+            </div>
+          </div>
+        </SettingsSection>
+
+        <SettingsSection
+          icon={Settings2}
+          title="Параметры генерации"
+          customized={customGenParams}
+        >
+          <div className="space-y-3">
+            <ParamSlider
+              label="temperature"
+              value={temperature}
+              min={0}
+              max={1.5}
+              step={0.05}
+              format={(v) => v.toFixed(2)}
+              hint="0 = детерминированно, 1+ = креативно/рискованно"
+              onChange={(v) => onParamsChange({ temperature: v })}
+            />
+            <ParamSlider
+              label="top-k regulations"
+              value={topK}
+              min={1}
+              max={10}
+              step={1}
+              format={(v) => `${v}`}
+              hint="Сколько регламентов в контекст. Меньше = точнее"
+              onChange={(v) => onParamsChange({ topK: v })}
+            />
+            <ParamSlider
+              label="max tokens"
+              value={maxTokens}
+              min={50}
+              max={2000}
+              step={50}
+              format={(v) => `${v}`}
+              hint="Лимит длины ОТВЕТА. 600 ≈ 3-5 пунктов, 200 ≈ короткий абзац"
+              onChange={(v) => onParamsChange({ maxTokens: v })}
+            />
+            <ParamSlider
+              label="num_ctx (контекст)"
+              value={numCtx}
+              min={2048}
+              max={32768}
+              step={2048}
+              format={(v) => (v >= 1024 ? `${(v / 1024).toFixed(0)}K` : `${v}`)}
+              hint={
+                numCtx >= 16384
+                  ? '⚠ >16K — qwen2.5:7b займёт 6+ ГБ RAM, prompt-eval будет медленным'
+                  : numCtx <= 4096
+                    ? 'Короткий контекст: быстро, но длинный документ обрежется'
+                    : 'Окно «видимого» текста — вход + ответ. 8K хватает на 5-6 регламентов + history'
+              }
+              onChange={(v) => onParamsChange({ numCtx: v })}
+            />
+            {customGenParams && (
+              <button
+                onClick={onResetParams}
+                className="block text-[10px] text-violet-700 underline hover:text-violet-900"
+                title={`Вернуть к дефолтам (temp=${DEFAULT_TEMPERATURE}, top-k=${DEFAULT_TOP_K}, max-tokens=${DEFAULT_MAX_TOKENS}, num_ctx=${DEFAULT_NUM_CTX / 1024}K)`}
+              >
+                Сбросить к дефолтам
+              </button>
+            )}
+          </div>
+        </SettingsSection>
+
+        <SettingsSection icon={Sparkles} title="RAGU системные промпты">
+          <p className="mb-2 text-[11px] leading-relaxed text-stone-600">
+            Глобальные промпты graph_ragu (community report, entity extraction,
+            search engines). Меняются отдельно — переопределение применяется ко
+            всем будущим запросам, включая /api/search.
+          </p>
+          <Link
+            to="/ragu"
+            className="inline-flex items-center gap-1 rounded-md border border-violet-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-violet-700 transition hover:border-violet-300 hover:bg-violet-50"
+          >
+            <Sparkles size={11} />
+            Открыть RAGU Studio
+            <ExternalLink size={10} className="text-violet-400" />
+          </Link>
+          <p className="mt-2 text-[10px] leading-relaxed text-stone-500">
+            Текущий чат <b>не использует</b> RAGU search engines (у него свой
+            retrieval-стек). RAGU-промпты влияют на cross-corpus анализ
+            документов и /api/search.
+          </p>
+        </SettingsSection>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-3">
-        <ParamSlider
-          label="temperature"
-          value={temperature}
-          min={0}
-          max={1.5}
-          step={0.05}
-          format={(v) => v.toFixed(2)}
-          hint="0 = детерминированно (одинаковые ответы), 1+ = креативно/рискованно"
-          onChange={(v) => onChange({ temperature: v })}
-        />
-        <ParamSlider
-          label="top-k regulations"
-          value={topK}
-          min={1}
-          max={10}
-          step={1}
-          format={(v) => `${v}`}
-          hint="Сколько регламентов кладём в контекст. Меньше = точнее, больше = шире покрытие"
-          onChange={(v) => onChange({ topK: v })}
-        />
-        <ParamSlider
-          label="max tokens"
-          value={maxTokens}
-          min={50}
-          max={2000}
-          step={50}
-          format={(v) => `${v}`}
-          hint="Лимит длины ответа. 600 ≈ 3–5 пунктов структурированного ответа"
-          onChange={(v) => onChange({ maxTokens: v })}
-        />
+      {/* Подвал с инфой про LLM-стек — переехал сюда из шапки страницы,
+          чтобы не зашумлять основной экран. Когда панель свёрнута, точка
+          из этого подвала показывается в w-8 полоске (см. ветку collapsed). */}
+      <LLMStatusFooter />
+    </aside>
+  )
+}
+
+// Компактный pillow-picker пресетов: чипы в две колонки, активный подсвечен.
+// Юзер-presets идут вторым блоком с кнопкой удаления.
+function PresetPicker({
+  presets,
+  activePresetId,
+  onApply,
+  onDelete,
+}: {
+  presets: SystemPromptPreset[]
+  activePresetId: string | null
+  onApply: (p: SystemPromptPreset) => void
+  onDelete: (id: string) => void
+}) {
+  const builtins = presets.filter((p) => p.builtin)
+  const userOnes = presets.filter((p) => !p.builtin)
+  return (
+    <div className="space-y-2">
+      <div className="text-[10px] font-semibold uppercase tracking-wide text-stone-500">
+        Шаблоны сценариев
       </div>
-      <div className="mt-2 text-[10px] text-violet-700/70">
-        Изменения применяются к следующему сообщению; на текущий разговор уже отправленные не влияют.
+      <div className="grid grid-cols-2 gap-1.5">
+        {builtins.map((p) => (
+          <PresetChip
+            key={p.id}
+            preset={p}
+            active={activePresetId === p.id}
+            onApply={() => onApply(p)}
+          />
+        ))}
       </div>
+      {userOnes.length > 0 && (
+        <>
+          <div className="mt-2 text-[10px] font-semibold uppercase tracking-wide text-stone-500">
+            Мои пресеты
+          </div>
+          <div className="space-y-1">
+            {userOnes.map((p) => (
+              <div key={p.id} className="flex items-center gap-1">
+                <PresetChip
+                  preset={p}
+                  active={activePresetId === p.id}
+                  onApply={() => onApply(p)}
+                  className="flex-1"
+                />
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Удалить пресет «${p.label}»?`)) onDelete(p.id)
+                  }}
+                  className="shrink-0 rounded p-1 text-stone-300 transition hover:bg-rose-50 hover:text-rose-600"
+                  title="Удалить пресет"
+                  aria-label={`Удалить пресет ${p.label}`}
+                >
+                  <X size={11} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
+  )
+}
+
+function PresetChip({
+  preset,
+  active,
+  onApply,
+  className,
+}: {
+  preset: SystemPromptPreset
+  active: boolean
+  onApply: () => void
+  className?: string
+}) {
+  return (
+    <button
+      onClick={onApply}
+      title={preset.description}
+      className={cn(
+        'rounded border px-2 py-1.5 text-left text-[11px] transition',
+        active
+          ? 'border-violet-400 bg-violet-50 font-semibold text-violet-900 shadow-sm'
+          : 'border-stone-200 bg-white text-stone-700 hover:border-violet-200 hover:bg-violet-50/40',
+        className,
+      )}
+    >
+      <div className="line-clamp-1 leading-tight">{preset.label}</div>
+      {preset.effects?.disable_all_regulations && (
+        <div
+          className={cn(
+            'mt-0.5 text-[9px] leading-tight',
+            active ? 'text-violet-700' : 'text-stone-500',
+          )}
+        >
+          выключит регламенты
+        </div>
+      )}
+    </button>
+  )
+}
+
+function SettingsSection({
+  icon: Icon,
+  title,
+  customized,
+  defaultOpen,
+  children,
+}: {
+  icon: typeof Pencil
+  title: string
+  customized?: boolean
+  defaultOpen?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <details
+      open={defaultOpen}
+      className="group rounded-md border border-stone-200 bg-white"
+    >
+      <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-xs font-semibold text-stone-700 transition hover:bg-stone-50">
+        <Icon size={12} className="text-stone-500" />
+        <span className="flex-1">{title}</span>
+        {customized && (
+          <span
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-500"
+            title="Значение отличается от дефолта"
+          />
+        )}
+        <ChevronDown size={13} className="text-stone-400 transition group-open:rotate-180" />
+      </summary>
+      <div className="border-t border-stone-100 px-3 py-2.5">{children}</div>
+    </details>
   )
 }
 
@@ -575,10 +993,10 @@ function ParamSlider({
   hint: string
 }) {
   return (
-    <label className="block">
-      <div className="mb-0.5 flex items-baseline justify-between">
-        <span className="font-medium text-violet-900">{label}</span>
-        <span className="font-mono text-violet-700">{format(value)}</span>
+    <label className="block text-xs">
+      <div className="mb-0.5 flex items-baseline justify-between gap-2">
+        <span className="font-mono text-[11px] text-stone-700">{label}</span>
+        <span className="font-mono text-[11px] font-semibold text-violet-700">{format(value)}</span>
       </div>
       <input
         type="range"
@@ -589,7 +1007,7 @@ function ParamSlider({
         onChange={(e) => onChange(Number(e.target.value))}
         className="w-full accent-violet-600"
       />
-      <div className="mt-0.5 text-[10px] leading-tight text-violet-700/70">{hint}</div>
+      <div className="mt-0.5 text-[10px] leading-tight text-stone-500">{hint}</div>
     </label>
   )
 }

@@ -9,6 +9,9 @@ interface Props {
   /** Тон рамки иконки и (опционально) layer-бейджа. */
   tone?: LayerTone
   title: string
+  /** Tooltip на title (через title-атрибут). Когда description слишком длинный
+   *  и отнимает вертикаль у основного контента, мы прячем его в hover-подсказку. */
+  titleTooltip?: string
   /** Текстовое описание под title (1-3 предложения). Поддерживает React-узлы для ссылок/<code>. */
   description?: ReactNode
   /** Бейджи в строке с title (Badge компоненты). */
@@ -41,6 +44,7 @@ export function PageHeader({
   icon: Icon,
   tone = 'neutral',
   title,
+  titleTooltip,
   description,
   badges,
   actions,
@@ -56,7 +60,15 @@ export function PageHeader({
             <div className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', t.bg)}>
               <Icon size={18} className={t.fg} />
             </div>
-            <h1 className="text-2xl font-semibold tracking-tight text-stone-900">{title}</h1>
+            <h1
+              className={cn(
+                'text-2xl font-semibold tracking-tight text-stone-900',
+                titleTooltip && 'cursor-help',
+              )}
+              title={titleTooltip}
+            >
+              {title}
+            </h1>
             {badges}
           </div>
           {description && <p className="mt-1 max-w-3xl text-sm text-stone-500">{description}</p>}

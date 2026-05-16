@@ -321,7 +321,20 @@ export const api = {
       ),
     chat: (
       messages: Array<{ role: 'user' | 'assistant'; content: string }>,
-      params: { top_k?: number; temperature?: number; max_tokens?: number } = {},
+      params: {
+        top_k?: number
+        temperature?: number
+        max_tokens?: number
+        // Доп-инструкция «стиль/тон/формат» — добавляется к встроенному
+        // system-промпту. Пустую строку не отправляем (бэк отфильтрует, но
+        // не плодим бесполезный wire-overhead).
+        extra_system_prompt?: string
+        // Регламенты, исключённые из retrieval'а (галки сняты слева).
+        // Пустой массив = всё включено.
+        disabled_regulation_ids?: string[]
+        // Контекстное окно Ollama (`num_ctx`). undefined = дефолт модели.
+        num_ctx?: number
+      } = {},
     ) =>
       request(
         `/api/sandbox/chat`,
