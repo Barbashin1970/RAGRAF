@@ -23,6 +23,9 @@ export interface PresetEffects {
   /** Размер контекстного окна Ollama (`num_ctx`). Шире для документов,
    *  уже для коротких задач. Степени 2 (4096, 8192, 16384) — оптимально по RAM. */
   num_ctx?: number
+  /** Какую модель использовать: 'precise' (qwen2.5:7b) или 'fast' (qwen2.5:3b).
+   *  Для коротких/быстрых сценариев лучше 'fast' — 2-3× быстрее на M2 Air. */
+  model?: 'precise' | 'fast'
 }
 
 export interface SystemPromptPreset {
@@ -48,6 +51,8 @@ export const BUILTIN_PRESETS: SystemPromptPreset[] = [
       temperature: 0.1,
       max_tokens: 600,
       num_ctx: 8192,
+      // Возвращаем точную модель — после fast-пресетов вроде «Краткий ответ».
+      model: 'precise',
     },
     builtin: true,
   },
@@ -88,6 +93,8 @@ export const BUILTIN_PRESETS: SystemPromptPreset[] = [
       // Извлечение из короткого фрагмента — большое окно не нужно,
       // лишние KV-кэш и медленный prompt-eval ради воздуха.
       num_ctx: 4096,
+      // 3b отлично справляется с поиском чисел в коротком тексте — 2-3× быстрее.
+      model: 'fast',
     },
     builtin: true,
   },
@@ -120,6 +127,8 @@ export const BUILTIN_PRESETS: SystemPromptPreset[] = [
       temperature: 0.1,
       max_tokens: 200,
       num_ctx: 4096,
+      // Короткий ответ — идеально для быстрой 3b: не нужна глубокая reasoning.
+      model: 'fast',
     },
     builtin: true,
   },

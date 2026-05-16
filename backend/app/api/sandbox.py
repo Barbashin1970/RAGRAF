@@ -52,6 +52,11 @@ class ChatRequest(BaseModel):
     # тянет 128K через rope-scaling, но на M2 Air это съест всю RAM и
     # генерация превратится в часы.
     num_ctx: int | None = Field(None, ge=512, le=32768)
+    # Override модели на конкретный запрос. None = settings.ragu_llm_model
+    # (дефолт «точной» 7b). Frontend позволяет переключить на быструю 3b для
+    # коротких сценариев. Имя 1-100 символов — Ollama примет любой tag, валидация
+    # происходит на стороне Ollama (404 если модель не скачана).
+    model: str | None = Field(None, min_length=1, max_length=100)
 
 
 class ExtractRequest(BaseModel):
@@ -107,6 +112,7 @@ async def sandbox_chat(req: ChatRequest) -> dict[str, Any]:
         extra_system_prompt=req.extra_system_prompt,
         disabled_regulation_ids=req.disabled_regulation_ids,
         num_ctx=req.num_ctx,
+        model=req.model,
     )
 
 
@@ -316,6 +322,62 @@ async def sandbox_analyze_document(doc_id: str) -> dict[str, Any]:
         return await document_analysis.analyze_document(doc_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
+
+
+class ModelOpRequest(BaseModel):
+    """Тело `/sandbox/llm/{load,unload}`. Имя модели — Ollama tag."""
+    model: str = Field(..., min_length=1, max_length=100)
+
+
+@router.post("/sandbox/llm/load")
+async def sandbox_llm_load(req: ModelOpRequest) -> dict[str, Any]:
+    """Принудительно загрузить модель в RAM Ollama. Используется кнопкой
+    «Загрузить» в правой панели — даёт UX «нажми и подожди прогрев», после
+    чего следующий чат-запрос идёт без задержки на cold-start.
+
+    Реализация: дёргаем native Ollama `/api/generate` с пустым промптом и
+    `keep_alive: -1` (держать в памяти бессрочно). Ollama не генерирует
+    токены, но загружает веса в VRAM/RAM.
+    """
+    from app.config import settings as cfg
+    if not cfg.openai_base_url:
+        raise HTTPException(status_code=503, detail="OPENAI_BASE_URL не задан")
+    base = cfg.openai_base_url.rstrip("/").rstrip("/v1")
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            r = await client.post(
+                f"{base}/api/generate",
+                json={"model": req.model, "prompt": "", "keep_alive": -1, "stream": False},
+            )
+        if r.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Ollama: {r.status_code} {r.text[:200]}")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Ollama недоступен: {e}") from e
+    return {"ok": True, "model": req.model, "status": "loaded"}
+
+
+@router.post("/sandbox/llm/unload")
+async def sandbox_llm_unload(req: ModelOpRequest) -> dict[str, Any]:
+    """Принудительно выгрузить модель из RAM Ollama (`keep_alive: 0`).
+    Освобождает 2-5 ГБ памяти когда модель больше не нужна. Следующий
+    запрос будет с cold-start."""
+    from app.config import settings as cfg
+    if not cfg.openai_base_url:
+        raise HTTPException(status_code=503, detail="OPENAI_BASE_URL не задан")
+    base = cfg.openai_base_url.rstrip("/").rstrip("/v1")
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            r = await client.post(
+                f"{base}/api/generate",
+                json={"model": req.model, "keep_alive": 0, "stream": False},
+            )
+        if r.status_code != 200:
+            raise HTTPException(status_code=502, detail=f"Ollama: {r.status_code} {r.text[:200]}")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=502, detail=f"Ollama недоступен: {e}") from e
+    return {"ok": True, "model": req.model, "status": "unloaded"}
 
 
 @router.post("/sandbox/documents/{doc_id}/analyze-summary")

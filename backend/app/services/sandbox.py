@@ -452,6 +452,7 @@ async def chat(
     extra_system_prompt: str | None = None,
     disabled_regulation_ids: list[str] | None = None,
     num_ctx: int | None = None,
+    model: str | None = None,
 ) -> dict[str, Any]:
     """Conversational Q&A: retrieval (mock TF-IDF) → LLM-grounded answer (Ollama).
 
@@ -690,8 +691,11 @@ async def chat(
         # из Modelfile (обычно 2048-4096), что часто маловато для длинных
         # документов.
         effective_max_tokens = max_tokens if max_tokens is not None else 600
+        # Модель из параметра override'ит дефолт из settings. Используется для
+        # переключения между «точной» (7b) и «быстрой» (3b) — выбор в UI.
+        effective_model = (model or "").strip() or settings.ragu_llm_model
         create_kwargs: dict[str, Any] = {
-            "model": settings.ragu_llm_model,
+            "model": effective_model,
             "messages": llm_messages,
             "max_tokens": effective_max_tokens,
             "temperature": temperature if temperature is not None else 0.1,

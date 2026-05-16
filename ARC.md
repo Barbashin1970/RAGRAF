@@ -552,12 +552,32 @@ flowchart LR
 
 ### 7.2 Модели и характеристики
 
-| Компонент           | Модель                              | Размер  | Скорость на M2          | Назначение                          |
+| Компонент           | Модель                              | Размер  | Скорость на M2 Air      | Назначение                          |
 |---------------------|-------------------------------------|---------|-------------------------|--------------------------------------|
-| **LLM**             | `qwen2.5:7b-instruct-q4_K_M`        | ~4.4 ГБ | ~20 tok/s, p50 latency 6 с | Q&A, генерация рекомендаций, объяснимость |
+| **Точная LLM** (default) | `qwen2.5:7b-instruct-q4_K_M`   | ~4.4 ГБ | ~6 tok/s, prefill ~50 tok/s | Сводки длинных документов, сравнение регламентов, follow-up'ы |
+| **Быстрая LLM** (опц.)  | `qwen2.5:3b-instruct-q4_K_M`    | ~1.9 ГБ | ~13 tok/s               | Приветствия, краткие ответы, извлечение параметров, быстрая итерация |
 | **Embedder**        | `bge-m3`                            | ~1.2 ГБ | ~150 tok/s, batched     | Семантический индекс, retrieval     |
-| **Backup LLM**      | `phi3:mini` (опционально)           | ~2.2 ГБ | ~40 tok/s               | Fallback при недоступности qwen2.5  |
 | **Runtime**         | Ollama 0.23+                        | ~80 МБ  | Native Metal на Apple Silicon | OpenAI-совместимый HTTP API   |
+
+Обе LLM — из одной семьи (qwen2.5-instruct), поэтому промпт-поведение совместимо: переключение в UI не требует переписывания системных промптов. 7b как дефолт даёт качество, 3b — скорость для коротких сценариев.
+
+**Переключение моделей в UI** ([SandboxScreen](frontend/src/components/sandbox/SandboxScreen.tsx), секция «Модель LLM» в правой панели):
+- Выбор персистится в `localStorage` ключом `ragraf:sandbox:model-kind:v1`
+- Каждый `ChatRequest` несёт поле `model` — backend подставляет в OpenAI client; `None` = дефолт из `settings.ragu_llm_model`
+- Если выбранная модель не установлена в Ollama, UI показывает плашку с командой `ollama pull <tag>` — обнаружение через `available_models` из `/api/sandbox/llm-info`
+- Пресеты сценариев тоже могут устанавливать модель: «Краткий ответ» / «Извлечь параметры» → fast (3b); «Резюме документа» / «Сравнить регламенты» → precise (7b)
+
+**Управление RAM**: каждая LLM-модель загружается в память Ollama при первом обращении (cold-start 10-30 сек на M2 Air), потом держится в RAM до истечения `keep_alive` (дефолт 5 мин после последнего запроса). RAGRAF даёт пользователю явный toggle:
+
+- `POST /api/sandbox/llm/load` — Ollama `keep_alive: -1` → модель в RAM бессрочно (готова отвечать без задержек)
+- `POST /api/sandbox/llm/unload` — Ollama `keep_alive: 0` → выгрузка немедленно (освободить 2-5 ГБ под другие задачи)
+- Кнопка-индикатор «прогреть / в RAM» в подвале правой панели Студии, рядом со строкой `LLM:` — состояние читается из `loaded_models` в llm-info
+
+**Где Ollama хранит модели** (см. также [README §LLM-модели](README.md#llm-модели-и-ollama)):
+- macOS: `~/.ollama/models/{blobs,manifests}/`
+- Linux: `/usr/share/ollama/.ollama/models/` или `~/.ollama/models/`
+- Windows: `C:\Users\<user>\.ollama\models\`
+- Сменить путь: `export OLLAMA_MODELS=/custom/path` перед `ollama serve`
 
 ### 7.3 EmbeddingIndex и batched rebuild
 

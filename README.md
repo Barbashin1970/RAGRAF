@@ -295,6 +295,95 @@ Health: <http://localhost:8000/health> · OpenAPI: <http://localhost:8000/docs> 
 
 ---
 
+## LLM-модели и Ollama
+
+RAGRAF Студия аналитика использует локальную LLM через [Ollama](https://ollama.com) — никакие данные не уходят в облако, всё работает на ноутбуке.
+
+### Установка Ollama
+
+| OS | Команда |
+|---|---|
+| **macOS** | <https://ollama.com/download/Ollama-darwin.zip> (или `brew install ollama`) |
+| **Linux** | `curl -fsSL https://ollama.com/install.sh \| sh` |
+| **Windows** | <https://ollama.com/download/OllamaSetup.exe> |
+
+После установки Ollama стартует фоновым сервисом на `http://localhost:11434` — это значение по умолчанию в `OPENAI_BASE_URL`.
+
+### Где Ollama хранит модели
+
+По умолчанию:
+
+| ОС | Путь |
+|---|---|
+| **macOS** | `~/.ollama/models/` |
+| **Linux** | `/usr/share/ollama/.ollama/models/` (если установлено через скрипт) или `~/.ollama/models/` |
+| **Windows** | `C:\Users\<user>\.ollama\models\` |
+
+Структура:
+- `blobs/` — веса моделей (тяжёлые `.gguf` бинарники, до нескольких ГБ каждая)
+- `manifests/` — метадата (теги, размеры, версии)
+
+Сменить расположение можно через переменную окружения `OLLAMA_MODELS`:
+
+```bash
+export OLLAMA_MODELS=/Volumes/External/ollama-models
+ollama serve   # перезапустить сервис чтобы подхватил
+```
+
+### Какие модели нужны RAGRAF
+
+| Назначение | Модель | Размер | Tag |
+|---|---|---|---|
+| **Точная LLM** (default) | qwen2.5:7b-instruct | 4.7 ГБ | `qwen2.5:7b-instruct-q4_K_M` |
+| **Быстрая LLM** (опционально) | qwen2.5:3b-instruct | 1.9 ГБ | `qwen2.5:3b-instruct-q4_K_M` |
+| **Embedder** (обязательно) | bge-m3 | 1.2 ГБ | `bge-m3:latest` |
+
+Скачать всё разом:
+
+```bash
+ollama pull qwen2.5:7b-instruct-q4_K_M
+ollama pull qwen2.5:3b-instruct-q4_K_M
+ollama pull bge-m3:latest
+```
+
+**Минимум для запуска**: только `qwen2.5:7b` + `bge-m3` (~6 ГБ на диске).
+Быструю 3b можно докачать позже из UI — в правой панели Студии есть переключатель моделей; если 3b не установлена, рядом появится плашка с командой `ollama pull`.
+
+### Управление моделями
+
+```bash
+ollama list      # что установлено + сколько весит
+ollama ps        # какие сейчас загружены в RAM (горячие)
+ollama rm <tag>  # удалить модель (освободит место на диске)
+ollama show <tag>   # детали модели (context length, family, …)
+```
+
+### Прогрев и выгрузка из RAM
+
+В правой панели Студии аналитика рядом со строкой `LLM:` есть кнопка **«прогреть» / «в RAM»** — кликом загружаешь модель в память Ollama заранее, чтобы первый ответ был без cold-start. Под капотом: `POST /api/generate` с `keep_alive: -1`. Повторный клик выгружает модель (`keep_alive: 0`) и освобождает RAM.
+
+Это удобно когда сидишь подолгу в Студии (модель уже в памяти, отвечает сразу) или наоборот закрываешь Студию и хочешь освободить 5 ГБ под другие задачи.
+
+### Настройка через `.env`
+
+```dotenv
+OPENAI_BASE_URL=http://localhost:11434/v1
+OPENAI_API_KEY=ollama
+RAGU_LLM_MODEL=qwen2.5:7b-instruct-q4_K_M
+RAGU_EMBED_MODEL=bge-m3
+RAGU_ENABLED=true
+```
+
+`OPENAI_API_KEY=ollama` — это просто dummy-значение, локальная Ollama его игнорирует. `RAGU_LLM_MODEL` задаёт «модель по умолчанию» — её можно переопределить на каждый запрос через UI.
+
+### Размер на M2 Air (рекомендация по железу)
+
+- 8 ГБ RAM — только 3b модель (7b не уместится одновременно с macOS и браузером)
+- 16 ГБ RAM — обе модели, переключаться через UI
+- 32+ ГБ — можно держать обе одновременно в памяти + большие документы в контексте
+
+---
+
 ## Тесты
 
 Три уровня; запускать после крупных правок чтобы ловить регрессию.

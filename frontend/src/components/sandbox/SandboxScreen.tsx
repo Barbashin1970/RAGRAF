@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Beaker,
   Bot,
@@ -40,6 +40,14 @@ import {
   saveUserPresets,
   type SystemPromptPreset,
 } from './systemPromptPresets'
+import {
+  DEFAULT_MODEL_KIND,
+  loadModelKind,
+  MODEL_CATALOG,
+  type ModelKind,
+  modelByKind,
+  saveModelKind,
+} from './llmModels'
 
 type Tab = 'search' | 'extract' | 'ragu'
 
@@ -183,10 +191,14 @@ function LLMStatusDot() {
 function LLMStatusFooter({
   regulationsTotal,
   regulationsEnabled,
+  selectedModel,
 }: {
   regulationsTotal: number
   regulationsEnabled: number
+  /** Ollama tag модели которую сейчас выберет чат — для кнопки load/unload. */
+  selectedModel: string
 }) {
+  const qc = useQueryClient()
   const { data, isError } = useLLMStatus()
   // Параллельно подтягиваем кол-во ВКЛЮЧЁННЫХ документов — это даёт цельную
   // картинку «что сейчас в контексте» рядом с числом регламентов из индекса.
@@ -197,6 +209,22 @@ function LLMStatusFooter({
   })
   const docsEnabled = docs?.limits.enabled_count ?? 0
   const docsTotal = docs?.limits.current_count ?? 0
+
+  // Состояние «выбранная модель сейчас в RAM Ollama» — нужно для toggle-кнопки.
+  // loaded_models приходит из llm-info, в нём список tags которые сейчас прогреты.
+  const loadedModels = data?.loaded_models ?? (data?.llm_loaded_in_memory ? [data.llm_model] : [])
+  const isSelectedLoaded = loadedModels.includes(selectedModel)
+
+  const loadMut = useMutation({
+    mutationFn: () => api.sandbox.loadModel(selectedModel),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sandbox-llm-info'] }),
+  })
+  const unloadMut = useMutation({
+    mutationFn: () => api.sandbox.unloadModel(selectedModel),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sandbox-llm-info'] }),
+  })
+  const busy = loadMut.isPending || unloadMut.isPending
+
   if (isError || !data) return null
 
   const tone = llmStatusTone(data)
@@ -235,10 +263,51 @@ function LLMStatusFooter({
         <div className="flex items-center gap-1.5">
           <Cpu size={9} className="text-violet-500" />
           <span className="text-stone-500">LLM:</span>
-          <code className="truncate rounded bg-violet-50 px-1 font-mono text-[9px] text-violet-800">
-            {data.llm_model}
+          <code
+            className="truncate rounded bg-violet-50 px-1 font-mono text-[9px] text-violet-800"
+            title={selectedModel}
+          >
+            {selectedModel.split(':')[0]}
+            {selectedModel.includes(':') ? ':' + selectedModel.split(':')[1].split('-')[0] : ''}
           </code>
+          {/* Toggle загрузки модели в RAM. Зелёная молния когда уже в памяти,
+              серая иконка ⏏ для выгрузки; и наоборот — иконка ⚡ когда не
+              загружена. Меняет состояние через Ollama keep_alive. */}
+          {isSelectedLoaded ? (
+            <button
+              onClick={() => unloadMut.mutate()}
+              disabled={busy}
+              className="ml-auto inline-flex items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100 disabled:opacity-50"
+              title={`Модель в RAM (~${selectedModel.includes('3b') ? '2' : '5'} ГБ). Кликни чтобы выгрузить и освободить память.`}
+            >
+              {unloadMut.isPending ? (
+                <Loader2 size={9} className="animate-spin" />
+              ) : (
+                <Zap size={9} className="fill-current" />
+              )}
+              в RAM
+            </button>
+          ) : (
+            <button
+              onClick={() => loadMut.mutate()}
+              disabled={busy}
+              className="ml-auto inline-flex items-center gap-1 rounded border border-stone-200 bg-white px-1.5 py-0.5 text-[9px] font-semibold text-stone-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50"
+              title={`Прогреть модель в RAM Ollama. Первый запрос займёт 10-30 сек на загрузку весов (~${selectedModel.includes('3b') ? '2' : '5'} ГБ), потом ответы быстрые.`}
+            >
+              {loadMut.isPending ? (
+                <Loader2 size={9} className="animate-spin" />
+              ) : (
+                <Zap size={9} />
+              )}
+              прогреть
+            </button>
+          )}
         </div>
+        {(loadMut.isError || unloadMut.isError) && (
+          <div className="text-[9px] text-rose-600">
+            {((loadMut.error || unloadMut.error) as Error).message}
+          </div>
+        )}
         <div className="flex items-center gap-1.5">
           <span className="text-stone-500">Embed:</span>
           <code className="truncate rounded bg-stone-100 px-1 font-mono text-[9px] text-stone-700">
@@ -342,6 +411,12 @@ function SearchDemo() {
   const [topK, setTopK] = useState<number>(DEFAULT_TOP_K)
   const [maxTokens, setMaxTokens] = useState<number>(DEFAULT_MAX_TOKENS)
   const [numCtx, setNumCtx] = useState<number>(DEFAULT_NUM_CTX)
+  // Выбранная модель — точная (7b) или быстрая (3b). Persisted в localStorage.
+  const [modelKind, setModelKindState] = useState<ModelKind>(() => loadModelKind())
+  const setModelKind = (kind: ModelKind) => {
+    setModelKindState(kind)
+    saveModelKind(kind)
+  }
   // Доп-инструкция «стиль/тон/формат» — приклеивается к встроенному
   // system-промпту на бэке. Не заменяет анти-галлюц правила, только добавляет.
   const [extraSystemPrompt, setExtraSystemPrompt] = useState<string>('')
@@ -428,6 +503,7 @@ function SearchDemo() {
           num_ctx: numCtx,
           extra_system_prompt: extraSystemPrompt.trim() || undefined,
           disabled_regulation_ids: effectiveDisabled,
+          model: modelByKind(modelKind).ollama_tag,
         },
         controller.signal,
       )
@@ -535,6 +611,7 @@ function SearchDemo() {
     if (fx?.temperature !== undefined) setTemperature(fx.temperature)
     if (fx?.max_tokens !== undefined) setMaxTokens(fx.max_tokens)
     if (fx?.num_ctx !== undefined) setNumCtx(fx.num_ctx)
+    if (fx?.model !== undefined) setModelKind(fx.model)
   }
 
   const saveCurrentAsPreset = (label: string) => {
@@ -671,6 +748,11 @@ function SearchDemo() {
         onDeletePreset={deleteUserPreset}
         regulationsTotal={allRegulationIds.length}
         regulationsEnabled={Math.max(0, allRegulationIds.length - disabledRegulationIds.size)}
+        modelKind={modelKind}
+        onModelKindChange={(k) => {
+          setModelKind(k)
+          setActivePresetId(null)
+        }}
       />
     </div>
   )
@@ -727,6 +809,8 @@ function ChatSettingsPanel({
   onDeletePreset,
   regulationsTotal,
   regulationsEnabled,
+  modelKind,
+  onModelKindChange,
 }: {
   extraSystemPrompt: string
   onExtraSystemPromptChange: (s: string) => void
@@ -745,6 +829,8 @@ function ChatSettingsPanel({
   onDeletePreset: (id: string) => void
   regulationsTotal: number
   regulationsEnabled: number
+  modelKind: ModelKind
+  onModelKindChange: (k: ModelKind) => void
 }) {
   const [collapsed, setCollapsed] = useState<boolean>(() => loadCollapsed())
   const toggleCollapsed = () => {
@@ -871,6 +957,11 @@ function ChatSettingsPanel({
           </div>
         </SettingsSection>
 
+        <ModelPickerSection
+          modelKind={modelKind}
+          onChange={onModelKindChange}
+        />
+
         <SettingsSection
           icon={Settings2}
           title="Параметры генерации"
@@ -963,8 +1054,92 @@ function ChatSettingsPanel({
       <LLMStatusFooter
         regulationsTotal={regulationsTotal}
         regulationsEnabled={regulationsEnabled}
+        selectedModel={modelByKind(modelKind).ollama_tag}
       />
     </aside>
+  )
+}
+
+// Селектор модели LLM — отдельная SettingsSection. Чипы Точная/Быстрая,
+// при наведении показывает trade-off (RAM, скорость, когда выбирать).
+// Если выбранная модель не установлена в Ollama (нет в available_models) —
+// показываем плашку с подсказкой `ollama pull <tag>`.
+function ModelPickerSection({
+  modelKind,
+  onChange,
+}: {
+  modelKind: ModelKind
+  onChange: (k: ModelKind) => void
+}) {
+  const { data: llmInfo } = useLLMStatus()
+  const availableModels = new Set(llmInfo?.available_models ?? [])
+  const customized = modelKind !== DEFAULT_MODEL_KIND
+  const selected = modelByKind(modelKind)
+  const isSelectedInstalled =
+    availableModels.size === 0 || availableModels.has(selected.ollama_tag)
+
+  return (
+    <SettingsSection icon={Cpu} title="Модель LLM" customized={customized}>
+      <div className="space-y-2">
+        {MODEL_CATALOG.map((m) => {
+          const active = m.kind === modelKind
+          // Если llm-info ещё не пришла, считаем установленным (не пугаем).
+          const installed = availableModels.size === 0 || availableModels.has(m.ollama_tag)
+          return (
+            <button
+              key={m.kind}
+              onClick={() => onChange(m.kind)}
+              className={cn(
+                'block w-full rounded border px-2.5 py-2 text-left text-xs transition',
+                active
+                  ? 'border-violet-400 bg-violet-50 shadow-sm'
+                  : 'border-stone-200 bg-white hover:border-violet-200 hover:bg-violet-50/40',
+              )}
+            >
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={cn(
+                    'inline-flex h-3 w-3 items-center justify-center rounded-full border',
+                    active ? 'border-violet-500 bg-violet-500' : 'border-stone-300 bg-white',
+                  )}
+                >
+                  {active && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                </span>
+                <span className={cn('font-medium', active ? 'text-violet-900' : 'text-stone-800')}>
+                  {m.label}
+                </span>
+                {!installed && (
+                  <span
+                    className="ml-auto rounded bg-amber-100 px-1 py-0.5 text-[9px] font-semibold text-amber-800"
+                    title={`Модель не установлена. Выполни: ollama pull ${m.ollama_tag}`}
+                  >
+                    нет
+                  </span>
+                )}
+              </div>
+              <div className="mt-1 text-[10px] leading-tight text-stone-500">
+                ~{m.tokens_per_sec} tok/s · {m.ram_gb} ГБ RAM
+              </div>
+              <div className="mt-0.5 text-[10px] leading-tight text-stone-500">
+                {m.hint}
+              </div>
+            </button>
+          )
+        })}
+        <p className="text-[10px] leading-tight text-stone-500">
+          <b>Когда {selected.kind === 'precise' ? 'точная' : 'быстрая'}:</b>{' '}
+          {selected.use_when}
+        </p>
+        {!isSelectedInstalled && (
+          <div className="rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[10px] leading-tight text-amber-900">
+            Модель не установлена в Ollama. В терминале:
+            <code className="mt-0.5 block font-mono text-[10px] text-amber-900">
+              ollama pull {selected.ollama_tag}
+            </code>
+          </div>
+        )}
+      </div>
+    </SettingsSection>
   )
 }
 

@@ -334,6 +334,9 @@ export const api = {
         disabled_regulation_ids?: string[]
         // Контекстное окно Ollama (`num_ctx`). undefined = дефолт модели.
         num_ctx?: number
+        // Override модели на этот запрос (например быстрая qwen2.5:3b
+        // вместо дефолтной 7b). undefined = настройка из .env.
+        model?: string
       } = {},
       // AbortSignal для кнопки «Стоп» в чате. Когда LLM крутится дольше чем
       // юзер готов ждать, abort() обрывает fetch — на бэке вызов к Ollama
@@ -400,6 +403,18 @@ export const api = {
       request<{ doc_id: string; summary: string }>(
         `/api/sandbox/documents/${encodeURIComponent(docId)}/analyze-summary`,
         { method: 'POST' },
+      ),
+    /** Принудительно загрузить модель в RAM Ollama (keep_alive=-1). */
+    loadModel: (model: string) =>
+      request<{ ok: boolean; model: string; status: string }>(
+        `/api/sandbox/llm/load`,
+        { method: 'POST', body: JSON.stringify({ model }) },
+      ),
+    /** Принудительно выгрузить модель из RAM (keep_alive=0). */
+    unloadModel: (model: string) =>
+      request<{ ok: boolean; model: string; status: string }>(
+        `/api/sandbox/llm/unload`,
+        { method: 'POST', body: JSON.stringify({ model }) },
       ),
   },
   ragu: {
