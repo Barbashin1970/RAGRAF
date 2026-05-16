@@ -135,6 +135,7 @@ import {
   saveResponseSchema,
   searchResponseSchema,
   shaclImportResponseSchema,
+  sigmaImportResponseSchema,
   validationResultSchema,
 } from './schemas'
 import { z } from 'zod'
@@ -228,6 +229,27 @@ export const api = {
       request(`/api/regulations/${encodeURIComponent(id)}/publish`, { method: 'POST' }, regulationSchema),
     archive: (id: string) =>
       request(`/api/regulations/${encodeURIComponent(id)}/archive`, { method: 'POST' }, regulationSchema),
+    /**
+     * Импорт SIGMA-bundle (ZIP) обратно в RAGRAF.
+     *
+     * Поддерживает оба формата:
+     *  - single bundle: ZIP с одной папкой `<source_id>/data.ttl + shapes.ttl`
+     *  - corpus bundle: несколько таких папок + `corpus_manifest.json`
+     *
+     * Регламенты создаются/обновляются в DuckDB store. SHACL пушится в upstream
+     * если он доступен; иначе мягко скипается (можно догрузить через UI).
+     */
+    importSigmaBundle: async (file: File) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      const r = await fetch(`/api/sigma-import/bundle`, { method: 'POST', body: fd })
+      if (!r.ok) {
+        const text = await r.text().catch(() => '')
+        throw new Error(`${r.status} ${r.statusText}: ${text}`)
+      }
+      const data: unknown = await r.json()
+      return sigmaImportResponseSchema.parse(data)
+    },
   },
   flow: {
     get: (id: string) => request(`/api/regulations/${encodeURIComponent(id)}/flow`, undefined, ruleDslSchema),

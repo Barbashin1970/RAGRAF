@@ -189,6 +189,30 @@ export const shaclImportResponseSchema = z.object({
   conflicts: z.array(z.unknown()),
 })
 
+// SIGMA-bundle import: ответ от POST /api/sigma-import/bundle.
+// `imported` — что попало в DuckDB, `skipped` — без data.ttl, `failed` — парс упал.
+const sigmaImportEntrySchema = z.object({
+  source_id: z.string(),
+  name: z.string().optional(),
+  parameter_count: z.number().optional(),
+  shapes_pushed: z.boolean().optional(),
+  shapes_error: z.string().nullable().optional(),
+  reason: z.string().optional(),
+})
+
+export const sigmaImportResponseSchema = z.object({
+  format_version: z.string(),
+  imported_at: z.string(),
+  total_imported: z.number(),
+  total_skipped: z.number(),
+  total_failed: z.number(),
+  imported: z.array(sigmaImportEntrySchema),
+  skipped: z.array(sigmaImportEntrySchema),
+  failed: z.array(sigmaImportEntrySchema),
+})
+
+export type SigmaImportResponse = z.infer<typeof sigmaImportResponseSchema>
+
 export const constraintsSaveResponseSchema = z.object({
   count: z.number(),
 })

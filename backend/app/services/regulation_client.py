@@ -136,8 +136,26 @@ class RegulationClient:
     # ---- shapes (SHACL, Turtle) ----
 
     async def get_shapes(self, source_id: str) -> str:
+        """Получить SHACL shapes для регламента.
+
+        Приоритет:
+          1. Фикстура (если `USE_FIXTURES=true` и у регламента есть shapes.ttl)
+          2. Upstream Regulation API
+          3. Фикстура без флага (fallback при недоступности upstream)
+          4. **Derived shape** — генерируем `RegulationShape` из параметров
+             регламента, лежащего в DuckDB store. Гарантирует что у каждого
+             регламента есть форма валидации (ТЗ СИГМА §4.1.3 + Rules-Management.pdf
+             пример), даже если аналитик не редактировал shapes явно. Это и есть
+             то что СИГМА ждёт в bundle для валидации data.ttl.
+
+        Возвращает пустую строку только если регламент полностью отсутствует
+        (нет ни в фикстуре, ни в store).
+        """
         if settings.use_fixtures and fixtures.has_fixture(source_id):
-            return fixtures.read_shapes(source_id)
+            shapes = fixtures.read_shapes(source_id)
+            if shapes and shapes.strip():
+                return shapes
+            # Фикстура есть, но shapes.ttl пустой — продолжаем к derived fallback.
 
         async def call():
             async with self._client() as c:
@@ -146,10 +164,23 @@ class RegulationClient:
                 return r.text
 
         result = await self._try_upstream(call)
-        if result is not None:
+        if result is not None and result.strip():
             return result
         if fixtures.has_fixture(source_id):
-            return fixtures.read_shapes(source_id)
+            shapes = fixtures.read_shapes(source_id)
+            if shapes and shapes.strip():
+                return shapes
+
+        # Derived fallback — генерируем RegulationShape из параметров.
+        # Импортируем лениво чтобы избежать циклов на bootstrap.
+        try:
+            from app.services.turtle_bridge import regulation_to_shacl_shapes
+
+            reg = regulation_store.get(source_id)
+            if reg is not None:
+                return regulation_to_shacl_shapes(reg)
+        except Exception:
+            pass
         return ""
 
     async def create_shapes(self, source_id: str, turtle: str) -> dict[str, Any]:

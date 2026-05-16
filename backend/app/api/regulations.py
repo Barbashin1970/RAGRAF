@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
@@ -214,22 +214,25 @@ async def update_regulation_raw(source_id: str, turtle: str):
 
 
 @router.get("/regulations/{source_id}/export-bundle")
-def export_regulation_bundle(source_id: str):
+async def export_regulation_bundle(source_id: str):
     """Экспорт одного регламента в SIGMA-совместимом ZIP-bundle.
 
-    Содержит `data.ttl` (OWL-инстанс), `shapes.ttl` (SHACL валидация под состав
-    параметров) и `manifest.json` (метадата RAGRAF: версия формата, история,
+    Содержит `data.ttl` (OWL-инстанс), `shapes.ttl` (SHACL валидация — берём
+    пользовательские правки из upstream/фикстуры, fallback на производный
+    шаблон) и `manifest.json` (метадата RAGRAF: версия формата, история,
     SIGMA-compliance поля). Подробнее — см. `services/sigma_export.py` и
     README §SIGMA export.
 
-    Returns `application/zip`. Не требует upstream — берёт данные из локального
-    DuckDB напрямую.
+    Returns `application/zip`. Чтобы попасть в bundle, SHACL должны быть
+    видимы через `client.get_shapes()` (т.е. либо в upstream, либо в
+    фикстуре — это и есть «то что аналитик отредактировал во вкладке
+    Ограничения»).
     """
     from fastapi.responses import Response
     from app.services import sigma_export
 
     try:
-        zip_bytes = sigma_export.build_regulation_bundle(source_id)
+        zip_bytes = await sigma_export.build_regulation_bundle(source_id)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
@@ -245,7 +248,7 @@ def export_regulation_bundle(source_id: str):
 
 
 @router.get("/sigma-export/corpus")
-def export_corpus_bundle(domain: str | None = None):
+async def export_corpus_bundle(domain: str | None = None):
     """Batch-экспорт всего корпуса (или одного домена) в один SIGMA-bundle.
 
     Параметр `?domain=heating` фильтрует. Без него — весь корпус.
@@ -257,7 +260,7 @@ def export_corpus_bundle(domain: str | None = None):
     from fastapi.responses import Response
     from app.services import sigma_export
 
-    zip_bytes, _manifest = sigma_export.build_corpus_bundle(domain=domain)
+    zip_bytes, _manifest = await sigma_export.build_corpus_bundle(domain=domain)
     suffix = f"-{domain}" if domain else ""
     return Response(
         content=zip_bytes,
@@ -266,6 +269,44 @@ def export_corpus_bundle(domain: str | None = None):
             "Content-Disposition": f'attachment; filename="ragraf-sigma-corpus{suffix}.zip"',
         },
     )
+
+
+# ── SIGMA Import (round-trip back from Apache Jena into RAGRAF) ──────────
+
+
+@router.post("/sigma-import/bundle")
+async def import_sigma_bundle(file: UploadFile = File(...)) -> dict[str, Any]:
+    """Импорт SIGMA-bundle (ZIP) обратно в RAGRAF.
+
+    Один endpoint обрабатывает оба сценария:
+      - Single bundle (один регламент): ZIP с одной папкой `<source_id>/`
+        внутри которой `data.ttl` + `shapes.ttl` (+ опционально `manifest.json`).
+      - Corpus bundle: несколько таких папок + `corpus_manifest.json` на корне.
+
+    Поведение:
+      1. Парсим `data.ttl` → Regulation (через `parse_regulation_turtle`).
+         `source_id` берём из `manifest.json` → fallback на имя папки в ZIP.
+      2. Сохраняем регламент в DuckDB как обычную правку с автором
+         `sigma-import`. History получит запись «Импорт SIGMA-bundle».
+      3. Если `shapes.ttl` непустой и upstream доступен — пушим SHACL через
+         `client.update_shapes()`. Если upstream не отвечает — мягко
+         пропускаем, регламент уже в store; SHACL можно дозалить через UI.
+
+    Возвращает отчёт с категориями `imported / skipped / failed` — UI
+    показывает эти счётчики аналитику.
+    """
+    from app.services import sigma_export
+
+    try:
+        body = await file.read()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Не удалось прочитать файл: {e}") from e
+    if not body:
+        raise HTTPException(status_code=400, detail="Пустой файл")
+    try:
+        return await sigma_export.import_bundle(body)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Импорт не удался: {e}") from e
 
 
 @router.delete("/regulations/{source_id}")

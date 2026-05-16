@@ -112,15 +112,23 @@ export function ConstraintEditorScreen() {
     <>
       {/* Import — file-input спрятан в <label>; кастомное поведение нельзя
           целиком отдать <Button>. Используем тот же класс что и secondary, плюс
-          синий tint иконки чтобы отличить от "Сохранить" / "Создать". */}
+          синий tint иконки чтобы отличить от "Сохранить" / "Создать".
+
+          Принимаем .ttl И .zip (SIGMA-bundle): пользователь может выгрузить
+          bundle через «Экспорт в СИГМУ», поправить shapes.ttl в самом архиве
+          (или в СИГМЕ) и вернуть тот же ZIP обратно. Backend извлечёт shapes.ttl
+          из ZIP-а и применит к текущему регламенту. Для импорта самого
+          регламента (data.ttl + создание/обновление в DuckDB) — отдельный
+          путь через «Импорт из СИГМЫ» на странице списка. */}
       <label
         className={`inline-flex h-7 cursor-pointer items-center gap-1 rounded-md border border-stone-200 bg-white px-2 text-xs font-medium text-stone-700 transition hover:bg-stone-50 ${importing ? 'opacity-60' : ''}`}
+        title="Загрузить SHACL: Turtle (.ttl) или SIGMA-bundle (.zip — возьмём shapes.ttl изнутри)"
       >
         <Upload size={13} className="text-blue-600" />
         {importing ? 'Импорт…' : 'Импорт SHACL'}
         <input
           type="file"
-          accept=".ttl,text/turtle"
+          accept=".ttl,text/turtle,.zip,application/zip"
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0]

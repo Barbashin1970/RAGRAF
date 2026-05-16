@@ -1098,14 +1098,34 @@ UI: кнопка «Экспорт в СИГМУ» в шапке Regulation Edito
 | Документы аналитика (PDF/DOCX) | Сырые источники, не часть онтологии. |
 | RAGU prompt overrides | Локальная конфигурация LLM-стека. |
 
-### 16.3.5 Round-trip обратно в RAGRAF (backlog)
+### 16.3.5 Round-trip обратно в RAGRAF (реализовано 2026-05-17)
 
-Сейчас bundle экспортируется в одну сторону. Полный круг (RAGRAF → СИГМА → RAGRAF) требует:
-1. Endpoint `POST /api/regulations/import-bundle` — принимает ZIP
-2. Парсер manifest.json + data.ttl (через `parse_regulation_turtle()` который уже есть)
-3. Импорт в DuckDB как новый регламент с реконструкцией истории
+СИГМА ещё в разработке, поэтому правка регламентов остаётся в RAGRAF. Реализован полный круг RAGRAF → СИГМА → RAGRAF.
 
-Это [Backlog §16.1](ARC.md) — нужно когда возникнет сценарий «забрать обновления из СИГМЫ обратно в локальную студию».
+**Endpoint:** `POST /api/sigma-import/bundle` ([backend/app/api/regulations.py](backend/app/api/regulations.py)) — multipart ZIP.
+
+**Поток импорта** ([backend/app/services/sigma_export.py](backend/app/services/sigma_export.py) `import_bundle()`):
+
+1. ZIP распаковывается через `_parse_bundle_zip()`: каждая папка верхнего уровня → один регламент. `corpus_manifest.json` на корне игнорируется (informational).
+2. `source_id` берётся из `manifest.json` → fallback на имя папки в ZIP.
+3. `data.ttl` парсится `parse_regulation_turtle()` (уже был) с подмешиванием `shapes.ttl` для определения SHACL bounds параметров.
+4. Регламент сохраняется в DuckDB через `regulation_store.save(reg, author="sigma-import", comment="Импорт SIGMA-bundle")` — попадает в `regulation_history` как обычная правка.
+5. `shapes.ttl` пушится в upstream `client.update_shapes()`. Если upstream недоступен — мягко пропускается (`shapes_error` в отчёте), регламент уже в store.
+6. Возвращается отчёт `{imported, skipped, failed}` с разбивкой по `source_id`.
+
+**Гарантия валидации.** В [regulation_client.py](backend/app/services/regulation_client.py) `get_shapes()` теперь имеет 4-шаговый fallback: фикстура → upstream → фикстура (без флага) → **derived из `regulation_to_shacl_shapes(reg)`**. Любой регламент в store отдаёт непустой `RegulationShape` — bundle всегда валидируется СИГМОЙ. Закрывает требование ТЗ СИГМА §4.1.3 + [Rules-Management.pdf](Rules-Management.pdf): «каждое правило должно иметь форму валидации».
+
+**UI-вход:**
+
+- `/regulations` — кнопка **«Импорт из СИГМЫ»** в toolbar (рядом с «Экспорт в СИГМУ»). Принимает single/corpus ZIP. На успех показывается inline-баннер с списком имён регламентов.
+- `/regulations/{id}/constraints` — кнопка **«Импорт SHACL»** теперь принимает и `.ttl`, и `.zip`. Из ZIP'а ([shacl.py](backend/app/api/shacl.py) `_extract_shapes_from_zip`) вытащит только `shapes.ttl` (первый встретившийся). Для полного импорта bundle с регламентом — используем `/sigma-import/bundle`.
+
+**Тесты** ([backend/tests/test_sigma_export.py](backend/tests/test_sigma_export.py), 6 кейсов):
+- round-trip export → delete → import восстанавливает регламент и его параметры
+- corpus bundle (несколько регламентов) импортируется корректно
+- ZIP без `data.ttl` мягко скипается
+- bundle включает реальные пользовательские SHACL (mock upstream)
+- **каждый seed-регламент имеет непустую `RegulationShape`** — guarantee из §16.3 не регрессирует
 
 ---
 

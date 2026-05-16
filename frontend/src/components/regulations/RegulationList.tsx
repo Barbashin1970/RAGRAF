@@ -18,6 +18,7 @@ import {
   Shield,
   Sliders,
   Trash2,
+  Upload,
   Workflow,
   X,
 } from 'lucide-react'
@@ -100,6 +101,7 @@ export function RegulationList() {
   const [query, setQuery] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [showCreateDomain, setShowCreateDomain] = useState(false)
+  const qc = useQueryClient()
   const { data: rawDatasets, isLoading, error } = useQuery({
     queryKey: ['datasets'],
     queryFn: () => api.datasets.list(),
@@ -107,6 +109,17 @@ export function RegulationList() {
   const { data: domains = [] } = useQuery({
     queryKey: ['domains'],
     queryFn: () => api.domains.list(),
+  })
+
+  // Импорт SIGMA-bundle (ZIP) обратно в RAGRAF. Принимает single или corpus
+  // bundle — backend сам различает по структуре ZIP. На успех инвалидируем
+  // и список регламентов, и domains (если домены пересортируются).
+  const importBundle = useMutation({
+    mutationFn: (file: File) => api.regulations.importSigmaBundle(file),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['datasets'] })
+      qc.invalidateQueries({ queryKey: ['domains'] })
+    },
   })
 
   const items: RegRow[] = useMemo(() => {
@@ -202,6 +215,30 @@ export function RegulationList() {
           >
             Экспорт в СИГМУ
           </Button>
+          {/* Import — file-input спрятан в <label>; кастомное поведение нельзя
+              целиком отдать <Button>. Принимаем single bundle (один регламент)
+              или corpus bundle (несколько папок + corpus_manifest.json) —
+              backend сам различает по структуре ZIP. */}
+          <label
+            className={cn(
+              'inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 text-xs font-medium text-stone-700 transition hover:bg-stone-50',
+              importBundle.isPending && 'opacity-60 cursor-wait',
+            )}
+            title="Загрузить ZIP с регламентами из СИГМЫ (data.ttl + shapes.ttl): создаст или обновит регламенты в локальной БД"
+          >
+            <Upload size={14} className="text-blue-600" />
+            {importBundle.isPending ? 'Импорт…' : 'Импорт из СИГМЫ'}
+            <input
+              type="file"
+              accept=".zip,application/zip"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) importBundle.mutate(f)
+                e.currentTarget.value = ''
+              }}
+            />
+          </label>
           <Button
             variant="secondary"
             icon={<Boxes size={14} />}
@@ -218,6 +255,57 @@ export function RegulationList() {
 
       <CreateRegulationDialog open={showCreate} onClose={() => setShowCreate(false)} />
       <CreateDomainDialog open={showCreateDomain} onClose={() => setShowCreateDomain(false)} />
+
+      {/* Inline-баннер с результатом импорта. Не модалка — пользователь видит
+          обновлённый список регламентов под ним и понимает что добавилось. */}
+      {importBundle.data && (
+        <div className="mx-6 mt-3 flex items-start gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          <Upload size={14} className="mt-0.5 shrink-0 text-emerald-600" />
+          <div className="min-w-0 flex-1">
+            <div className="font-medium">
+              Импорт завершён: добавлено / обновлено {importBundle.data.total_imported}
+              {importBundle.data.total_skipped > 0 && `, пропущено ${importBundle.data.total_skipped}`}
+              {importBundle.data.total_failed > 0 && `, ошибок ${importBundle.data.total_failed}`}
+            </div>
+            {importBundle.data.imported.length > 0 && (
+              <div className="mt-1 text-xs text-emerald-700">
+                {importBundle.data.imported.map((it) => it.source_id).join(', ')}
+              </div>
+            )}
+            {importBundle.data.failed.length > 0 && (
+              <ul className="mt-1 text-xs text-rose-700">
+                {importBundle.data.failed.map((f, i) => (
+                  <li key={i}>
+                    <code className="rounded bg-rose-100 px-1">{f.source_id}</code> — {f.reason}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <button
+            onClick={() => importBundle.reset()}
+            className="shrink-0 rounded p-0.5 text-emerald-700 hover:bg-emerald-100"
+            aria-label="Закрыть"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+      {importBundle.isError && (
+        <div className="mx-6 mt-3 flex items-start gap-2 rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+          <AlertCircle size={14} className="mt-0.5 shrink-0" />
+          <div className="min-w-0 flex-1">
+            Не удалось импортировать: <span className="font-mono text-xs">{(importBundle.error as Error).message}</span>
+          </div>
+          <button
+            onClick={() => importBundle.reset()}
+            className="shrink-0 rounded p-0.5 text-rose-700 hover:bg-rose-100"
+            aria-label="Закрыть"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       <PageBody>
         {isLoading && (
