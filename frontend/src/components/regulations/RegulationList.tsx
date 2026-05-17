@@ -211,7 +211,7 @@ export function RegulationList() {
             />
           </div>
           <Button
-            variant="ghost"
+            variant="secondary"
             icon={<Download size={14} className="text-emerald-600" />}
             onClick={() => {
               // Batch SIGMA export. Прямая GET-навигация — браузер качает ZIP.
@@ -221,14 +221,15 @@ export function RegulationList() {
           >
             Экспорт в СИГМУ
           </Button>
-          {/* Import — file-input спрятан в <label>; кастомное поведение нельзя
-              целиком отдать <Button>. Принимаем single bundle (один регламент)
-              или corpus bundle (несколько папок + corpus_manifest.json) —
-              backend сам различает по структуре ZIP. */}
+          {/* Import — file-input не получается засунуть внутрь <Button>
+              (button не может содержать input как форму), поэтому используем
+              <label>. Стили один-в-один совпадают с `Button variant=secondary
+              size=md` чтобы шрифт/высота/отступы не «прыгали» относительно
+              Export-кнопки слева. */}
           <label
             className={cn(
-              'inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2.5 text-xs font-medium text-stone-700 transition hover:bg-stone-50',
-              importBundle.isPending && 'opacity-60 cursor-wait',
+              'inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-stone-200 bg-white px-3 text-sm font-medium text-stone-700 transition hover:bg-stone-50',
+              importBundle.isPending && 'cursor-wait opacity-60',
             )}
             title="Загрузить ZIP с регламентами из СИГМЫ (data.ttl + shapes.ttl): создаст или обновит регламенты в локальной БД"
           >

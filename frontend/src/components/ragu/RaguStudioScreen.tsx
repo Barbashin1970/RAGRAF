@@ -133,7 +133,6 @@ export function RaguStudioContent() {
   const [selected, setSelected] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [helpOpen, setHelpOpen] = useState(false)
-  const [whatIsOpen, setWhatIsOpen] = useState(false)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['ragu-prompts'],
@@ -183,36 +182,21 @@ export function RaguStudioContent() {
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
+          {/* Единая точка справки: интро «Что такое RAGU» + workflow +
+              ссылка на бэклог сценариев. Раньше было три отдельных входа
+              (две кнопки + плашка) с пересекающимся контентом — объединили
+              в один модал, чтобы не дублировать. */}
           <Button
             variant="author"
             size="sm"
-            icon={<BookOpen size={13} />}
-            onClick={() => setWhatIsOpen((v) => !v)}
-            aria-expanded={whatIsOpen}
-            title="Краткая справка: что такое RAGU и зачем она в связке с RAGRAF"
-          >
-            Что такое RAGU?
-          </Button>
-          <Link to="/sandbox/backlog" title="Бэклог: следующие RAGU-сценарии">
-            <Button variant="secondary" size="sm" icon={<Lightbulb size={13} className="text-amber-600" />}>
-              Бэклог демо
-            </Button>
-          </Link>
-          <Button
-            variant="secondary"
-            size="sm"
             icon={<HelpCircle size={13} />}
             onClick={() => setHelpOpen(true)}
-            title="Что это за экран и как им пользоваться"
+            title="Что такое RAGU, как пользоваться этим экраном, бэклог сценариев"
           >
-            Как это работает
+            Справка RAGU
           </Button>
         </div>
       </div>
-
-      {whatIsOpen && (
-        <WhatIsRaguPanel onClose={() => setWhatIsOpen(false)} />
-      )}
 
       {helpOpen && <HelpModal onClose={() => setHelpOpen(false)} />}
 
@@ -316,49 +300,6 @@ export function RaguStudioScreen() {
     <PageShell>
       <RaguStudioContent />
     </PageShell>
-  )
-}
-
-/**
- * Раскрывающаяся плашка «Что такое RAGU?» — раньше жила в шапке Студии
- * аналитики. Переехала в RAGU Studio как контекстная информация.
- */
-function WhatIsRaguPanel({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="border-b border-violet-200 bg-gradient-to-br from-violet-50/80 to-white px-6 py-3 text-xs text-stone-700">
-      <div className="mb-1 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-violet-700">
-          <BookOpen size={12} /> RAGU + RAGRAF — что это и зачем
-        </div>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={onClose}
-          aria-label="Скрыть справку"
-          className="h-6 w-6 p-0 text-violet-400 hover:text-violet-700"
-        >
-          <X size={12} />
-        </Button>
-      </div>
-      <p className="leading-relaxed">
-        <b>RAGU</b> — движок <i>GraphRAG</i>, который понимает технические тексты:
-        приказы, регламенты, СНиПы, ГОСТы. Из произвольного документа он вытаскивает
-        <b> параметры с диапазонами</b>, ищет похожие документы <b>по смыслу запроса</b>{' '}
-        (а не по совпадению слов), и связывает регламенты в <b>граф знаний</b> — где
-        видно, что один параметр живёт в нескольких регламентах разных ведомств.
-      </p>
-      <p className="mt-1.5 leading-relaxed">
-        <b>RAGRAF</b> — визуальный редактор и виз-карта поверх этих данных:
-        слайдеры, Rule DSL Flow, SHACL-ограничения, версионирование.
-      </p>
-      <div className="mt-2 border-t border-violet-100 pt-2 text-[11px] text-stone-500">
-        Полная версия с примерами и обоснованием — на{' '}
-        <Link to="/sandbox/backlog" className="font-medium text-violet-700 underline-offset-2 hover:underline">
-          странице бэклога
-        </Link>
-        .
-      </div>
-    </div>
   )
 }
 
@@ -718,9 +659,9 @@ function HelpModal({ onClose }: { onClose: () => void }) {
             </div>
             <div>
               <div className="text-[10px] font-semibold uppercase tracking-wide text-stone-500">
-                Онбординг
+                Справка
               </div>
-              <div className="text-sm font-semibold text-stone-900">Как пользоваться RAGU Studio</div>
+              <div className="text-sm font-semibold text-stone-900">RAGU: введение, workflow и бэклог</div>
             </div>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose} aria-label="Закрыть">
@@ -729,16 +670,28 @@ function HelpModal({ onClose }: { onClose: () => void }) {
         </header>
 
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-4 text-sm leading-relaxed text-stone-700">
-          <Section title="Что это за экран" icon={Sparkles}>
+          {/* Раздел 1 — раньше жил в WhatIsRaguPanel (inline-плашка под шапкой).
+              Объединили в этот же модал, чтобы у юзера была одна точка входа. */}
+          <Section title="Что такое RAGU + RAGRAF" icon={Sparkles}>
             <p>
-              <b>RAGU</b> — графовая RAG-библиотека, которую мы используем для извлечения сущностей
-              из регламентов, кластеризации в общины и ответа на вопросы по корпусу. Все её
-              «инструкции LLM-у» (промпты) живут внутри пакета — раньше это был чёрный ящик.
+              <b>RAGU</b> — движок <i>GraphRAG</i>, который понимает технические тексты:
+              приказы, регламенты, СНиПы, ГОСТы. Из произвольного документа он вытаскивает{' '}
+              <b>параметры с диапазонами</b>, ищет похожие документы <b>по смыслу запроса</b>{' '}
+              (не по совпадению слов) и связывает регламенты в <b>граф знаний</b> — где видно,
+              что один параметр живёт в нескольких регламентах разных ведомств.
             </p>
             <p className="mt-2">
-              На этом экране ты видишь все <b>18 системных промптов</b>, можешь переписать любой
-              и сохранить как override — RAGU подхватит твой текст на следующем запросе. Это
-              работает без форка библиотеки и без перезапуска бэкенда.
+              <b>RAGRAF</b> — визуальный редактор и виз-карта поверх этих данных: слайдеры,
+              Rule DSL Flow, SHACL-ограничения, версионирование, симулятор исполнения.
+            </p>
+          </Section>
+
+          <Section title="Что это за экран (RAGU Studio)" icon={Lightbulb}>
+            <p>
+              Здесь — все <b>18 системных промптов</b> RAGU. Можно переписать любой и
+              сохранить как override — RAGU подхватит твой текст на следующем запросе. Это
+              работает <b>без форка библиотеки</b> и <b>без перезапуска бэкенда</b>: овверайды
+              лежат в DuckDB и применяются через <code className="bg-stone-100 px-1 rounded">RaguGenerativeModule.update_prompt</code>.
             </p>
           </Section>
 
@@ -825,6 +778,44 @@ function HelpModal({ onClose }: { onClose: () => void }) {
               Это нативный путь RAGU, работающий через <code className="bg-stone-100 px-1 rounded">RaguGenerativeModule.update_prompt</code>{' '}
               — то есть форк библиотеки не нужен.
             </p>
+          </Section>
+
+          {/* Раздел про будущие RAGU-сценарии — раньше открывался отдельной
+              кнопкой «Бэклог демо», теперь живёт здесь как краткий список с
+              ссылкой на полную страницу /sandbox/backlog. Полный контент со
+              сложностью и RAGU-фичами — там; здесь — навигация. */}
+          <Section title="Будущие сценарии (бэклог)" icon={Lightbulb}>
+            <p className="mb-2 text-stone-600">
+              Идеи следующих RAGU-демо. Реализуем когда станет ясно, что именно нужно
+              аналитику или заказчику.
+            </p>
+            <ul className="ml-1 list-none space-y-1.5">
+              <Bullet>
+                <b>Knowledge Graph всех регламентов</b> — Cytoscape-карта с общими параметрами
+                между регламентами. <i>GlobalSearchEngine + community detection.</i>
+              </Bullet>
+              <Bullet>
+                <b>Сравнение двух регламентов</b> — RAGU подсвечивает общие / противоречащие
+                параметры. <i>Embedding similarity, cross-query.</i>
+              </Bullet>
+              <Bullet>
+                <b>Авто-классификация домена</b> — при создании регламента RAGU предсказывает
+                domain через embeddings и центроиды. <i>Embedder + cosine.</i>
+              </Bullet>
+              <Bullet>
+                <b>Q&A над регламентом</b> — панель «Спроси у RAGU» прямо на странице
+                регламента. <i>LocalSearchEngine + QueryPlanEngine.</i>
+              </Bullet>
+            </ul>
+            <div className="mt-3">
+              <Link
+                to="/sandbox/backlog"
+                onClick={onClose}
+                className="inline-flex items-center gap-1 text-[12px] font-medium text-violet-700 underline-offset-2 hover:underline"
+              >
+                Открыть полную страницу бэклога →
+              </Link>
+            </div>
           </Section>
         </div>
 

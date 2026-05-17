@@ -10,6 +10,7 @@ import { SandboxBacklog } from '@/components/sandbox/SandboxBacklog'
 import { RaguStudioScreen } from '@/components/ragu/RaguStudioScreen'
 import { SensorLibraryScreen } from '@/components/sensors/SensorLibraryScreen'
 import { ExecuteScreen } from '@/components/execute/ExecuteScreen'
+import { RegulationExtractScreen } from '@/components/regulations/RegulationExtractScreen'
 import { cn } from '@/lib/cn'
 
 function NavLink({ to, icon: Icon, label }: { to: string; icon: typeof Activity; label: string }) {
@@ -158,6 +159,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/regulations" replace />} />
           <Route path="/regulations" element={<RegulationList />} />
+          <Route path="/regulations/new-from-text" element={<RegulationExtractScreen />} />
           <Route path="/regulations/:id/edit" element={<RegulationEditorScreen />} />
           <Route path="/regulations/:id/flow" element={<FlowEditorScreen />} />
           <Route path="/regulations/:id/constraints" element={<ConstraintEditorScreen />} />
@@ -170,6 +172,8 @@ export default function App() {
               внутри Студии аналитика. Старые ссылки в коде/документации
               не ломаются. */}
           <Route path="/ragu" element={<Navigate to="/sandbox?tab=ragu" replace />} />
+          {/* Старый маршрут extract-tab — теперь отдельный экран в /regulations. */}
+          <Route path="/sandbox/extract" element={<Navigate to="/regulations/new-from-text" replace />} />
           <Route path="*" element={<div className="p-6 text-stone-500">Страница не найдена</div>} />
         </Routes>
       </main>

@@ -167,18 +167,22 @@ export function CreateRegulationDialog({ open, onClose }: Props) {
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-stone-200 bg-stone-50 px-5 py-3">
-          {/* Альтернативный entry-point: «текст → параметры → регламент» через песочницу.
-              Author-вариант кнопки (violet) — визуально подсказывает что переход в
-              Author Layer (Студию аналитика). */}
+          {/* Альтернативный entry-point: «текст → параметры → регламент».
+              Раньше переходило в Sandbox (там жил extract-tab), теперь —
+              в полноэкранный /regulations/new-from-text. Это rules-based
+              regex без LLM, поэтому экран в разделе «Регламенты», а не в
+              «Студии аналитика». Если в диалоге уже выбран домен — пробрасываем
+              его в новый экран через ?domain=, чтобы выбор не сбрасывался. */}
           <Button
             variant="author"
             icon={<Wand2 size={14} />}
             onClick={() => {
               onClose()
-              navigate('/sandbox?tab=extract')
+              const q = domain ? `?domain=${encodeURIComponent(domain)}` : ''
+              navigate(`/regulations/new-from-text${q}`)
             }}
             disabled={create.isPending}
-            title="Открыть песочницу с примерами регламентов — extractor предложит параметры из текста"
+            title="Открыть полноэкранный режим извлечения параметров: вставляешь текст, выбираешь параметры, создаётся регламент"
           >
             Извлечь из текста
           </Button>
