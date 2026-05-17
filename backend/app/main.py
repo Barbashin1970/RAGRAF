@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import datasets, flow, graph, ragu, regulations, sandbox, sensor_schemas, shacl, search, validate, versions
+from app.api import datasets, extraction_terms, flow, graph, ragu, regulations, sandbox, sensor_schemas, shacl, search, validate, versions
 from app.config import settings
 from app.services import regulation_store, sensor_schema_store
 
@@ -20,6 +20,12 @@ async def lifespan(_: FastAPI):
         sensor_schema_store.init_db()
     except Exception as e:
         print(f"[lifespan] sensor_schema_store.init_db failed: {e}")
+    # Словарь rules-based извлечения — отдельная таблица, идемпотентный seed.
+    try:
+        from app.services import extraction_term_store
+        extraction_term_store.init_db()
+    except Exception as e:
+        print(f"[lifespan] extraction_term_store.init_db failed: {e}")
     yield
 
 
@@ -151,3 +157,4 @@ app.include_router(search.router, prefix="/api", tags=["search"])
 app.include_router(sandbox.router, prefix="/api", tags=["sandbox"])
 app.include_router(ragu.router, prefix="/api", tags=["ragu"])
 app.include_router(sensor_schemas.router, prefix="/api", tags=["sensor-schemas"])
+app.include_router(extraction_terms.router, prefix="/api", tags=["extraction-terms"])

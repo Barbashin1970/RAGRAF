@@ -143,13 +143,16 @@ def semantic_search(query: str, top_k: int = 5) -> list[dict[str, Any]]:
 # ── Parameter extraction ──────────────────────────────────────────────
 
 
-# Словарь контекстных слов (русск.) → camelCase parameter name.
-# Используется чтобы для матча "давление 20.5 атм" вытащить name=pressure.
+# Fallback-словарь контекстных слов (русск.) → camelCase parameter name.
+# DEPRECATED: используется только если DuckDB-таблица `extraction_terms`
+# недоступна (например в чисто-unit-тестах без lifespan). Боевой путь —
+# `extraction_term_store.get_dict()`, который читается на КАЖДЫЙ
+# extract-вызов и подхватывает пользовательские правки без рестарта.
 #
-# Порядок не важен — `_guess_name` берёт стем с максимальным `rfind` (ближе к
-# числу). Стемы могут быть многословные ("пик нагрузк") и пересекаться по
-# подстрокам — это нормально, выигрывает ближайший к числу.
-CONTEXT_NAMES: dict[str, str] = {
+# Аналитик добавляет новые термины из UI («Словарь» в RegulationExtractScreen),
+# они сразу применяются на следующем extract. См. также SEED_TERMS в
+# extraction_term_store.py — там полный список с domain-тэгами.
+CONTEXT_NAMES_FALLBACK: dict[str, str] = {
     # — Физические параметры
     "температур": "temperature",
     "давлен": "pressure",
@@ -261,24 +264,52 @@ def _left_context(text: str, start: int, width: int = 80) -> str:
     return chunk
 
 
-def _guess_name(window: str) -> str | None:
+def _load_dict() -> dict[str, tuple[str, str | None]]:
+    """stem → (parameter_name, domain).
+
+    Читается из DuckDB на каждый extract — даёт hot-reload пользовательских
+    правок без рестарта. Если DB недоступна (чистые unit-тесты) — fallback
+    на хардкод CONTEXT_NAMES_FALLBACK (без domain-тэгов, predicted_domain
+    в таком режиме всегда None).
+    """
+    try:
+        from app.services import extraction_term_store
+        terms = extraction_term_store.get_dict()
+        return {stem: (t.parameter_name, t.domain) for stem, t in terms.items()}
+    except Exception:
+        # DuckDB не поднят / lifespan не выполнялся — fallback на хардкод.
+        return {stem: (name, None) for stem, name in CONTEXT_NAMES_FALLBACK.items()}
+
+
+def _guess_name(window: str, dictionary: dict[str, tuple[str, str | None]] | None = None) -> tuple[str, str | None] | None:
     """Ищем контекстное слово в окрестности матча.
+
+    Возвращает (parameter_name, domain) — domain нужен для подсчёта голосов
+    за предсказание домена в `extract_parameters`. None если не нашли.
 
     Выбираем стем с самым ПОЗДНИМ вхождением — оно ближе всего к числу
     (наиболее релевантное). Это важно для случаев «...температура 70°C,
     давление 4 атм» где надо привязать «4» к «давление», а не к «температура».
     """
+    d = dictionary if dictionary is not None else _load_dict()
     w = window.lower()
-    best: tuple[int, str] | None = None
-    for stem, name in CONTEXT_NAMES.items():
+    best: tuple[int, str, str | None] | None = None
+    for stem, (name, domain) in d.items():
         idx = w.rfind(stem)
         if idx != -1 and (best is None or idx > best[0]):
-            best = (idx, name)
-    return best[1] if best else None
+            best = (idx, name, domain)
+    return (best[1], best[2]) if best else None
 
 
-def _guess_name_with_fallback(text: str, match_start: int, match_end: int) -> str | None:
+def _guess_name_with_fallback(
+    text: str,
+    match_start: int,
+    match_end: int,
+    dictionary: dict[str, tuple[str, str | None]],
+) -> tuple[str, str | None] | None:
     """Многоуровневый поиск имени параметра.
+
+    Возвращает (parameter_name, domain) или None.
 
     Раньше использовали только окно 80 символов слева — это не работает на
     текстах где ключевое слово стоит в начале абзаца, а само число — в конце
@@ -297,15 +328,15 @@ def _guess_name_with_fallback(text: str, match_start: int, match_end: int) -> st
     """
     # 1. Узкое окно слева — приоритет proximity
     near = _left_context(text, match_start, width=80)
-    name = _guess_name(near)
-    if name:
-        return name
+    hit = _guess_name(near, dictionary)
+    if hit:
+        return hit
 
     # 2. Целое предложение вокруг матча
     sentence = _enclosing_sentence(text, match_start, match_end)
-    name = _guess_name(sentence)
-    if name:
-        return name
+    hit = _guess_name(sentence, dictionary)
+    if hit:
+        return hit
 
     # 3. Предыдущее предложение (для конструкций «Заголовок: ... 6 ± 2 ч ...»)
     prev_chunk = text[max(0, match_start - 400) : match_start]
@@ -317,7 +348,7 @@ def _guess_name_with_fallback(text: str, match_start: int, match_end: int) -> st
     )
     if last_sent_break != -1:
         prev_chunk = prev_chunk[: last_sent_break + 1]
-    return _guess_name(prev_chunk)
+    return _guess_name(prev_chunk, dictionary)
 
 
 def _enclosing_sentence(text: str, start: int, end: int) -> str:
@@ -328,27 +359,30 @@ def _enclosing_sentence(text: str, start: int, end: int) -> str:
     return text[sent_start + 1 : sent_end + 1].strip()
 
 
-def extract_parameters(text: str) -> list[dict[str, Any]]:
-    """Найти все «число (± deviation) единица» паттерны и предложить имена.
+def extract_parameters(text: str) -> dict[str, Any]:
+    """Извлечь параметры из текста + предсказать домен.
 
     Returns:
-      [
-        {
-          "id": "...",  # клиент использует как React key
-          "suggested_name": "pressure",
-          "value": 20.5,
-          "deviation": 1.5,
-          "unit": "атм",
-          "source_text": "...",       # предложение целиком
-          "confidence": 0.85,         # 0..1, выше = больше уверенность в имени
-        },
-        ...
-      ]
+      {
+        "extracted": [{id, suggested_name, value, deviation, unit, source_text, confidence}, ...],
+        "predicted_domain": "heating" | "housing" | "safety" | "environment" | None,
+        "domain_scores": [{"domain": "heating", "hits": 5, "confidence": 0.71}, ...],
+      }
+
+    Предсказание домена работает так: при каждом матче термин словаря несёт
+    тэг domain (опциональный). Считаем гистограмму голосов по доменам;
+    predicted_domain = argmax, confidence = top_count / total_hits.
+
+    Извлечение — rules-based, без LLM. Словарь читается из DuckDB
+    extraction_terms на каждый вызов (горячая правка из UI).
     """
     if not (text or "").strip():
-        return []
+        return {"extracted": [], "predicted_domain": None, "domain_scores": []}
 
+    dictionary = _load_dict()
     found: list[dict[str, Any]] = []
+    domain_votes: dict[str, int] = {}
+
     for m in _PARAM_PATTERN.finditer(text):
         raw_value, raw_dev, unit = m.group(1), m.group(2), m.group(3)
         value = _to_float(raw_value)
@@ -358,8 +392,6 @@ def extract_parameters(text: str) -> list[dict[str, Any]]:
 
         # Детект: «...при допустимом отклонении 5.5 атм» — текущий матч это
         # deviation предыдущего параметра, а не новый параметр. Сливаем.
-        # Окно 40 символов слева от числа — туда вмещается «при допустимом
-        # отклонении» / «максимальным отклонением» и т.п.
         left_for_dev = text[max(0, m.start() - 40) : m.start()]
         is_deviation_continuation = bool(_DEVIATION_MARKER_RE.search(left_for_dev))
 
@@ -367,43 +399,62 @@ def extract_parameters(text: str) -> list[dict[str, Any]]:
             prev = found[-1]
             if prev["unit"] == unit and prev.get("deviation") is None:
                 prev["deviation"] = value
-                # Confidence чуть выше — мы поняли структуру «ref + отдельный deviation».
                 prev["confidence"] = round(min(1.0, prev["confidence"] + 0.05), 2)
-                # Расширим source_text включив и deviation-кусок.
                 prev["source_text"] = _enclosing_sentence(text, m.start(), m.end()) or prev["source_text"]
                 continue
 
-        # Многоуровневый поиск имени: окно 80 → предложение → предыдущее
-        # предложение. Подробнее см. `_guess_name_with_fallback`.
-        suggested = _guess_name_with_fallback(text, m.start(), m.end())
-        confidence = 0.85 if suggested else 0.4
-        # Слегка повышаем confidence если есть симметричное deviation —
-        # это сильно похоже на наш формат "ref ± dev unit".
+        # Многоуровневый поиск имени + domain-тэг сматчившегося термина.
+        hit = _guess_name_with_fallback(text, m.start(), m.end(), dictionary)
+        suggested_name: str | None
+        matched_domain: str | None = None
+        if hit:
+            suggested_name, matched_domain = hit
+        else:
+            suggested_name = None
+
+        confidence = 0.85 if suggested_name else 0.4
         if deviation is not None:
             confidence = min(1.0, confidence + 0.1)
 
         sentence = _enclosing_sentence(text, m.start(), m.end())
 
-        # Если имя не угадали — даём осмысленный русский плейсхолдер
-        # (не "param_N" — не путаем аналитика английским литералом, плюс
-        # явно сигналим «надо переименовать вручную»).
-        if not suggested:
-            suggested = f"параметр_{len(found) + 1}"
+        if not suggested_name:
+            suggested_name = f"параметр_{len(found) + 1}"
+
+        if matched_domain:
+            domain_votes[matched_domain] = domain_votes.get(matched_domain, 0) + 1
 
         found.append(
             {
                 "id": f"ext_{uuid.uuid4().hex[:8]}",
-                "suggested_name": suggested,
+                "suggested_name": suggested_name,
                 "value": value,
                 "deviation": deviation,
                 "unit": unit,
                 "source_text": sentence or text[max(0, m.start() - 30) : m.end() + 30].strip(),
                 "confidence": round(confidence, 2),
-                # auto-derived bounds (для удобного импорта в редактор)
                 "min_inclusive": 0.0 if value >= 0 else None,
+                "matched_domain": matched_domain,  # для отладки / выделения в UI
             }
         )
-    return found
+
+    # Сортируем домены по числу голосов; predicted = argmax (если есть голоса).
+    total_hits = sum(domain_votes.values())
+    domain_scores: list[dict[str, Any]] = []
+    if total_hits > 0:
+        for dom, hits in sorted(domain_votes.items(), key=lambda kv: kv[1], reverse=True):
+            domain_scores.append({
+                "domain": dom,
+                "hits": hits,
+                "confidence": round(hits / total_hits, 2),
+            })
+    predicted = domain_scores[0]["domain"] if domain_scores else None
+
+    return {
+        "extracted": found,
+        "predicted_domain": predicted,
+        "domain_scores": domain_scores,
+    }
 
 
 # ── RAGU-aware switching ──────────────────────────────────────────────

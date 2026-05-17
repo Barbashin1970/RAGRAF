@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { useMutation } from '@tanstack/react-query'
-import { ArrowLeft, Check, FileSearch, Loader2, PackagePlus } from 'lucide-react'
-import { api } from '@/lib/api'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, BookOpen, Check, FileSearch, Loader2, PackagePlus, Plus, RefreshCw, Trash2, X } from 'lucide-react'
+import { api, type ExtractionTerm } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { DOMAIN_VISUALS, getDomainVisual } from '@/lib/domains'
 import { Button } from '@/components/ui'
@@ -136,6 +136,10 @@ export function RegulationExtractScreen() {
   const [regName, setRegName] = useState(DEFAULT_PRESET.suggestedName)
   // Если в URL пришёл domain — берём его, иначе дефолт пресета.
   const [domain, setDomain] = useState<string>(presetDomain ?? DEFAULT_PRESET.suggestedDomain)
+  // Аналитик мог выбрать домен сам — не перезаписываем его автопредсказанием.
+  const [domainManuallyPicked, setDomainManuallyPicked] = useState(false)
+  // Модал редактирования словаря — открывается из кнопки в шапке.
+  const [showDictionary, setShowDictionary] = useState(false)
 
   const extract = useMutation({
     mutationFn: () => api.sandbox.extractParameters(text),
@@ -149,6 +153,17 @@ export function RegulationExtractScreen() {
       setPicked(newPicked)
       setIncluded(newIncluded)
       setCustomNames({})
+      // Авто-выбор предсказанного домена, если юзер ещё не лазил руками.
+      // predicted_domain rules-based — точность ограничена; если confidence
+      // меньше 50%, не подменяем (юзер сам решит).
+      if (
+        !domainManuallyPicked &&
+        data.predicted_domain &&
+        data.domain_scores &&
+        data.domain_scores[0]?.confidence >= 0.5
+      ) {
+        setDomain(data.predicted_domain)
+      }
     },
   })
 
@@ -239,8 +254,21 @@ export function RegulationExtractScreen() {
               temperature и т.д.). Подходит для формулировок вида «параметр N ± M ед.».
             </p>
           </div>
+          <div className="shrink-0">
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<BookOpen size={13} />}
+              onClick={() => setShowDictionary(true)}
+              title="Открыть редактор словаря: можно добавлять/менять стемы для распознавания"
+            >
+              Словарь
+            </Button>
+          </div>
         </div>
       </header>
+
+      {showDictionary && <DictionaryEditor onClose={() => setShowDictionary(false)} />}
 
       <main className="mx-auto w-full max-w-5xl flex-1 space-y-4 px-6 py-5">
         <StepHeader n={1} title="Вставь текст регламента или выбери пример справа" />
@@ -309,7 +337,12 @@ export function RegulationExtractScreen() {
             regName={regName}
             onNameChange={setRegName}
             domain={domain}
-            onDomainChange={setDomain}
+            onDomainChange={(d) => {
+              setDomain(d)
+              setDomainManuallyPicked(true)
+            }}
+            predictedDomain={extract.data?.predicted_domain ?? null}
+            predictedConfidence={extract.data?.domain_scores?.[0]?.confidence ?? 0}
             onCreate={doCreate}
             canCreate={canCreate}
             isPending={create.isPending}
@@ -519,6 +552,8 @@ function BuildRegulationPanel({
   canCreate,
   isPending,
   error,
+  predictedDomain,
+  predictedConfidence,
 }: {
   selectedCount: number
   regName: string
@@ -529,6 +564,8 @@ function BuildRegulationPanel({
   canCreate: boolean
   isPending: boolean
   error: Error | null
+  predictedDomain: string | null
+  predictedConfidence: number
 }) {
   const v = getDomainVisual(domain)
   return (
@@ -566,7 +603,17 @@ function BuildRegulationPanel({
           </label>
 
           <div>
-            <div className="mb-1 text-xs font-medium text-stone-700">Домен</div>
+            <div className="mb-1 flex items-baseline gap-2">
+              <span className="text-xs font-medium text-stone-700">Домен</span>
+              {predictedDomain && (
+                <span
+                  className="rounded-full bg-violet-100 px-1.5 py-0.5 font-mono text-[10px] font-medium text-violet-700"
+                  title="Предсказание словаря: какой домен чаще всего голосовал сматчившимися терминами"
+                >
+                  словарь голосует: {predictedDomain} · {Math.round(predictedConfidence * 100)}%
+                </span>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {Object.entries(DOMAIN_VISUALS).map(([id, vv]) => {
                 const Icon = vv.icon
@@ -645,5 +692,295 @@ function ConfidenceBadge({ value }: { value: number }) {
     <span className={cn('rounded-full px-1.5 py-0.5 text-[10px] font-medium', tone)}>
       confidence {pct}%
     </span>
+  )
+}
+
+
+// ── Модал редактирования словаря rules-based извлечения ────────────────
+//
+// Backend: extraction_terms таблица в DuckDB. Каждая запись — стем русского
+// слова (например «давлен») → имя параметра (pressure) + optional domain.
+// Все термины ПОЛНОСТЬЮ редактируемые независимо от source — и seed,
+// и user-добавленные. При правке seed-термина source автоматически
+// меняется на 'user' (бэкенд форсит), чтобы UI отличал «свежий» seed
+// от изменённого.
+
+function DictionaryEditor({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient()
+  const { data: terms = [], isLoading } = useQuery({
+    queryKey: ['extraction-terms'],
+    queryFn: () => api.extractionTerms.list(),
+  })
+
+  const [filter, setFilter] = useState('')
+  const [draft, setDraft] = useState<ExtractionTerm | null>(null)
+
+  const upsert = useMutation({
+    mutationFn: (t: ExtractionTerm) => api.extractionTerms.upsert(t.stem, t),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['extraction-terms'] }),
+  })
+  const remove = useMutation({
+    mutationFn: (stem: string) => api.extractionTerms.delete(stem),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['extraction-terms'] }),
+  })
+  const reseed = useMutation({
+    mutationFn: () => api.extractionTerms.reseed(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['extraction-terms'] }),
+  })
+
+  const filtered = useMemo(() => {
+    const q = filter.trim().toLowerCase()
+    if (!q) return terms
+    return terms.filter((t) =>
+      t.stem.toLowerCase().includes(q) ||
+      t.parameter_name.toLowerCase().includes(q) ||
+      (t.domain ?? '').toLowerCase().includes(q),
+    )
+  }, [terms, filter])
+
+  const userCount = terms.filter((t) => t.source === 'user').length
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 backdrop-blur-[2px] p-4" onClick={onClose}>
+      <div
+        className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-stone-200 bg-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header className="flex items-center justify-between border-b border-stone-200 bg-violet-50/40 px-5 py-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-violet-100 text-violet-700">
+              <BookOpen size={18} />
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-stone-500">Словарь</div>
+              <div className="text-sm font-semibold text-stone-900">
+                Термины извлечения — {terms.length} {userCount > 0 ? `(${userCount} ваших)` : '(все seed)'}
+              </div>
+            </div>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Закрыть">
+            <X size={16} />
+          </Button>
+        </header>
+
+        <div className="border-b border-stone-200 bg-stone-50/60 px-5 py-2">
+          <p className="text-[11px] leading-snug text-stone-600">
+            Стем — подстрочный паттерн в русском тексте (например «давлен» матчит «давление», «давлением»). Каждый
+            термин редактируется независимо от <b>source</b>: seed-термины тоже можно править, после правки они
+            пометятся как user.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 border-b border-stone-200 px-5 py-2">
+          <input
+            type="search"
+            placeholder="Фильтр по стему / параметру / домену…"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="flex-1 rounded-md border border-stone-200 bg-white px-2 py-1 text-sm placeholder-stone-400"
+          />
+          <Button
+            size="sm"
+            variant="primary"
+            icon={<Plus size={13} />}
+            onClick={() => setDraft({ stem: '', parameter_name: '', domain: null, unit_hint: null, source: 'user' })}
+            disabled={draft !== null}
+          >
+            Добавить
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<RefreshCw size={13} />}
+            onClick={() => {
+              if (confirm('Сбросить ВСЕ правки и пересеять дефолтный набор?')) {
+                reseed.mutate()
+              }
+            }}
+            loading={reseed.isPending}
+            title="Удалить все пользовательские термины и восстановить дефолтный seed"
+          >
+            Сброс
+          </Button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
+          {isLoading ? (
+            <div className="text-sm text-stone-500">Загрузка…</div>
+          ) : (
+            <table className="w-full table-fixed text-sm">
+              <thead>
+                <tr className="border-b border-stone-200 text-left text-[11px] uppercase tracking-wide text-stone-500">
+                  <th className="w-[140px] py-2 pr-2 font-medium">Стем</th>
+                  <th className="w-[160px] py-2 pr-2 font-medium">Параметр</th>
+                  <th className="w-[110px] py-2 pr-2 font-medium">Домен</th>
+                  <th className="w-[80px] py-2 pr-2 font-medium">Ед.</th>
+                  <th className="w-[80px] py-2 pr-2 font-medium">Source</th>
+                  <th className="w-[80px] py-2"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {draft && (
+                  <TermRow
+                    term={draft}
+                    isDraft
+                    onSave={(t) => upsert.mutate(t, { onSuccess: () => setDraft(null) })}
+                    onCancel={() => setDraft(null)}
+                    saving={upsert.isPending}
+                  />
+                )}
+                {filtered.map((t) => (
+                  <TermRow
+                    key={t.stem}
+                    term={t}
+                    onSave={(u) => upsert.mutate(u)}
+                    onDelete={() => {
+                      if (confirm(`Удалить термин «${t.stem}» → ${t.parameter_name}?`)) {
+                        remove.mutate(t.stem)
+                      }
+                    }}
+                    saving={upsert.isPending}
+                  />
+                ))}
+                {filtered.length === 0 && !draft && (
+                  <tr>
+                    <td colSpan={6} className="py-6 text-center text-sm text-stone-500">
+                      Терминов нет. Нажмите «Добавить».
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const DOMAIN_OPTIONS = [
+  { value: '', label: '— cross-domain —' },
+  { value: 'heating', label: 'Теплоснабжение' },
+  { value: 'housing', label: 'ЖКХ' },
+  { value: 'safety', label: 'Безопасность' },
+  { value: 'environment', label: 'Экология' },
+]
+
+interface TermRowProps {
+  term: ExtractionTerm
+  isDraft?: boolean
+  onSave: (t: ExtractionTerm) => void
+  onCancel?: () => void
+  onDelete?: () => void
+  saving: boolean
+}
+
+function TermRow({ term, isDraft, onSave, onCancel, onDelete, saving }: TermRowProps) {
+  const [local, setLocal] = useState<ExtractionTerm>(term)
+  const dirty = JSON.stringify(local) !== JSON.stringify(term)
+  const canSave = local.stem.trim().length > 0 && local.parameter_name.trim().length > 0
+
+  return (
+    <tr className={cn('border-b border-stone-100 text-sm', isDraft && 'bg-amber-50/40')}>
+      <td className="py-1.5 pr-2">
+        {isDraft ? (
+          <input
+            className="w-full rounded border border-stone-300 px-1.5 py-1 font-mono text-xs"
+            placeholder="стем (напр. давлен)"
+            value={local.stem}
+            onChange={(e) => setLocal({ ...local, stem: e.target.value })}
+            autoFocus
+          />
+        ) : (
+          <span className="font-mono text-xs">{local.stem}</span>
+        )}
+      </td>
+      <td className="py-1.5 pr-2">
+        <input
+          className="w-full rounded border border-stone-200 px-1.5 py-1 font-mono text-xs"
+          placeholder="parameter_name"
+          value={local.parameter_name}
+          onChange={(e) => setLocal({ ...local, parameter_name: e.target.value })}
+        />
+      </td>
+      <td className="py-1.5 pr-2">
+        <select
+          className="w-full rounded border border-stone-200 bg-white px-1.5 py-1 text-xs"
+          value={local.domain ?? ''}
+          onChange={(e) => setLocal({ ...local, domain: e.target.value || null })}
+        >
+          {DOMAIN_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      </td>
+      <td className="py-1.5 pr-2">
+        <input
+          className="w-full rounded border border-stone-200 px-1.5 py-1 text-xs"
+          placeholder="—"
+          value={local.unit_hint ?? ''}
+          onChange={(e) => setLocal({ ...local, unit_hint: e.target.value || null })}
+        />
+      </td>
+      <td className="py-1.5 pr-2">
+        <span
+          className={cn(
+            'rounded-full px-1.5 py-0.5 text-[10px] font-medium',
+            local.source === 'user' ? 'bg-violet-100 text-violet-700' : 'bg-stone-100 text-stone-600',
+          )}
+        >
+          {local.source}
+        </span>
+      </td>
+      <td className="py-1.5 text-right">
+        <div className="flex items-center justify-end gap-1">
+          {isDraft ? (
+            <>
+              <Button
+                size="sm"
+                variant="primary"
+                icon={<Plus size={11} />}
+                disabled={!canSave || saving}
+                loading={saving}
+                onClick={() => onSave(local)}
+              >
+                Создать
+              </Button>
+              <button
+                onClick={onCancel}
+                className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                title="Отмена"
+                type="button"
+              >
+                <X size={13} />
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => canSave && onSave(local)}
+                disabled={!dirty || !canSave || saving}
+                className={cn(
+                  'rounded px-1.5 py-0.5 text-[11px]',
+                  dirty && canSave ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'text-stone-300',
+                )}
+                title={dirty ? 'Сохранить' : 'Без изменений'}
+                type="button"
+              >
+                Сохранить
+              </button>
+              <button
+                onClick={onDelete}
+                className="rounded p-1 text-rose-600 hover:bg-rose-50"
+                title="Удалить термин"
+                type="button"
+              >
+                <Trash2 size={13} />
+              </button>
+            </>
+          )}
+        </div>
+      </td>
+    </tr>
   )
 }

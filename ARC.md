@@ -347,6 +347,9 @@ erDiagram
 | `parameters`           | Параметры регламента (1:N)                                | `(source_id, id)` PK · `name` · `datatype` · `ref_value` · `deviation` · `unit` · `min_inclusive` · `max_inclusive` · `position` |
 | `regulation_history`   | Snapshot-ы при каждом save (полный JSON)                  | `version_id` PK · `source_id` FK · `snapshot` (JSON) · `created_at` · `author` · `comment` |
 | `flow_versions`        | История Rule DSL Flow                                     | `version_id` PK · `regulation_id` FK · `dsl_snapshot` (JSON) · `diff_summary` |
+| `sensor_subtypes`      | Подтипы датчиков (22 в seed: видеодетекторы Нетрис, Войслинк, DAS, air-варианты) | `subtype_id` PK · `class_id` (= SensorType литерал) · `label` · `description` · `position` |
+| `sensor_field_schemas` | Поля payload для каждого подтипа (282 в seed)             | `(subtype_id, field_name)` PK · `datatype` · `unit` · `description` · `required` · `example_value` · `position` |
+| `extraction_terms`     | Словарь rules-based извлечения параметров из текста       | `stem` PK · `parameter_name` · `domain` · `unit_hint` · `source` (seed/user) |
 
 **Constraints** (SHACL-ограничения) хранятся не отдельной таблицей, а как Turtle-документ через upstream `regulation_client.constraints_turtle()` или локально через rdflib — это сохраняет round-trip совместимость с внешними SHACL-валидаторами. Парсинг — `parse_shapes_turtle()` в `turtle_bridge.py`.
 
@@ -354,10 +357,13 @@ erDiagram
 
 | Где                                              | Что                                                                          |
 |--------------------------------------------------|------------------------------------------------------------------------------|
-| `backend/app/services/sandbox.py · CONTEXT_NAMES`| 30+ стемов русского → camelCase имя параметра (для extract)                  |
 | `backend/app/services/sandbox.py · KNOWN_UNITS`  | 15 единиц измерения (атм, °C, м/с, мкг/м³, %, ч, мин, …)                     |
-| `backend/data/fixtures/*.ttl`                    | 6 эталонных регламентов (теплоснабжение, ЖКХ, безопасность, экология) — seed |
-| `frontend/src/lib/api.ts · NODE_KIND_META`       | 7 типов узлов Rule DSL Flow + lucide-иконки                                  |
+| `backend/app/services/sandbox.py · CONTEXT_NAMES_FALLBACK` | DEPRECATED fallback на случай если DuckDB-словарь недоступен в тестах. Боевой путь — `extraction_terms` таблица |
+| `backend/app/services/extraction_term_store.py · SEED_TERMS` | 70+ стартовых терминов извлечения по доменам — heating/housing/safety/environment + общие. Сидятся в `extraction_terms` |
+| `backend/app/services/sensor_schema_store.py · SEED_SUBTYPES + SEED_FIELDS` | 22 подтипа датчиков (видеодетекторы Нетрис/Войслинк по PDF-спецификациям 2024, DAS, CO2/PM/NO2). 282 поля payload — ORM-источник правды по person/anpr |
+| `backend/data/fixtures/*.ttl`                    | 8 эталонных регламентов (heating, housing, safety, environment + nsu-parking-anpr) — seed |
+| `frontend/src/lib/api.ts · NODE_KIND_META`       | 7 типов узлов Rule DSL Flow + sensor → lucide-иконки                         |
+| `frontend/src/lib/api.ts · SENSOR_TYPE_META`     | 7 классов датчиков (p/t/flow/noise/detector/fiber/air) + цветовая палитра    |
 | `frontend/src/lib/domains.ts`                    | Цветовое кодирование доменов на карточках регламентов                        |
 
 ### 4.3 Enum'ы
@@ -1148,6 +1154,62 @@ UI: кнопка «Экспорт в СИГМУ» в шапке Regulation Edito
 - **каждый seed-регламент имеет непустую `RegulationShape`** — guarantee из §16.3 не регрессирует
 
 ---
+
+## 16.4 Execute Layer (runtime, частично готов)
+
+**Реализовано** (май 2026):
+
+- **Flow Executor** (`backend/app/services/flow_executor.py`) — интерпретатор Rule DSL flow с тремя стратегиями привязки sensor-показаний: по `sensor_id`, по `param_id`, по `sensor_type`. Возвращает `level + recommendation + fired_nodes + fired_edges + trace`.
+- **Endpoint** `POST /api/regulations/{sid}/execute` — принимает `{readings, dsl?}`, возвращает `ExecutionResult`. Тот же контракт можно вызывать из СИГМЫ как «movement → вердикт».
+- **Sensor-нода в Flow Editor** — оранжевый круг, тип физического датчика (`SensorType`), привязка к input через `bindsTo` (автозаполняется при рисовании ребра).
+- **ExecutePanel** в Flow Editor — пресеты «Норма / Внимание / Критика», подсветка сработавшего пути на канвасе.
+- **Экран `/execute`** — список регламентов с CTA «Симулировать», status-grid «что работает / что в работе».
+- **Библиотека датчиков** (`/sensors`) — DuckDB-backed дерево классов → подтипов → полей payload. CRUD из UI.
+- **Словарь rules-based извлечения** (`/regulations/new-from-text` → «Словарь») — DuckDB-backed CRUD по терминам. Predicted_domain по голосованию.
+
+**Не реализовано (бэклог)**:
+
+- `POST /api/events/ingest` — приёмник реальных событий от СИГМЫ.
+- Журнал срабатываний в DuckDB + UI-timeline.
+- Webhook-actions на OUTPUT-ноде.
+- `POST /api/etl/match-event` — поиск подходящего регламента по полям payload.
+
+См. секцию «📡 Приёмник событий СИГМЫ» в [BACKLOG.md](BACKLOG.md).
+
+## 16.5 Sensor library — двухуровневая модель (класс → подтип → поля)
+
+**Хранилище**: `sensor_subtypes` + `sensor_field_schemas` (см. §4.2). Сидится из `SEED_SUBTYPES` и `SEED_FIELDS` в `extraction_term_store.py` при первом старте.
+
+**Подтипы**:
+- **Видеодетекторы Нетрис** (10): `vd-face`, `vd-person` (76 ORM-атрибутов), `vd-fall`, `vd-anpr` (16 ORM-полей из `EventNumberPlate`), `vd-smoke`, `vd-fire`, `vd-weapon`, `vd-motion`, `vd-boost`, `vd-aggressive` — по PDF #13 «Выходные данные Детекторов событий Нетрис» (2024).
+- **Видеодетекторы Войслинк** (6): `vd-vehicle-brand`, `vd-accident`, `vd-stop-in-lane`, `vd-dropped-cargo`, `vd-pedestrian`, `vd-driver-violation` — по PDF #14 (2024).
+- **DAS**: `fiber-vibration`, `fiber-temperature` — distributed acoustic / temperature sensing.
+- **Air**: `air-co2`, `air-pm`, `air-no2`.
+- **Generic per class** (1 на каждый из 7 классов) — для обратной совместимости с flows без выбранного подтипа.
+
+**Источник правды по полям**:
+- ORM-файлы `event-data-examples/videodetectors/*.py` (для `vd-person` и `vd-anpr`).
+- PDF-спецификации для остальных детекторов.
+
+**Frontend**:
+- `/sensors` — tree-CRUD по классам/подтипам/полям.
+- В PropertyPanel sensor-ноды: селектор класса + селектор подтипа + JSON-превью payload (читается из реестра).
+
+## 16.6 Rules-based извлечение параметров с domain prediction
+
+**Что**: `POST /api/sandbox/extract-parameters` принимает произвольный текст регламента, возвращает кандидатов в параметры (`value ± deviation unit`) + `predicted_domain`.
+
+**Как работает**:
+- Regex `_PARAM_PATTERN` ловит `число [± deviation] единица` из `KNOWN_UNITS`.
+- Для каждого матча: ищем стем в словаре `extraction_terms` (DuckDB) в окне 80 символов слева → предложение → предыдущее предложение.
+- Каждый сматчившийся термин голосует за свой `domain` тэг. `predicted_domain = argmax(votes)`.
+
+**Словарь — редактируемый**:
+- 70+ стартовых терминов в `SEED_TERMS` (`extraction_term_store.py`) по 4 доменам.
+- UI «Словарь» в `/regulations/new-from-text` позволяет CRUD'ить термины. Все правки (включая seed) сохраняются в DuckDB; при правке seed-термина `source` автоматом меняется на `user`.
+- «Дообучение» = `PUT /api/extraction-terms/{stem}` — добавление нераспознанных слов. Применяется на следующем extract без рестарта.
+
+**Без LLM**: чисто rules-based regex + словарь. Экран перенесён из `/sandbox` (где жил рядом с LLM-чатом) в `/regulations/new-from-text` именно поэтому — это инструмент Model Layer, не Author Layer.
 
 ## 17. Ссылки
 

@@ -218,6 +218,23 @@ export const sensorFieldsByTypeSchema = z.object({
 
 export const sensorSchemasListResponse = z.array(sensorFieldsByTypeSchema)
 
+// ── Extraction dictionary (rules-based) ────────────────────────────────
+export const extractionTermSchema = z.object({
+  stem: z.string(),
+  parameter_name: z.string(),
+  domain: z.string().nullable().optional(),
+  unit_hint: z.string().nullable().optional(),
+  source: z.enum(['seed', 'user']),
+})
+
+export const extractionTermsListResponse = z.array(extractionTermSchema)
+
+export const domainScoreSchema = z.object({
+  domain: z.string(),
+  hits: z.number(),
+  confidence: z.number(),
+})
+
 // ── Validation result ────────────────────────────────────────────────────
 
 export const validationErrorSchema = z.object({
@@ -384,12 +401,18 @@ export const sandboxExtractedParamSchema = z.object({
   source_text: z.string(),
   confidence: z.number(),
   min_inclusive: z.number().nullable().optional(),
+  // Какой домен голосовал этот матч (для отладки и подсветки в UI).
+  matched_domain: z.string().nullable().optional(),
 })
 
 export const sandboxExtractResponseSchema = z.object({
   mode: z.enum(['mock', 'real']),
   extracted: z.array(sandboxExtractedParamSchema),
   count: z.number(),
+  // Новое (rules-based dictionary): предсказание домена по голосованию
+  // сматчившихся терминов. Optional — старые клиенты получают undefined.
+  predicted_domain: z.string().nullable().optional(),
+  domain_scores: z.array(domainScoreSchema).optional(),
 })
 
 export const sandboxCreateFromParamsResponseSchema = z.object({

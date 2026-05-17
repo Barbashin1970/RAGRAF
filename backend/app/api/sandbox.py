@@ -194,16 +194,20 @@ def sandbox_search(req: SearchRequest) -> dict[str, Any]:
 
 @router.post("/sandbox/extract-parameters")
 def sandbox_extract_parameters(req: ExtractRequest) -> dict[str, Any]:
-    """Извлечь параметры из произвольного текста регламента.
+    """Извлечь параметры из произвольного текста регламента + предсказать домен.
 
-    Mock-режим: regex по `число [± deviation] единица` + контекстный словарь
-    (давление → pressure, температура → temperature и т.п.).
+    Rules-based: regex по `число [± deviation] единица` + DuckDB-словарь
+    extraction_terms (давление → pressure, дым → smokeConcentration, ...).
+    Каждый термин может нести domain-тэг — это голос за предсказание домена
+    регламента. predicted_domain = argmax по сумме голосов.
     """
-    found = sandbox.extract_parameters(req.text)
+    result = sandbox.extract_parameters(req.text)
     return {
         "mode": sandbox.backend_mode(),
-        "extracted": found,
-        "count": len(found),
+        "extracted": result["extracted"],
+        "count": len(result["extracted"]),
+        "predicted_domain": result["predicted_domain"],
+        "domain_scores": result["domain_scores"],
     }
 
 

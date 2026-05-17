@@ -289,6 +289,28 @@ class SensorClassWithSubtypes(BaseModel):
     subtypes: list[SensorSubtype] = Field(default_factory=list)
 
 
+# --- Extraction dictionary ---------------------------------------------
+#
+# Словарь «русский стем → имя параметра» для rules-based извлечения
+# параметров из произвольного текста регламента. Раньше хардкод в коде —
+# теперь редактируемый набор пар. Аналитик «дообучает» движок добавляя
+# нераспознанные слова. См. extraction_term_store.py.
+
+class ExtractionTerm(BaseModel):
+    stem: str                       # «давлен», «температур» — стем для подстрочного поиска
+    parameter_name: str             # «pressure», «temperature» — что предложить
+    domain: str | None = None       # heating / housing / safety / environment / None (cross-domain)
+    unit_hint: str | None = None    # 'атм' / '°C' — подсказка для UI (необязательно)
+    source: Literal["seed", "user"] = "seed"  # помечает откуда взялся термин — для UI
+
+
+class DomainScore(BaseModel):
+    """Голоса за домен по результатам извлечения."""
+    domain: str
+    hits: int                       # сколько extract'ов сматчилось на термин этого домена
+    confidence: float               # 0..1 — доля от total_hits
+
+
 # --- Search (RAGU) ------------------------------------------------------
 
 

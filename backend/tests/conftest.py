@@ -34,6 +34,9 @@ def isolated_data_dir(tmp_path, monkeypatch):
     # выживает между тестами и проносит данные одного теста в следующий.
     from app.services import sensor_schema_store
     importlib.reload(sensor_schema_store)
+    # То же самое для extraction_term_store.
+    from app.services import extraction_term_store
+    importlib.reload(extraction_term_store)
     yield
     # cleanup: закрыть DuckDB connections обоих stores
     try:
@@ -46,6 +49,13 @@ def isolated_data_dir(tmp_path, monkeypatch):
         if sensor_schema_store._conn is not None:
             sensor_schema_store._conn.close()
             sensor_schema_store._conn = None
+    except Exception:
+        pass
+    try:
+        from app.services import extraction_term_store as ets
+        if ets._conn is not None:
+            ets._conn.close()
+            ets._conn = None
     except Exception:
         pass
 

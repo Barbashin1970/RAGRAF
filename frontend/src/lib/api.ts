@@ -170,6 +170,23 @@ export interface SensorFieldsByType {
   fields: SensorFieldSchema[]
 }
 
+// ── Extraction dictionary ─────────────────────────────────────────────
+// Словарь rules-based извлечения — DuckDB-backed, аналитик «дообучает»
+// движок добавлением новых стемов из UI. См. /api/extraction-terms.
+export interface ExtractionTerm {
+  stem: string                  // подстрочный паттерн в русском тексте
+  parameter_name: string        // что предложить в качестве имени параметра
+  domain?: string | null        // тэг домена (heating/housing/safety/environment) или null
+  unit_hint?: string | null     // подсказка единицы для UI
+  source: 'seed' | 'user'
+}
+
+export interface DomainScore {
+  domain: string
+  hits: number
+  confidence: number            // 0..1, доля от total_hits
+}
+
 // ── Режим «Исполнение» (Execute) ──────────────────────────────────────
 // Зеркалит app/services/flow_executor.py. ETL → POST /execute → ExecutionResult.
 export interface SensorReading {
@@ -226,6 +243,8 @@ import {
   sandboxLlmInfoSchema,
   saveResponseSchema,
   searchResponseSchema,
+  extractionTermSchema,
+  extractionTermsListResponse,
   sensorFieldSchema,
   sensorFieldsByTypeSchema,
   sensorSchemasListResponse,
@@ -625,6 +644,30 @@ export const api = {
       request<{ ok: boolean; subtype_id: string }>(
         `/api/sensor-subtypes/${encodeURIComponent(subtypeId)}`,
         { method: 'DELETE' },
+      ),
+  },
+  // ── Словарь rules-based извлечения ─────────────────────────────────
+  // CRUD над DuckDB extraction_terms: пополнение нераспознанными словами
+  // прямо из UI («Словарь» в RegulationExtractScreen). Source-of-truth
+  // для seed-набора — backend/app/services/extraction_term_store.py.
+  extractionTerms: {
+    list: () =>
+      request(`/api/extraction-terms`, undefined, extractionTermsListResponse),
+    upsert: (stem: string, body: ExtractionTerm) =>
+      request(
+        `/api/extraction-terms/${encodeURIComponent(stem)}`,
+        { method: 'PUT', body: JSON.stringify(body) },
+        extractionTermSchema,
+      ),
+    delete: (stem: string) =>
+      request<{ ok: boolean; stem: string }>(
+        `/api/extraction-terms/${encodeURIComponent(stem)}`,
+        { method: 'DELETE' },
+      ),
+    reseed: () =>
+      request<{ ok: boolean; terms_seeded: number }>(
+        `/api/extraction-terms/reseed`,
+        { method: 'POST' },
       ),
   },
   sensorSchemas: {
