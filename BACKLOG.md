@@ -456,6 +456,28 @@ for r in row:
 
 ---
 
+## 🧠 NER-обогащение через Natasha (русский NER без обучения)
+
+**Идея.** Дополнить rules-based извлечение параметров (numeric + unit) лёгким русским NER-слоем, который ловит `DATE / TIME / LAW / ORG / MONEY` — те классы, что наш regex-парсер игнорирует. Цель — автоматическая привязка регламента к нормативной базе («согласно ГОСТ 22270-2018», «ФЗ-261», «по СНиП 41-01») и извлечение периодичности («проверка каждые 30 минут», «не менее одного раза в смену»).
+
+**Почему Natasha, а не NEREL fine-tune.** Natasha — pip-пакет `pip install natasha`, pre-trained на русском, без GPU и без обучения. F1 ~80 на новостях, для наших технических текстов скорее всего сопоставимо или чуть ниже. Альтернатива (fine-tune `rubert-base-cased` на [NEREL](https://github.com/nerel-ds/NEREL) dataset) даёт +5 F1, но требует 2-4 GPU-часа и пайплайн обучения. Для MVP это лишнее.
+
+**Что делаем (за полдня):**
+1. `pip install natasha` в [backend/requirements.txt](backend/requirements.txt).
+2. Новый сервис `backend/app/services/ner_temporal.py` — обёртка над `natasha.NamesExtractor` + `DatesExtractor` + регулярки на LAW (`ГОСТ \d`, `ФЗ-\d`, `СНиП [\d.-]+`).
+3. В [sandbox.extract_parameters](backend/app/services/sandbox.py) — после числового извлечения, дополнительный проход NER, найденные `DATE/TIME/LAW` подцепляются как мета-атрибуты регламента:
+   - `validity_period: {from, to}` если есть date-диапазон
+   - `source_law_refs: [...]` массив строк
+   - `periodicity: "каждые 30 минут"` свободный текст
+4. UI: новая секция «Нормативные ссылки и сроки» в RegulationEditor рядом с параметрами.
+5. Тесты на 5-10 примеров из `Rules-Management.pdf`: ловим минимум ГОСТ-ссылки и временные периоды.
+
+**Если Natasha не зайдёт по качеству** — апгрейд через NEREL fine-tune `DeepPavlov/rubert-base-cased`. Это уже отдельная задача со своим GPU-бюджетом.
+
+**Чего НЕ делаем:** Natasha не помогает с `pressure / temperature / flowRate` — это останется на словаре стемов + regex. Natasha дополняет, не заменяет.
+
+---
+
 ## Документация / DX
 
 - Юнит-тесты на `templates.py` (сейчас покрыто только через `test_create_regulation.py`).

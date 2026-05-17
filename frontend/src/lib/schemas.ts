@@ -379,6 +379,10 @@ export const sandboxLlmInfoSchema = z.object({
   // Когда false — рисуем баннер «семантический поиск ограничен»
   // и блокируем форму загрузки PDF/DOCX.
   embeddings_enabled: z.boolean().optional(),
+  // Поддерживает ли провайдер ручную настройку контекстного окна.
+  // Только Ollama (через extra_body.options.num_ctx). Cloud-провайдеры
+  // выбирают context-size сами по модели — слайдер UI скрывает.
+  supports_num_ctx: z.boolean().optional(),
   ragu_enabled: z.boolean(),
   llm_model: z.string(),
   embed_model: z.string(),

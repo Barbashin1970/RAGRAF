@@ -1,0 +1,50 @@
+# Что НЕ нужно отправлять в Railway snapshot.
+# Railway применяет .railwayignore при upload архива (до docker build),
+# экономит время заливки и место в build cache. Дополняет .dockerignore.
+
+# ── IDE / OS / Claude ─────────────────────────────────────────────────
+.claude/
+.vscode/
+.idea/
+.DS_Store
+
+# ── Python / Node артефакты разработки ────────────────────────────────
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/node_modules/
+**/.vite/
+frontend/dist/
+frontend/coverage/
+
+# ── Тесты — не нужны runtime'у Railway ────────────────────────────────
+backend/tests/
+
+# ── Документация и сэмплы ─────────────────────────────────────────────
+*.md
+*.pdf
+docs/
+event-data-examples/
+TZ_SIGMA*.pdf
+Rules-Management.pdf
+
+# ── DuckDB-бэкапы ─────────────────────────────────────────────────────
+backend/data/*.bak-*
+backend/data/*.wal.bak-*
+
+# ── Env-файлы ─────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── Логи ──────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Локальные launcher'ы и внешние сабпроекты ─────────────────────────
+start.bat
+start.command
+external/
+scripts/

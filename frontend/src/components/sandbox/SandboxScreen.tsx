@@ -512,13 +512,16 @@ function SearchDemo() {
         : disabledRegulationIds.size > 0
           ? Array.from(disabledRegulationIds)
           : undefined
+      // num_ctx применим только к Ollama. Для cloud-провайдеров не отправляем —
+      // бэк всё равно срежет, но не засоряем payload.
+      const supportsNumCtx = llmInfo?.supports_num_ctx !== false
       return api.sandbox.chat(
         history,
         {
           top_k: topK,
           temperature,
           max_tokens: maxTokens,
-          num_ctx: numCtx,
+          ...(supportsNumCtx ? { num_ctx: numCtx } : {}),
           extra_system_prompt: extraSystemPrompt.trim() || undefined,
           disabled_regulation_ids: effectiveDisabled,
           model: resolveModelTag(modelKind, llmInfo),
@@ -1013,28 +1016,40 @@ function ChatSettingsPanel({
               label="max tokens"
               value={maxTokens}
               min={50}
-              max={2000}
-              step={50}
-              format={(v) => `${v}`}
-              hint="Лимит длины ОТВЕТА. 600 ≈ 3-5 пунктов, 200 ≈ короткий абзац"
+              // Cloud-провайдеры (Cerebras Qwen3-235B, gpt-oss-120b) выдают
+              // до 16K в одном ответе; Ollama на M2 практически — 4K потолок.
+              // llm-info.limits.max_tokens отражает это автоматически.
+              max={llmInfoForPanel?.limits.max_tokens[1] ?? 4000}
+              step={(llmInfoForPanel?.limits.max_tokens[1] ?? 4000) >= 8000 ? 500 : 50}
+              format={(v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}K` : `${v}`)}
+              hint={
+                llmInfoForPanel?.provider === 'cerebras'
+                  ? 'Лимит длины ОТВЕТА. Cerebras Qwen3-235B / gpt-oss-120b cap’ятся на 16K; llama3.1-8b — 8K.'
+                  : 'Лимит длины ОТВЕТА. 600 ≈ 3-5 пунктов, 200 ≈ короткий абзац'
+              }
               onChange={(v) => onParamsChange({ maxTokens: v })}
             />
-            <ParamSlider
-              label="num_ctx (контекст)"
-              value={numCtx}
-              min={2048}
-              max={32768}
-              step={2048}
-              format={(v) => (v >= 1024 ? `${(v / 1024).toFixed(0)}K` : `${v}`)}
-              hint={
-                numCtx >= 16384
-                  ? '⚠ >16K — qwen2.5:7b займёт 6+ ГБ RAM, prompt-eval будет медленным'
-                  : numCtx <= 4096
-                    ? 'Короткий контекст: быстро, но длинный документ обрежется'
-                    : 'Окно «видимого» текста — вход + ответ. 8K хватает на 5-6 регламентов + history'
-              }
-              onChange={(v) => onParamsChange({ numCtx: v })}
-            />
+            {/* num_ctx применим только к Ollama (extra_body.options.num_ctx).
+                Cloud-провайдеры выбирают context-окно сами по модели — слайдер
+                не делает ничего. Скрываем чтобы не путать. */}
+            {llmInfoForPanel?.supports_num_ctx !== false && (
+              <ParamSlider
+                label="num_ctx (контекст)"
+                value={numCtx}
+                min={2048}
+                max={32768}
+                step={2048}
+                format={(v) => (v >= 1024 ? `${(v / 1024).toFixed(0)}K` : `${v}`)}
+                hint={
+                  numCtx >= 16384
+                    ? '⚠ >16K — qwen2.5:7b займёт 6+ ГБ RAM, prompt-eval будет медленным'
+                    : numCtx <= 4096
+                      ? 'Короткий контекст: быстро, но длинный документ обрежется'
+                      : 'Окно «видимого» текста — вход + ответ. 8K хватает на 5-6 регламентов + history'
+                }
+                onChange={(v) => onParamsChange({ numCtx: v })}
+              />
+            )}
             {customGenParams && (
               <button
                 onClick={onResetParams}
@@ -1443,8 +1458,8 @@ function TypingIndicator() {
         {elapsed >= 30 && (
           <div className="mt-1 max-w-[280px] text-[10px] leading-tight text-stone-500">
             {elapsed >= 90
-              ? 'Очень долго. Возможно стоит уменьшить num_ctx или отключить лишний контекст.'
-              : 'qwen2.5:7b на M2 Air медленный — обычно 30-90 сек на ответ.'}
+              ? 'Очень долго. Возможно стоит уменьшить max_tokens или отключить лишний контекст.'
+              : 'LLM отвечает дольше обычного — это нормально для длинных контекстов или большой модели.'}
           </div>
         )}
       </div>
@@ -1483,7 +1498,7 @@ function ChatBubble({ turn }: { turn: ChatTurn }) {
           <div className="text-[10px] text-stone-400">
             {turn.mode === 'real' ? (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-1.5 py-0.5 text-emerald-700">
-                <Sparkles size={9} /> ответ от локальной LLM (Ollama)
+                <Sparkles size={9} /> ответ LLM
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-1.5 py-0.5 text-amber-700">

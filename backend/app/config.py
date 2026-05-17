@@ -49,6 +49,13 @@ class Settings(BaseSettings):
 
     data_dir: str = "./data"
 
+    # Каталог собранной фронт-статики (`frontend/dist/` после `npm run build`).
+    # В dev — пуст (фронт работает на Vite-сервере 5173, прокси на /api).
+    # На Railway — Dockerfile копирует `frontend/dist/` сюда и FastAPI
+    # отдаёт SPA + assets как статику + catch-all на index.html для роутов
+    # React Router (см. main.py).
+    static_dir: str = ""
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

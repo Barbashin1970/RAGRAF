@@ -1,0 +1,78 @@
+# Что НЕ копировать в Docker build context при сборке из корня RAGRAF.
+# Railway использует корень репозитория как build-context (см. railway.json),
+# поэтому .dockerignore лежит именно здесь.
+#
+# Цель: не пихать в image то, что runtime'у не нужно — это экономит время
+# сборки, размер image, и bandwidth для push в Railway.
+
+# ── IDE / OS / Claude ─────────────────────────────────────────────────
+.claude/
+.vscode/
+.idea/
+.DS_Store
+**/.DS_Store
+
+# ── Git ───────────────────────────────────────────────────────────────
+.git/
+.gitignore
+.gitattributes
+
+# ── Python: venv, кэши, тесты ─────────────────────────────────────────
+**/.venv/
+**/venv/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+backend/tests/
+
+# ── Node: модули, кэши ────────────────────────────────────────────────
+# frontend/node_modules выкидываем — multi-stage Docker сам поставит
+# через npm ci в stage 1. То же с .vite (dev-кэш).
+**/node_modules/
+**/.vite/
+frontend/dist/
+frontend/coverage/
+
+# ── Документация / scratch ────────────────────────────────────────────
+# Не нужны runtime'у. Если кому понадобятся — есть git.
+*.md
+!backend/data/fixtures/INDEX.md
+*.pdf
+docs/
+event-data-examples/
+ARC.md
+ARC-SIGMA.md
+BACKLOG.md
+DEPLOY.md
+README.md
+REVIEW.md
+TZ_RAGRAF.md
+TZ_SIGMA*.pdf
+Rules-Management.pdf
+
+# ── DuckDB-бэкапы ─────────────────────────────────────────────────────
+# Локальные timestamped-бэкапы хранят 8+ МБ каждый, на проде не нужны.
+backend/data/*.bak-*
+backend/data/*.wal.bak-*
+backend/data/regulations.duckdb.wal
+
+# ── Логи / отчёты ─────────────────────────────────────────────────────
+*.log
+logs/
+reports/
+
+# ── Локальные launcher'ы (macOS / Windows) — не нужны на сервере ──────
+start.bat
+start.command
+
+# ── Внешние сабпроекты и одноразовые скрипты ──────────────────────────
+# external/ — клон RAGU, не используется runtime'ом (мы зовём по API).
+# scripts/ — администраторские утилиты, в image не нужны.
+external/
+scripts/
+
+# ── Env-файлы — НЕ копировать в image ─────────────────────────────────
+# Конфиг на проде идёт через Railway Variables, не через .env в файле.
+.env
+.env.*
+!.env.example

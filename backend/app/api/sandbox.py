@@ -39,7 +39,11 @@ class ChatRequest(BaseModel):
     messages: list[ChatMessage] = Field(..., min_length=1)
     top_k: int = Field(4, ge=1, le=10)
     temperature: float | None = Field(None, ge=0.0, le=1.5)
-    max_tokens: int | None = Field(None, ge=50, le=4000)
+    # 16000 — потолок под cloud-провайдеры (Cerebras Qwen3-235B выдаёт до 16K
+    # в одном ответе). Для Ollama UI самоограничит до 4000 через `limits` в
+    # llm-info, но сам бэкенд принимает до 16000 — это не вредит, длинные
+    # ответы Ollama просто медленно генерируются, но не падают.
+    max_tokens: int | None = Field(None, ge=50, le=16000)
     extra_system_prompt: str | None = Field(None, max_length=4000)
     # Регламенты, исключённые из retrieval'а для этого запроса (галки сняты в
     # левой панели). Длина 0..200 чтобы не дать клиенту прислать монстр-список.
@@ -127,6 +131,14 @@ async def sandbox_llm_info() -> dict[str, Any]:
     from app.services import embedding_index
     from app.config import settings as cfg
 
+    # Для cloud-провайдеров поднимаем верхнюю границу max_tokens до 16000 —
+    # Cerebras Qwen3-235B / gpt-oss-120b выдают до 16K в одном ответе, на M2
+    # с qwen2.5:7b 4000 был рациональным потолком (RAM + время). Это меняет
+    # только верхнюю границу слайдера — дефолт остаётся 600 (короткие ответы
+    # для Q&A; длинные саммари — пользователь подкручивает сам).
+    is_cloud = cfg.llm_provider not in ("ollama", "mock")
+    max_tokens_cap = 16000 if is_cloud else 4000
+
     info: dict[str, Any] = {
         "mode": sandbox.backend_mode(),
         "provider": cfg.llm_provider,
@@ -142,11 +154,15 @@ async def sandbox_llm_info() -> dict[str, Any]:
             cfg.embedding_base_url
             and cfg.embedding_base_url != cfg.openai_base_url
         ),
+        # `num_ctx` имеет смысл только для Ollama (она читает `extra_body.options.num_ctx`).
+        # Cloud-провайдеры выбирают context-window сами по модели (не управляется
+        # через API). UI скрывает слайдер если supports_num_ctx=false.
+        "supports_num_ctx": cfg.llm_provider == "ollama",
         "defaults": {"temperature": 0.1, "top_k": 4, "max_tokens": 600},
         "limits": {
             "temperature": [0.0, 1.5],
             "top_k": [1, 10],
-            "max_tokens": [50, 4000],
+            "max_tokens": [50, max_tokens_cap],
         },
         "llm_reachable": False,
         "llm_loaded_in_memory": False,
@@ -176,9 +192,37 @@ async def sandbox_llm_info() -> dict[str, Any]:
                     info["loaded_models"] = loaded
         except Exception:
             pass
-    elif cfg.llm_provider not in ("ollama", "mock"):
-        # Облачные провайдеры — считаем доступным если есть api_key.
-        info["llm_reachable"] = bool(cfg.openai_api_key)
+    elif cfg.llm_provider not in ("ollama", "mock") and cfg.openai_base_url:
+        # Облачные OpenAI-совместимые провайдеры — пингуем `/v1/models`
+        # чтобы получить актуальный список (Cerebras / Groq / OpenRouter / OpenAI
+        # все поддерживают этот endpoint). На stale preset из кода больше не
+        # полагаемся — если провайдер добавил / убрал модель, UI сразу увидит.
+        # Fallback на preset если запрос упал (timeout / 401 / сеть).
+        import httpx
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                models_url = cfg.openai_base_url.rstrip("/") + "/models"
+                resp = await client.get(
+                    models_url,
+                    headers={"Authorization": f"Bearer {cfg.openai_api_key}"} if cfg.openai_api_key else {},
+                )
+                if resp.status_code == 200:
+                    data = resp.json()
+                    live = [m["id"] for m in data.get("data", []) if m.get("id")]
+                    if live:
+                        # Если текущая модель из настроек есть в живом списке —
+                        # ставим её первой, чтобы UI открывал picker с правильным
+                        # выбором по умолчанию.
+                        if cfg.ragu_llm_model in live:
+                            live = [cfg.ragu_llm_model] + [m for m in live if m != cfg.ragu_llm_model]
+                        info["available_models"] = live
+                    info["llm_reachable"] = True
+                else:
+                    info["llm_reachable"] = bool(cfg.openai_api_key)
+        except Exception:
+            # Сетевой fail — оставляем preset из _provider_model_presets()
+            # и доверяем наличию ключа как «должно работать».
+            info["llm_reachable"] = bool(cfg.openai_api_key)
 
     # Размер embedding-индекса — без побочных эффектов (если ещё не построен, не строим).
     try:

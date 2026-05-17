@@ -1,7 +1,10 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api import datasets, extraction_terms, flow, graph, ragu, regulations, sandbox, sensor_schemas, shacl, search, validate, versions
 from app.config import settings
@@ -141,7 +144,11 @@ app.add_middleware(
 
 
 @app.get("/health", tags=["meta"])
+@app.get("/api/health", tags=["meta"])
 def health() -> dict[str, str]:
+    """Health-check для Railway / docker-compose. Возвращает 200 как только
+    FastAPI поднял lifespan и слушает порт. Дублируется на /api/health чтобы
+    из-под reverse-proxy запрос не уходил в SPA-catch-all."""
     return {"status": "ok"}
 
 
@@ -158,3 +165,43 @@ app.include_router(sandbox.router, prefix="/api", tags=["sandbox"])
 app.include_router(ragu.router, prefix="/api", tags=["ragu"])
 app.include_router(sensor_schemas.router, prefix="/api", tags=["sensor-schemas"])
 app.include_router(extraction_terms.router, prefix="/api", tags=["extraction-terms"])
+
+
+# ── SPA static serving ────────────────────────────────────────────────
+# В dev (vite на 5173 проксирует /api → :8000) этот блок выключен — settings.static_dir
+# пустой. На проде в Dockerfile укажем STATIC_DIR=/srv/frontend_dist, и
+# FastAPI начнёт раздавать:
+#   - /assets/* — статика с долгим cache (Vite-хеширует имена файлов)
+#   - / и любой неизвестный путь — index.html (для роутов React Router)
+# Catch-all регистрируется ПОСЛЕ всех api-роутеров, иначе перехватит /api/*.
+if settings.static_dir:
+    _static_root = Path(settings.static_dir).resolve()
+    if _static_root.is_dir():
+        _assets_dir = _static_root / "assets"
+        if _assets_dir.is_dir():
+            # Vite кладёт хешированные JS/CSS в /assets — раздаём с
+            # immutable-cache (1 год), браузер не дёргает их повторно.
+            app.mount(
+                "/assets",
+                StaticFiles(directory=str(_assets_dir)),
+                name="assets",
+            )
+
+        _index_html = _static_root / "index.html"
+
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def spa_fallback(full_path: str):
+            # /api/* уже выловлены роутерами выше; если запрос дошёл сюда —
+            # это либо реальный файл (vite.svg, favicon.ico), либо
+            # клиентский маршрут SPA → отдаём index.html.
+            # Блокируем path-traversal: resolve относительно root.
+            if full_path:
+                candidate = (_static_root / full_path).resolve()
+                if (
+                    _static_root in candidate.parents
+                    and candidate.is_file()
+                ):
+                    return FileResponse(candidate)
+            if _index_html.is_file():
+                return FileResponse(_index_html)
+            raise HTTPException(status_code=404, detail="SPA index.html not found")
