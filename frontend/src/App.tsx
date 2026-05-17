@@ -140,8 +140,15 @@ export default function App() {
     <div className="flex h-full flex-col">
       {!isLanding && (
         <header className="flex items-center gap-3 border-b border-stone-200 bg-white px-4 py-2">
-          <Link to="/" className="mr-2 text-lg font-semibold text-primary transition hover:text-primary/80" title="На главную">
-            RAGRAF
+          <Link
+            to="/"
+            className="group mr-2 inline-flex items-center gap-1.5 text-lg font-semibold text-primary transition hover:text-primary/80"
+            title="На главную «Сигма»"
+          >
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-600 text-white transition group-hover:bg-blue-700">
+              <span aria-hidden style={{ fontWeight: 700, lineHeight: 1 }}>Σ</span>
+            </span>
+            <span>RAGRAF</span>
           </Link>
           {/* Навигация отражает Author/Execute split (см. BACKLOG → Phase 1).
               «Студия аналитика» — где LLM/RAGU помогают разобрать документы;

@@ -11,6 +11,7 @@
 }
 
 html, body, #root { height: 100%; }
+html { scroll-behavior: smooth; }  /* плавный scroll к anchor-ссылкам на лендинге */
 body { font-family: 'Inter', system-ui, sans-serif; }
 
 /* Cytoscape container default */
