@@ -1,6 +1,7 @@
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Activity, Beaker, BookOpen, ExternalLink, FileJson, ListTree, PlayCircle, Radar } from 'lucide-react'
 import { GraphView } from '@/components/graph/GraphView'
+import { LandingScreen } from '@/components/landing/LandingScreen'
 import { RegulationList } from '@/components/regulations/RegulationList'
 import { RegulationEditorScreen } from '@/components/regulations/RegulationEditorScreen'
 import { FlowEditorScreen } from '@/components/flow/FlowEditorScreen'
@@ -129,35 +130,45 @@ function DocsMenu() {
 }
 
 export default function App() {
+  // На главной (LandingScreen) показываем «маркетинговый» layout без
+  // top-nav — landing — это полностраничный hero. На всех остальных
+  // экранах — стандартная шапка с навигацией.
+  const { pathname } = useLocation()
+  const isLanding = pathname === '/'
+
   return (
     <div className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b border-stone-200 bg-white px-4 py-2">
-        <div className="mr-2 text-lg font-semibold text-primary">RAGRAF</div>
-        {/* Навигация отражает Author/Execute split (см. BACKLOG → Phase 1).
-            «Студия аналитика» — где LLM/RAGU помогают разобрать документы;
-            «Регламенты» — структурированные модели (data layer);
-            «Исполнение» — runtime (event-mode), пока заглушка с roadmap. */}
-        <nav className="flex items-center gap-1">
-          <NavLink to="/sandbox" icon={Beaker} label="Студия аналитика" />
-          <NavLink to="/regulations" icon={ListTree} label="Регламенты" />
-          <NavLink to="/sensors" icon={Radar} label="Датчики" />
-          <NavLink to="/graph" icon={Activity} label="Граф связей" />
-          {/* RAGU Studio переехала внутрь Студии аналитика как 3-й таб
-              (см. SandboxScreen). Из шапки убрана чтобы навигация была
-              4-уровневой (3 экрана + roadmap), не превращалась в кашу. */}
-          <ExecutionNavLink />
-        </nav>
-        <div className="ml-auto flex items-center gap-2">
-          <span className="hidden text-xs text-stone-500 lg:inline">
-            визуализатор и редактор регламентов
-          </span>
-          <DocsMenu />
-        </div>
-      </header>
+      {!isLanding && (
+        <header className="flex items-center gap-3 border-b border-stone-200 bg-white px-4 py-2">
+          <Link to="/" className="mr-2 text-lg font-semibold text-primary transition hover:text-primary/80" title="На главную">
+            RAGRAF
+          </Link>
+          {/* Навигация отражает Author/Execute split (см. BACKLOG → Phase 1).
+              «Студия аналитика» — где LLM/RAGU помогают разобрать документы;
+              «Регламенты» — структурированные модели (data layer);
+              «Исполнение» — runtime (event-mode), пока заглушка с roadmap. */}
+          <nav className="flex items-center gap-1">
+            <NavLink to="/sandbox" icon={Beaker} label="Студия аналитика" />
+            <NavLink to="/regulations" icon={ListTree} label="Регламенты" />
+            <NavLink to="/sensors" icon={Radar} label="Датчики" />
+            <NavLink to="/graph" icon={Activity} label="Граф связей" />
+            {/* RAGU Studio переехала внутрь Студии аналитика как 3-й таб
+                (см. SandboxScreen). Из шапки убрана чтобы навигация была
+                4-уровневой (3 экрана + roadmap), не превращалась в кашу. */}
+            <ExecutionNavLink />
+          </nav>
+          <div className="ml-auto flex items-center gap-2">
+            <span className="hidden text-xs text-stone-500 lg:inline">
+              визуализатор и редактор регламентов
+            </span>
+            <DocsMenu />
+          </div>
+        </header>
+      )}
 
       <main className="min-h-0 flex-1 overflow-hidden">
         <Routes>
-          <Route path="/" element={<Navigate to="/regulations" replace />} />
+          <Route path="/" element={<LandingScreen />} />
           <Route path="/regulations" element={<RegulationList />} />
           <Route path="/regulations/new-from-text" element={<RegulationExtractScreen />} />
           <Route path="/regulations/:id/edit" element={<RegulationEditorScreen />} />

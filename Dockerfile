@@ -47,10 +47,19 @@ RUN pip install --no-cache-dir --upgrade pip \
 # Backend код.
 COPY backend/app /srv/backend/app
 
-# Seed-данные DuckDB + фикстуры. ВАЖНО: данные кладём в `_seed_data/`,
-# а runtime-каталог `/data` будет Volume на Railway (см. start.sh —
-# при первом запуске, если /data пустой, копируем сюда seed).
-# Бэкап `regulations.duckdb.bak-*` в .dockerignore — не нужен в image.
+# Fixtures (data.ttl / shapes.ttl / flow.json) — СТАТИКА, путь хардкожен
+# в коде через `Path(__file__).parents[2] / "data" / "fixtures"`
+# (см. app/services/fixtures.py:3). Должны лежать РЯДОМ с backend/, не
+# на Volume. Без них:
+#   • flow.py GET /regulations/{id}/flow не находит стартер для регламентов
+#     без runtime-флоу в /data/flows/ → React Flow рисует пустую диаграмму;
+#   • turtle bridge не отдаёт shapes/data для seed-регламентов.
+COPY backend/data/fixtures /srv/backend/data/fixtures
+
+# Seed-данные DuckDB + начальное содержимое flows/ / versions/. ВАЖНО:
+# это копируется в `_seed_data/`, а runtime-каталог `/data` будет Volume
+# на Railway (см. start.sh — при первом запуске, если /data пустой,
+# копируем сюда seed). Бэкап `regulations.duckdb.bak-*` в .dockerignore.
 COPY backend/data /srv/_seed_data
 
 # Vite-build из stage 1.
