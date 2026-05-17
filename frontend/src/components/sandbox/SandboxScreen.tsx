@@ -134,12 +134,24 @@ function useLLMStatus() {
   })
 }
 
-type LLMStatusTone = 'ok' | 'warm' | 'cold' | 'mock' | 'unknown'
+type LLMStatusTone = 'ok' | 'warm' | 'cold' | 'mock' | 'unknown' | 'busy'
 
-function llmStatusTone(data: ReturnType<typeof useLLMStatus>['data']): LLMStatusTone {
+function llmStatusTone(
+  data: ReturnType<typeof useLLMStatus>['data'],
+  isGenerating?: boolean,
+): LLMStatusTone {
+  // «busy» — приоритетнее всего: пока идёт chat-запрос, показываем
+  // пульсирующий фиолетовый, чтобы новичок видел что система работает.
+  // Это особенно важно на Cerebras/Groq — там нет TypingIndicator-«троеточия»
+  // если ответ возвращается крупным куском за раз.
+  if (isGenerating) return 'busy'
   if (!data) return 'unknown'
   if (data.mode === 'mock') return 'mock'
   if (!data.llm_reachable) return 'cold'
+  // Для cloud-провайдеров концепции «в RAM/не в RAM» нет — Cerebras/Groq всегда
+  // готовы. Возвращаем 'ok' (зелёный) при reachable, иначе пользователь видит
+  // постоянный оранжевый и думает что что-то не так.
+  if (data.provider && data.provider !== 'ollama') return 'ok'
   return data.llm_loaded_in_memory ? 'ok' : 'warm'
 }
 
@@ -149,12 +161,13 @@ const TONE_DOT: Record<LLMStatusTone, string> = {
   cold: 'text-rose-500',
   mock: 'text-amber-500',
   unknown: 'text-stone-300',
+  busy: 'text-violet-500 animate-pulse',
 }
 
 function llmStatusLabel(tone: LLMStatusTone): string {
   switch (tone) {
     case 'ok':
-      return 'LLM на связи и загружена в RAM — следующий запрос будет быстрым.'
+      return 'LLM на связи и готова отвечать.'
     case 'warm':
       return 'Ollama на связи, но модель не в памяти — первый запрос будет медленным.'
     case 'cold':
@@ -163,13 +176,15 @@ function llmStatusLabel(tone: LLMStatusTone): string {
       return 'Mock-режим: без LLM, retrieval по TF-IDF. Задай OPENAI_BASE_URL и OPENAI_API_KEY для подключения внешнего провайдера.'
     case 'unknown':
       return 'Состояние LLM ещё не получено.'
+    case 'busy':
+      return 'Идёт генерация ответа…'
   }
 }
 
 /** Компактный индикатор для свёрнутой правой панели (одна точка + tooltip). */
-function LLMStatusDot() {
+function LLMStatusDot({ isGenerating }: { isGenerating?: boolean }) {
   const { data } = useLLMStatus()
-  const tone = llmStatusTone(data)
+  const tone = llmStatusTone(data, isGenerating)
   return (
     <div className="flex items-center justify-center px-1 py-1.5" title={llmStatusLabel(tone)}>
       <Circle size={10} className={cn('fill-current', TONE_DOT[tone])} />
@@ -182,11 +197,14 @@ function LLMStatusFooter({
   regulationsTotal,
   regulationsEnabled,
   selectedModel,
+  isGenerating,
 }: {
   regulationsTotal: number
   regulationsEnabled: number
   /** Ollama tag модели которую сейчас выберет чат — для кнопки load/unload. */
   selectedModel: string
+  /** true пока chat-mutation в полёте — индикатор пульсирует, статус «генерация…». */
+  isGenerating?: boolean
 }) {
   const qc = useQueryClient()
   const { data, isError } = useLLMStatus()
@@ -217,7 +235,7 @@ function LLMStatusFooter({
 
   if (isError || !data) return null
 
-  const tone = llmStatusTone(data)
+  const tone = llmStatusTone(data, isGenerating)
   const provider = data.provider ?? 'ollama'
   // Управление load/unload (keep_alive) — Ollama-specific. Для cloud-провайдеров
   // не показываем кнопки — там моделями управляет провайдер.
@@ -253,8 +271,23 @@ function LLMStatusFooter({
         <Circle size={8} className={cn('fill-current', TONE_DOT[tone])} />
         <span className="font-semibold text-stone-800">
           {providerLabel[provider] ?? provider}:{' '}
-          <span className={tone === 'cold' ? 'text-rose-700' : 'text-emerald-700'}>
-            {data.llm_reachable ? 'на связи' : 'не отвечает'}
+          {/* Пока идёт chat-запрос — пишем «генерация…» фиолетовым, чтобы
+              новичок видел что модель работает (особенно важно на cloud:
+              ответ может прилететь крупным куском без typing-троеточия). */}
+          <span
+            className={cn(
+              isGenerating
+                ? 'text-violet-700'
+                : tone === 'cold'
+                  ? 'text-rose-700'
+                  : 'text-emerald-700',
+            )}
+          >
+            {isGenerating
+              ? 'генерация…'
+              : data.llm_reachable
+                ? 'на связи'
+                : 'не отвечает'}
           </span>
         </span>
         {data.llm_loaded_in_memory && (
@@ -774,6 +807,7 @@ function SearchDemo() {
           setModelKind(k)
           setActivePresetId(null)
         }}
+        isGenerating={chat.isPending}
       />
     </div>
   )
@@ -832,6 +866,7 @@ function ChatSettingsPanel({
   regulationsEnabled,
   modelKind,
   onModelKindChange,
+  isGenerating,
 }: {
   extraSystemPrompt: string
   onExtraSystemPromptChange: (s: string) => void
@@ -852,6 +887,7 @@ function ChatSettingsPanel({
   regulationsEnabled: number
   modelKind: ModelKind
   onModelKindChange: (k: ModelKind) => void
+  isGenerating?: boolean
 }) {
   // llm-info нужен здесь, чтобы передать в LLMStatusFooter правильный tag
   // выбранной модели для текущего провайдера (cerebras qwen-3-32b vs ollama qwen2.5:7b).
@@ -900,7 +936,7 @@ function ChatSettingsPanel({
             />
           )}
         </div>
-        <LLMStatusDot />
+        <LLMStatusDot isGenerating={isGenerating} />
       </aside>
     )
   }
@@ -1091,6 +1127,7 @@ function ChatSettingsPanel({
         regulationsTotal={regulationsTotal}
         regulationsEnabled={regulationsEnabled}
         selectedModel={resolveModelTag(modelKind, llmInfoForPanel)}
+        isGenerating={isGenerating}
       />
     </aside>
   )
