@@ -639,6 +639,81 @@ self._vectors = {rid: list(d.embedding) for rid, d in zip(ids, resp.data)}
 
 Функциональность UI не блокируется ни на одном из путей.
 
+### 7.5 Провайдер-агностичный backend (Ollama / Cerebras / Groq / OpenAI)
+
+Начиная с мая 2026 backend перестал быть Ollama-only. Выбор провайдера —
+одна переменная `LLM_PROVIDER`, фронт автоматически подтягивает каталог
+моделей из `/api/sandbox/llm-info`.
+
+```mermaid
+flowchart LR
+  ENV["LLM_PROVIDER<br>(env)"] --> CHAT
+  ENV --> MODELINFO
+
+  subgraph SVC["sandbox.chat()"]
+    CHAT["AsyncOpenAI(<br>base_url, api_key)"]
+    OPT{"provider ==<br>'ollama'?"}
+    CHAT --> OPT
+    OPT -->|да| WITHOPT["extra_body={'options':<br>{num_ctx, temperature, ...}}"]
+    OPT -->|нет| BARE["temperature= / max_tokens=<br>(стандартный OpenAI)"]
+  end
+
+  MODELINFO["/api/sandbox/llm-info"] --> CATALOG{"provider"}
+  CATALOG -->|ollama| TAGS["GET /api/tags<br>(локальный список)"]
+  CATALOG -->|cloud| MODELS["GET /v1/models<br>(httpx + Bearer)"]
+  CATALOG --> FALLBACK["preset из llmModels.ts"]
+
+  style ENV fill:#FEF3C7,stroke:#F59E0B
+  style WITHOPT fill:#DBEAFE,stroke:#3B82F6
+  style BARE fill:#DCFCE7,stroke:#16A34A
+```
+
+| Провайдер   | base_url                          | Поддерживаемые модели (presets)                                              |
+|-------------|-----------------------------------|------------------------------------------------------------------------------|
+| `ollama`    | `http://localhost:11434/v1`       | `qwen2.5:7b-instruct-q4_K_M`, `qwen2.5:3b-instruct-q4_K_M`                   |
+| `cerebras`  | `https://api.cerebras.ai/v1`      | `qwen-3-235b-a22b-instruct-2507`, `gpt-oss-120b`, `zai-glm-4.7`, `llama3.1-8b` |
+| `groq`      | `https://api.groq.com/openai/v1`  | `llama-3.3-70b-versatile`, `llama-3.1-8b-instant`, `qwen-qwq-32b`            |
+| `openrouter`| `https://openrouter.ai/api/v1`    | `qwen/qwen-2.5-72b-instruct:free`, `meta-llama/llama-3.3-70b-instruct:free`, `deepseek/deepseek-r1:free` |
+| `openai`    | `https://api.openai.com/v1`       | `gpt-4o-mini`, `gpt-4o`                                                      |
+| `mock`      | —                                 | детерминированные ответы по ключевым словам (для тестов)                     |
+
+**Ollama-specific options** (`num_ctx`, `top_k`, `mirostat`) проходят
+только при `provider == 'ollama'`. Для cloud-провайдеров `extra_body`
+не выставляется — иначе Cerebras/Groq возвращают 400.
+
+**Подбор модели в UI** ([llmModels.ts](frontend/src/components/sandbox/llmModels.ts))
+теперь идентифицирует каждую модель по её tag-у (не по слотам `precise/fast`).
+Это исправляет баг, когда несколько cloud-моделей шарили один kind и
+подсвечивались синхронно — см. коммит 2026-05-17.
+
+### 7.6 Гибридный режим: cloud chat + local embeddings
+
+На 2026-05 ни один бесплатный cloud-провайдер не отдаёт embedding-API
+совместимый с `bge-m3` (1024-d, мультиязычный). Решение — раздельные
+endpoint'ы:
+
+```dotenv
+# Chat → cloud
+LLM_PROVIDER=cerebras
+OPENAI_BASE_URL=https://api.cerebras.ai/v1
+OPENAI_API_KEY=csk-…
+
+# Embeddings → local
+EMBEDDINGS_ENABLED=true
+EMBEDDING_BASE_URL=http://localhost:11434/v1
+EMBEDDING_API_KEY=ollama
+RAGU_EMBED_MODEL=bge-m3
+```
+
+`Settings.effective_embedding_base_url` падает с `EMBEDDING_BASE_URL`
+на `OPENAI_BASE_URL` если override не задан — обратная совместимость
+с pure-Ollama setup'ом.
+
+Если embedding-stack недоступен (Railway без Ollama-instance) —
+`EMBEDDINGS_ENABLED=false` выключает retrieval, и Студия отрисует
+баннер «загрузка документов недоступна» + отключит upload-кнопки.
+Chat при этом продолжает работать.
+
 ---
 
 ## 8. Извлечение параметров из текста
@@ -902,27 +977,74 @@ cd frontend && npm install && npm run dev
 
 `launch.sh` ([в корне репозитория](launch.sh)) делает это всё одной командой с self-healing-логикой: при ctrl-C каскадно завершает обе подсистемы, при сбое одной — оставляет другую работать.
 
-### 12.3 Будущий продакшен-режим (опционально, см. §10.4)
+### 12.3 Production Railway-deploy (реализовано 2026-05-17)
 
-При срабатывании триггеров миграции — переход на:
+Боевая сборка: <https://ragraf.up.railway.app/>. Один Docker-образ, один
+платный Volume, никаких GPU-нод и cloud-эмбеддеров.
 
 ```mermaid
 flowchart TB
-  subgraph PROD["☁ Production (после миграции)"]
-    LB["🌐 Load balancer / Nginx"]
-    FE_PROD["📦 Frontend (статика)<br>vite build → CDN"]
-    BE_PROD["⚙ FastAPI (gunicorn + uvicorn workers)"]
-    PG[("🐘 PostgreSQL<br>с реплицируемым standby")]
-    OL_PROD["🦙 Ollama (managed)<br>или vLLM на GPU-нод"]
+  subgraph RAILWAY["☁ Railway (single container + Volume)"]
+    direction TB
+    IMG["🐳 Multi-stage Dockerfile<br>node:20-alpine → python:3.12-slim"]
+    APP["⚙ uvicorn app.main:app<br>--host 0.0.0.0 --port $PORT"]
+    SPA["📦 StaticFiles /assets<br>SPA catch-all → index.html<br>(StaticDir=/srv/frontend_dist)"]
+    VOL[("💾 Volume /data<br>regulations.duckdb · flows/ ·<br>versions/ · ragu_store/")]
+    SEED["🌱 start.sh<br>seed /data из /srv/_seed_data<br>при пустом БД"]
   end
 
-  LB --> FE_PROD
+  USER["👤 Пользователь"] --> APP
+  APP --> SPA
+  APP <--> VOL
+  SEED --> VOL
+  APP -.->|chat| CEREBRAS["☁ Cerebras /v1<br>(или Groq/OpenAI)"]
+
+  style CEREBRAS fill:#FEF3C7,stroke:#F59E0B
+  style VOL fill:#DBEAFE,stroke:#3B82F6
+```
+
+**Ключевые артефакты:**
+- [`Dockerfile`](Dockerfile) — две стадии: vite build → python runtime;
+  на финале: `useradd ragraf:1000`, `EXPOSE 8080`, `ENV STATIC_DIR=/srv/frontend_dist DATA_DIR=/data`.
+- [`start.sh`](start.sh) — privilege drop через `runuser` (на Railway volume = root:root),
+  copy seed-data в `/data` если БД нет, `exec uvicorn` с `--proxy-headers`.
+- [`railway.json`](railway.json) — `healthcheckPath=/api/health`, `healthcheckTimeout=90`,
+  restartPolicy `ON_FAILURE` × 3.
+- [`.dockerignore`](.dockerignore) / [`.railwayignore`](.railwayignore) —
+  исключают `.venv`, `node_modules`, `*.pdf`, backup-копии, `.env`.
+
+**Подводные камни (вылечены при первых деплоях):**
+- `openai` пакет был только в локальном `.venv`, в `requirements.txt` отсутствовал —
+  cloud-провайдер падал с `ModuleNotFoundError` на проде. Исправлено добавлением
+  `openai==2.36.0` в [`backend/requirements.txt`](backend/requirements.txt).
+- `fixtures.py` использует `Path(__file__).parents[2]/data/fixtures` — в Docker-image
+  это путь `/srv/backend/data/fixtures`, и его пришлось копировать **отдельно** от
+  `/srv/_seed_data` (последний — для volume seeding'а, первый — для flow-схем).
+- Railway Volume пустой при первом монтировании → start.sh обязательно seed'ит
+  его из baked-in `/srv/_seed_data` перед запуском uvicorn.
+
+Полная инструкция со всеми переменными — [DEPLOY.md](DEPLOY.md).
+
+### 12.4 Будущий многоинстансный режим (опционально, см. §10.4)
+
+При срабатывании триггеров масштаба (> 10 одновременных аналитиков или
+требование HA) — переход с DuckDB на Postgres:
+
+```mermaid
+flowchart TB
+  subgraph PROD["☁ Multi-instance (после миграции)"]
+    LB["🌐 Load balancer / Nginx"]
+    BE_PROD["⚙ FastAPI (gunicorn + uvicorn workers)<br>несколько Railway-replicas"]
+    PG[("🐘 PostgreSQL<br>с реплицируемым standby")]
+    OL_PROD["🦙 Cerebras / Groq / OpenAI<br>(уже cloud)"]
+  end
+
   LB --> BE_PROD
   BE_PROD <--> PG
   BE_PROD -.-> OL_PROD
 ```
 
-Шаги миграции — Приложение А [TZ_RAGRAF.md](TZ_RAGRAF.md), оценка 2–4 рабочих дня.
+Шаги миграции DuckDB → Postgres — Приложение А [TZ_RAGRAF.md](TZ_RAGRAF.md), оценка 2–4 рабочих дня.
 
 ---
 

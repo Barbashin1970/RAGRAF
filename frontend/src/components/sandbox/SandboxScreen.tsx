@@ -1116,7 +1116,10 @@ function ModelPickerSection({
     [llmInfo?.provider, llmInfo?.available_models, llmInfo?.llm_model],
   )
   const availableModels = new Set(llmInfo?.available_models ?? [])
-  const customized = modelKind !== DEFAULT_MODEL_KIND
+  // «customized» = выбрана не первая модель текущего каталога. Для Ollama это
+  // эквивалент `!== DEFAULT_MODEL_KIND`; для cloud-провайдера дефолт — первый
+  // tag из `available_models` (для Cerebras = qwen-3-235b).
+  const customized = !!catalog[0] && modelKind !== catalog[0].kind
   const selected = catalog.find((m) => m.kind === modelKind) ?? catalog[0] ?? modelByKind(modelKind)
   const isSelectedInstalled =
     !isOllama || availableModels.size === 0 || availableModels.has(selected.ollama_tag)

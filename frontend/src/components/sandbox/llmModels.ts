@@ -10,9 +10,21 @@
  * и fallback'а когда llm-info ещё не пришла.
  */
 
-export type ModelKind = 'precise' | 'fast'
+/**
+ * ВАЖНО: `ModelKind` теперь — реальный tag модели (строка), а не enum
+ * `'precise' | 'fast'`. Раньше у нас было два слота для Ollama (precise/fast)
+ * и мы натягивали те же два слота на cloud-провайдеров — но Cerebras отдаёт
+ * 4 модели, и им всем доставался один и тот же kind `'fast'`. Результат:
+ * клики по чипам 2/3/4 подсвечивали все три одновременно (визуальный баг).
+ *
+ * Теперь идентификатор выбора = `ollama_tag`. Совпадение по тегу гарантирует,
+ * что активным считается ровно один чип. Старые значения `'precise'/'fast'`
+ * в localStorage просто не найдутся в каталоге → fallback на первую модель.
+ */
+export type ModelKind = string
 
 export interface LLMModelProfile {
+  /** Идентификатор для UI-выбора. Равен `ollama_tag` (единая identity). */
   kind: ModelKind
   /** Реальный tag модели — то, что уйдёт в `model` поле chat-запроса. */
   ollama_tag: string
@@ -28,7 +40,7 @@ export interface LLMModelProfile {
 
 export const MODEL_CATALOG: LLMModelProfile[] = [
   {
-    kind: 'precise',
+    kind: 'qwen2.5:7b-instruct-q4_K_M',
     ollama_tag: 'qwen2.5:7b-instruct-q4_K_M',
     label: 'Точная (qwen2.5:7b)',
     hint: 'Полное качество reasoning и русского. Дольше отвечает.',
@@ -37,7 +49,7 @@ export const MODEL_CATALOG: LLMModelProfile[] = [
     use_when: 'Сводки длинных документов, сравнение регламентов, сложные follow-up\'ы.',
   },
   {
-    kind: 'fast',
+    kind: 'qwen2.5:3b-instruct-q4_K_M',
     ollama_tag: 'qwen2.5:3b-instruct-q4_K_M',
     label: 'Быстрая (qwen2.5:3b)',
     hint: '~2-3× быстрее при половине RAM. Та же семья — промпты не нужно переписывать.',
@@ -47,7 +59,7 @@ export const MODEL_CATALOG: LLMModelProfile[] = [
   },
 ]
 
-export const DEFAULT_MODEL_KIND: ModelKind = 'precise'
+export const DEFAULT_MODEL_KIND: ModelKind = MODEL_CATALOG[0].kind
 
 export function modelByKind(kind: ModelKind): LLMModelProfile {
   return MODEL_CATALOG.find((m) => m.kind === kind) ?? MODEL_CATALOG[0]
@@ -59,7 +71,7 @@ export function loadModelKind(): ModelKind {
   if (typeof window === 'undefined') return DEFAULT_MODEL_KIND
   try {
     const v = window.localStorage.getItem(STORAGE_KEY)
-    if (v === 'precise' || v === 'fast') return v
+    if (typeof v === 'string' && v.length > 0) return v
   } catch {
     // localStorage недоступен — берём дефолт
   }
@@ -118,10 +130,12 @@ export function buildModelCatalog(
   const list = available && available.length > 0 ? [...available] : (fallbackModel ? [fallbackModel] : [])
   if (list.length === 0) return MODEL_CATALOG
 
-  return list.map((tag, idx): LLMModelProfile => {
+  return list.map((tag): LLMModelProfile => {
     const hint = PROVIDER_HINTS[tag]
     return {
-      kind: idx === 0 ? 'precise' : 'fast',
+      // identity = реальный tag модели. Раньше первой назначали `precise`,
+      // остальным — `fast`, и 3 cloud-модели становились визуально неотличимы.
+      kind: tag,
       ollama_tag: tag,
       label: hint?.label ?? tag,
       hint: hint?.hint ?? `Модель провайдера ${provider}`,

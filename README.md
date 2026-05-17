@@ -27,9 +27,9 @@
 
 Каждый регламент содержит: имя, дату, набор параметров (`<name>` + парное `<name>Deviation`), SHACL-форму с границами `sh:minInclusive`/`sh:maxInclusive`, рекомендацию (многострочный текст), стартовый Rule DSL для flow-редактора.
 
-### 2. Реальные данные из 6 регламентов
+### 2. Реальные данные из 7 регламентов
 
-Из коробки загружено **6 регламентов** (включены при `USE_FIXTURES=true`):
+Из коробки загружено **7 регламентов** (включены при `USE_FIXTURES=true`):
 
 #### Теплоснабжение
 
@@ -56,6 +56,11 @@
 
 - **`air-quality-smog-trap`** — Регламент при экологической ловушке: безветрие + загрязнение PM2.5.
   *Источник:* `~/NSK_OpenData_Bot/config/rules/ecology_rules.yaml` (`risks.smog_trap`, `risks.pdk`) + `src/ecology_cache.py`. Параметры: ветер 3.0 ± 1.5 м/с (порог штиля 1.5), PM2.5 10 ± 10 мкг/м³ (норматив ВОЗ 35), часов выше ПДК 0 ± 4, заблаговременность SMS уязвимым 6 ± 2 ч, целевое снижение выбросов 17.5 ± 2.5 %. Эскалация: рекомендации жителям (очистители, маски FFP2) → SMS астма/ХОБЛ/дети/пожилые → режим НМУ + предписания предприятиям 15–20% → экстренное оповещение населения + школы/детсады при ПДК ВОЗ.
+
+#### Транспорт и парковки
+
+- **`nsu-parking-anpr`** — Регламент контроля доступа на парковку НГУ.
+  *Источник:* ОРД НГУ 2024 + контракт ANPR-системы. Параметры: время распознавания номера, лимит стоянки, фолбэк-звонок при отказе ANPR, месячный отчёт по нарушениям. Эскалация: автоматический шлагбаум по белому списку → телефонный фолбэк в КПП при отказе камеры → еженедельный отчёт уполномоченному.
 
 ### 3. Graph View
 
@@ -323,6 +328,49 @@ Health: <http://localhost:8000/health> · OpenAPI: <http://localhost:8000/docs> 
 
 ---
 
+## Production-развёртывание (Railway)
+
+Проект собирается одним мульти-стейдж Docker-образом и развёрнут на Railway:
+живая сборка — <https://ragraf.up.railway.app/>. Полная инструкция со всеми
+переменными — [DEPLOY.md](DEPLOY.md).
+
+**Краткая шпаргалка:**
+1. Build из `Dockerfile` (Node 20 → Python 3.12-slim); фронт собирается
+   в `/srv/frontend_dist` и раздаётся самим FastAPI как SPA.
+2. На Railway монтируется **Volume на `/data`** — там живёт `regulations.duckdb`,
+   `flows/`, `versions/`, `ragu_store/`. Скрипт `start.sh` seed'ит volume из
+   `/srv/_seed_data` при первом старте (если БД пустая).
+3. Healthcheck: `/api/health` (timeout 90s, `railway.json`).
+4. Минимум переменных для production-чата на Cerebras:
+   ```
+   LLM_PROVIDER=cerebras
+   OPENAI_BASE_URL=https://api.cerebras.ai/v1
+   OPENAI_API_KEY=csk-…
+   RAGU_LLM_MODEL=qwen-3-235b-a22b-instruct-2507
+   EMBEDDINGS_ENABLED=false
+   USE_FIXTURES=true
+   ```
+   (embeddings выключены, т.к. на Railway без Volume-Ollama-instance их
+   запускать негде; гибридный режим — для локалки.)
+
+---
+
+## Главная страница (landing)
+
+На `/` рендерится single-page landing в стиле Vercel / Linear / Stripe
+([`LandingScreen.tsx`](frontend/src/components/landing/LandingScreen.tsx)):
+sticky-nav с прозрачным режимом над hero и opaque-режимом после
+скролла (IntersectionObserver), секции «Платформа · Сценарий · Модули ·
+Архитектура · Эффекты», подвал с ссылками на платформенные экраны и внешние
+ресурсы (GitHub, Тренажёр операторов, Фреймворк КАППА, Открытые данные
+городов, API Swagger).
+
+Брендинг — греческая Σ (золотая на slate-900 фоне, см.
+[`frontend/public/favicon.svg`](frontend/public/favicon.svg)) и единый
+синий тон blue-600/700 в шапке внутренних страниц.
+
+---
+
 ## LLM-модели и Ollama
 
 RAGRAF Студия аналитика использует локальную LLM через [Ollama](https://ollama.com) — никакие данные не уходят в облако, всё работает на ноутбуке.
@@ -395,14 +443,70 @@ ollama show <tag>   # детали модели (context length, family, …)
 ### Настройка через `.env`
 
 ```dotenv
+LLM_PROVIDER=ollama
 OPENAI_BASE_URL=http://localhost:11434/v1
 OPENAI_API_KEY=ollama
 RAGU_LLM_MODEL=qwen2.5:7b-instruct-q4_K_M
 RAGU_EMBED_MODEL=bge-m3
 RAGU_ENABLED=true
+EMBEDDINGS_ENABLED=true
 ```
 
 `OPENAI_API_KEY=ollama` — это просто dummy-значение, локальная Ollama его игнорирует. `RAGU_LLM_MODEL` задаёт «модель по умолчанию» — её можно переопределить на каждый запрос через UI.
+
+---
+
+## Multi-provider LLM (Cerebras / Groq / OpenAI / Ollama)
+
+Backend провайдер-агностичный. Переключение делается одной переменной
+`LLM_PROVIDER` без правок кода — фронт автоматически подтягивает каталог
+моделей из `/api/sandbox/llm-info` и рисует их в правой панели Студии.
+
+| Провайдер | Когда выбирать | Скорость | Цена |
+|---|---|---|---|
+| `ollama` | Локально, без интернета, чувствительные данные | ~5–15 т/с | бесплатно |
+| `cerebras` | Прод: дешёвый Wafer-инфер, ~1500 т/с | очень высокая | free-tier есть |
+| `groq` | Альтернатива Cerebras, бесплатный лимит | 250–750 т/с | free-tier |
+| `openrouter` | Доступ к 100+ моделям через один API | средняя | pay-per-token |
+| `openai` | Дорогие премиум-модели (GPT-4o, o1) | средняя | $$$ |
+| `mock` | Тесты и CI, без реальных запросов | 0 | бесплатно |
+
+Поддерживаемые модели (на 2026-05) поднимаются автоматически из живого
+`/v1/models` каждого провайдера + жёсткие presets в [`frontend/src/components/sandbox/llmModels.ts`](frontend/src/components/sandbox/llmModels.ts). Для Cerebras это
+`qwen-3-235b-a22b-instruct-2507`, `gpt-oss-120b`, `zai-glm-4.7`, `llama3.1-8b`.
+
+### Гибридный режим (cloud chat + local embeddings)
+
+Если хочется быстрый cloud chat, но эмбеддинги держать локально (нет
+бесплатных cloud-embedding на 2026 для bge-m3) — задай отдельный
+endpoint:
+
+```dotenv
+LLM_PROVIDER=cerebras
+OPENAI_BASE_URL=https://api.cerebras.ai/v1
+OPENAI_API_KEY=csk-…
+RAGU_LLM_MODEL=qwen-3-235b-a22b-instruct-2507
+
+EMBEDDINGS_ENABLED=true
+EMBEDDING_BASE_URL=http://localhost:11434/v1
+EMBEDDING_API_KEY=ollama
+RAGU_EMBED_MODEL=bge-m3
+```
+
+Если у провайдера нет embedding-endpoint'а — выключи RAG-поиск целиком:
+
+```dotenv
+EMBEDDINGS_ENABLED=false
+```
+
+Chat при этом работает, а Студия отрисует баннер «загрузка документов
+недоступна» (кнопка `+ Источник` дизейблится).
+
+### `mock` для тестов
+
+`LLM_PROVIDER=mock` отдаёт детерминированные ответы по ключевым словам
+без реальных запросов наружу — это режим pytest по умолчанию (см.
+[`backend/tests/conftest.py`](backend/tests/conftest.py)).
 
 ### Размер на M2 Air (рекомендация по железу)
 
