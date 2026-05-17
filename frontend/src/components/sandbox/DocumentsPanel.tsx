@@ -43,6 +43,15 @@ export function DocumentsPanel() {
     queryFn: () => api.sandbox.listDocuments(),
   })
 
+  // Для cloud-провайдеров (Cerebras / Groq) embeddings выключены → загрузка
+  // PDF отключена на бэке (503), здесь блокируем форму превентивно и показываем
+  // объяснение, чтобы пользователь не дёргался.
+  const { data: llmInfo } = useQuery({
+    queryKey: ['sandbox-llm-info'],
+    queryFn: () => api.sandbox.llmInfo(),
+  })
+  const embeddingsEnabled = llmInfo?.embeddings_enabled !== false
+
   const upload = useMutation({
     mutationFn: (file: File) => api.sandbox.uploadDocument(file),
     onSuccess: () => {
@@ -95,8 +104,14 @@ export function DocumentsPanel() {
           size="sm"
           icon={upload.isPending ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
           onClick={onPickFile}
-          disabled={atLimit || upload.isPending}
-          title={atLimit ? 'Достигнут лимит документов' : 'Загрузить PDF или DOCX'}
+          disabled={atLimit || upload.isPending || !embeddingsEnabled}
+          title={
+            !embeddingsEnabled
+              ? 'Загрузка документов отключена: embedding-провайдер не настроен'
+              : atLimit
+                ? 'Достигнут лимит документов'
+                : 'Загрузить PDF или DOCX'
+          }
         >
           Источник
         </Button>
@@ -109,8 +124,21 @@ export function DocumentsPanel() {
         />
       </header>
 
+      {/* Embeddings выключены → загрузка PDF не работает (нет векторного поиска
+          по чанкам). Заметная плашка вверху чтобы пользователь не недоумевал. */}
+      {!embeddingsEnabled && (
+        <div className="flex items-start gap-2 border-b border-stone-200 bg-stone-100 px-3 py-2 text-[11px] leading-snug text-stone-700">
+          <AlertTriangle size={13} className="mt-0.5 shrink-0 text-stone-500" />
+          <span>
+            <b>Загрузка документов отключена.</b> Текущий LLM-провайдер не предоставляет
+            embeddings. Для работы фичи подключи Ollama (bge-m3 локально) или Gemini
+            text-embedding-004 и установи <code>EMBEDDINGS_ENABLED=true</code>.
+          </span>
+        </div>
+      )}
+
       {/* Slow-response warning при 2+ включённых */}
-      {showSlowWarn && (
+      {showSlowWarn && embeddingsEnabled && (
         <div className="flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-snug text-amber-900">
           <AlertTriangle size={13} className="mt-0.5 shrink-0 text-amber-600" />
           <span>

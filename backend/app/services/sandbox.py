@@ -460,20 +460,32 @@ def extract_parameters(text: str) -> dict[str, Any]:
 # ── RAGU-aware switching ──────────────────────────────────────────────
 
 
+def is_real_llm_available() -> bool:
+    """Настроен ли удалённый OpenAI-совместимый LLM (Ollama / Cerebras / Groq).
+
+    Достаточно `openai_base_url` (для Ollama по сети) + `openai_api_key`
+    (для облачных провайдеров). Если ничего не задано — работаем в mock-режиме
+    (keyword-search + шаблонный ответ).
+    """
+    if settings.llm_provider == "mock":
+        return False
+    if settings.llm_provider == "ollama":
+        return bool(settings.openai_base_url)
+    # Облачные провайдеры — нужен и base_url, и api_key.
+    return bool(settings.openai_base_url) and bool(settings.openai_api_key)
+
+
 def is_real_ragu_available() -> bool:
-    """Доступна ли реальная RAGU-имплементация (флаг + установлен graph_ragu)."""
-    if not settings.ragu_enabled:
-        return False
-    try:
-        import ragu  # noqa: F401
-        return True
-    except ImportError:
-        return False
+    """Legacy-alias для is_real_llm_available — оставлен для обратной
+    совместимости с тестами и UI-индикаторами. RAGU-флаг больше не нужен
+    с тех пор как мы переключились на чистый OpenAI-совместимый LLM API.
+    """
+    return is_real_llm_available()
 
 
 def backend_mode() -> str:
     """`real` / `mock` — для UI индикатора."""
-    return "real" if is_real_ragu_available() else "mock"
+    return "real" if is_real_llm_available() else "mock"
 
 
 # ── Conversational Q&A над регламентами ──────────────────────────────
@@ -568,8 +580,8 @@ async def chat(
         total_regs_in_corpus > 0 and len(disabled_set) >= total_regs_in_corpus
     )
 
-    if not is_real_ragu_available():
-        # Mock-режим — используем TF-IDF, embeddings требуют Ollama.
+    if not is_real_llm_available():
+        # Mock-режим — используем TF-IDF, удалённый LLM не настроен.
         if skip_regulation_retrieval:
             hits = []
         else:
@@ -579,19 +591,22 @@ async def chat(
 
     if skip_regulation_retrieval:
         hits = []
-    else:
-        # Real-режим: семантический retrieval через bge-m3 embeddings. Это
-        # принципиально лучше TF-IDF на русских формулировках с синонимами
-        # («наводнение» ↔ «протечка» ↔ «вода»), и не ловит общие предлоги
-        # вроде «при» / «и» / «в» которые TF-IDF матчит на каждом регламенте.
+    elif settings.embeddings_enabled:
+        # Семантический retrieval через embeddings. Это принципиально лучше
+        # TF-IDF на русских формулировках с синонимами («наводнение» ↔
+        # «протечка»), но требует embedding-провайдера (Ollama bge-m3 или
+        # Gemini text-embedding). При embeddings_enabled=False (дефолт Railway-
+        # демо) сразу падаем в keyword-search ниже.
         try:
             from app.services.embedding_index import semantic_search_embeddings
             hits = await semantic_search_embeddings(query, top_k=retrieval_top_k)
         except Exception:
-            # Если embeddings отвалились (Ollama офлайн) — fallback на TF-IDF.
             hits = semantic_search(query, top_k=retrieval_top_k)
-        # Фильтрация после retrieval'а: отсекаем регламенты, которые пользователь
-        # выключил, и ограничиваем до запрошенного top_k.
+        hits = [h for h in hits if h.get("regulation_id") not in disabled_set][:top_k]
+    else:
+        # Embeddings выключены — keyword-only retrieval. Точность ниже, но
+        # достаточно для 8 seed-регламентов в демо-стенде.
+        hits = semantic_search(query, top_k=retrieval_top_k)
         hits = [h for h in hits if h.get("regulation_id") not in disabled_set][:top_k]
 
     # Контекст регламентов — только если они есть. Когда пользователь
@@ -602,16 +617,17 @@ async def chat(
     context = _build_regulation_context(hits) if hits else ""
 
     # NotebookLM-style: если аналитик включил в контекст загруженные документы
-    # (PDF/DOCX), достаём релевантные chunks через bge-m3 и добавляем рядом с
-    # регламентами. Каждый chunk идёт с filename — LLM может цитировать
-    # «по такому-то файлу: ...».
+    # (PDF/DOCX), достаём релевантные chunks. С embeddings_enabled=False
+    # document_store отдаёт keyword-match вместо cosine-search — для коротких
+    # документов работает, для длинных PDF выдача хуже.
     doc_chunks: list[dict[str, Any]] = []
-    try:
-        from app.services import document_store
-        if document_store.count_enabled() > 0:
-            doc_chunks = await document_store.retrieve_relevant_chunks(query, top_k=4)
-    except Exception:
-        doc_chunks = []
+    if settings.embeddings_enabled:
+        try:
+            from app.services import document_store
+            if document_store.count_enabled() > 0:
+                doc_chunks = await document_store.retrieve_relevant_chunks(query, top_k=4)
+        except Exception:
+            doc_chunks = []
 
     doc_context_block = ""
     if doc_chunks:
@@ -780,14 +796,15 @@ async def chat(
             "max_tokens": effective_max_tokens,
             "temperature": temperature if temperature is not None else 0.1,
         }
-        # Ollama-specific options: num_ctx (контекст) + num_predict (явный
-        # лимит вывода). num_predict дублирует max_tokens для OpenAI-совместимого
-        # эндпойнта Ollama — без него Ollama иногда «тянет» дольше чем стандарт
-        # OpenAI ожидает, особенно когда max_tokens у клиента маленький.
-        ollama_options: dict[str, Any] = {"num_predict": effective_max_tokens}
-        if num_ctx is not None:
-            ollama_options["num_ctx"] = num_ctx
-        create_kwargs["extra_body"] = {"options": ollama_options}
+        # Ollama-specific options пробрасываем ТОЛЬКО для llm_provider=ollama.
+        # Cerebras/Groq/OpenAI на неизвестные поля в body вернут 400 «Unknown
+        # parameter `options`». Для них num_ctx неприменим (контекст определяется
+        # моделью), а max_tokens уже передан явно в OpenAI-формате.
+        if settings.llm_provider == "ollama":
+            ollama_options: dict[str, Any] = {"num_predict": effective_max_tokens}
+            if num_ctx is not None:
+                ollama_options["num_ctx"] = num_ctx
+            create_kwargs["extra_body"] = {"options": ollama_options}
         resp = await client.chat.completions.create(**create_kwargs)
         answer = (resp.choices[0].message.content or "").strip()
         if not answer:

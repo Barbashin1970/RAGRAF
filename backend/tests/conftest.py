@@ -23,6 +23,14 @@ def isolated_data_dir(tmp_path, monkeypatch):
     # требует поднятой локальной Ollama, что неприемлемо в CI и не нужно
     # для проверки фичей не относящихся к LLM.
     monkeypatch.setenv("RAGU_ENABLED", "false")
+    # Тесты не должны подхватывать рабочий `.env` с Ollama URL — иначе
+    # is_real_llm_available() вернёт True и sandbox-тесты увидят mode=real
+    # вместо ожидаемого mock. Тесты, которым нужен реальный провайдер
+    # (test_llm_provider_switch), сами выставляют этот env через monkeypatch.
+    monkeypatch.setenv("OPENAI_BASE_URL", "")
+    monkeypatch.setenv("OPENAI_API_KEY", "")
+    monkeypatch.setenv("LLM_PROVIDER", "mock")
+    monkeypatch.setenv("EMBEDDINGS_ENABLED", "false")
 
     # сбрасываем кешированные модуль-уровень глобалы
     import importlib
@@ -37,6 +45,16 @@ def isolated_data_dir(tmp_path, monkeypatch):
     # То же самое для extraction_term_store.
     from app.services import extraction_term_store
     importlib.reload(extraction_term_store)
+    # Сервисы, которые на module-level делают `from app.config import settings`,
+    # держат ссылку на старый Settings-инстанс — после reload(config) их тоже
+    # надо переподнять, иначе is_real_llm_available()/embeddings_enabled будут
+    # читать stale-значение и тесты дадут ложно-real mode.
+    from app.services import sandbox as _sandbox
+    importlib.reload(_sandbox)
+    from app.services import embedding_index as _embedding_index
+    importlib.reload(_embedding_index)
+    from app.services import document_store as _document_store
+    importlib.reload(_document_store)
     yield
     # cleanup: закрыть DuckDB connections обоих stores
     try:

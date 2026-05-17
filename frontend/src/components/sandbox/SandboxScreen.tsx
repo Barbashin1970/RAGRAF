@@ -41,11 +41,13 @@ import {
   type SystemPromptPreset,
 } from './systemPromptPresets'
 import {
+  buildModelCatalog,
   DEFAULT_MODEL_KIND,
   loadModelKind,
   MODEL_CATALOG,
   type ModelKind,
   modelByKind,
+  resolveModelTag,
   saveModelKind,
 } from './llmModels'
 
@@ -156,9 +158,9 @@ function llmStatusLabel(tone: LLMStatusTone): string {
     case 'warm':
       return 'Ollama на связи, но модель не в памяти — первый запрос будет медленным.'
     case 'cold':
-      return 'Ollama не отвечает. Проверь что сервис запущен на base_url.'
+      return 'LLM-провайдер не отвечает. Проверь что сервис запущен и base_url корректен.'
     case 'mock':
-      return 'Mock-режим: без LLM, retrieval по TF-IDF. Включи RAGU_ENABLED=true для реальной LLM.'
+      return 'Mock-режим: без LLM, retrieval по TF-IDF. Задай OPENAI_BASE_URL и OPENAI_API_KEY для подключения внешнего провайдера.'
     case 'unknown':
       return 'Состояние LLM ещё не получено.'
   }
@@ -216,6 +218,18 @@ function LLMStatusFooter({
   if (isError || !data) return null
 
   const tone = llmStatusTone(data)
+  const provider = data.provider ?? 'ollama'
+  // Управление load/unload (keep_alive) — Ollama-specific. Для cloud-провайдеров
+  // не показываем кнопки — там моделями управляет провайдер.
+  const isOllama = provider === 'ollama'
+  const providerLabel: Record<string, string> = {
+    ollama: 'Ollama',
+    cerebras: 'Cerebras',
+    groq: 'Groq',
+    openrouter: 'OpenRouter',
+    openai: 'OpenAI',
+    mock: 'Mock',
+  }
   if (data.mode === 'mock') {
     return (
       <div className="border-t border-stone-200 bg-amber-50/40 px-3 py-2 text-[10px] text-amber-900">
@@ -224,7 +238,7 @@ function LLMStatusFooter({
           <span><b>Mock-режим</b> — без LLM, TF-IDF поиск</span>
         </div>
         <div className="mt-0.5 text-amber-700">
-          Индекс: {data.index_size > 0 ? `${data.index_size} рег.` : 'не построен'}
+          Задай OPENAI_BASE_URL и OPENAI_API_KEY для подключения провайдера.
         </div>
       </div>
     )
@@ -238,7 +252,7 @@ function LLMStatusFooter({
       <div className="mb-1 flex items-center gap-1.5">
         <Circle size={8} className={cn('fill-current', TONE_DOT[tone])} />
         <span className="font-semibold text-stone-800">
-          Ollama:{' '}
+          {providerLabel[provider] ?? provider}:{' '}
           <span className={tone === 'cold' ? 'text-rose-700' : 'text-emerald-700'}>
             {data.llm_reachable ? 'на связи' : 'не отвечает'}
           </span>
@@ -260,8 +274,9 @@ function LLMStatusFooter({
           </code>
           {/* Toggle загрузки модели в RAM. Зелёная молния когда уже в памяти,
               серая иконка ⏏ для выгрузки; и наоборот — иконка ⚡ когда не
-              загружена. Меняет состояние через Ollama keep_alive. */}
-          {isSelectedLoaded ? (
+              загружена. Меняет состояние через Ollama keep_alive. Для облачных
+              провайдеров эта кнопка не имеет смысла — модель не в нашей RAM. */}
+          {isOllama && isSelectedLoaded ? (
             <button
               onClick={() => unloadMut.mutate()}
               disabled={busy}
@@ -275,7 +290,7 @@ function LLMStatusFooter({
               )}
               в RAM
             </button>
-          ) : (
+          ) : isOllama ? (
             <button
               onClick={() => loadMut.mutate()}
               disabled={busy}
@@ -289,19 +304,31 @@ function LLMStatusFooter({
               )}
               прогреть
             </button>
-          )}
+          ) : null}
         </div>
         {(loadMut.isError || unloadMut.isError) && (
           <div className="text-[9px] text-rose-600">
             {((loadMut.error || unloadMut.error) as Error).message}
           </div>
         )}
-        <div className="flex items-center gap-1.5">
-          <span className="text-stone-500">Embed:</span>
-          <code className="truncate rounded bg-stone-100 px-1 font-mono text-[9px] text-stone-700">
-            {data.embed_model}
-          </code>
-        </div>
+        {data.embeddings_enabled !== false ? (
+          <div className="flex items-center gap-1.5">
+            <span className="text-stone-500">Embed:</span>
+            <code className="truncate rounded bg-stone-100 px-1 font-mono text-[9px] text-stone-700">
+              {data.embed_model}
+            </code>
+          </div>
+        ) : (
+          <div
+            className="flex items-center gap-1.5 text-stone-500"
+            title="Embeddings отключены — семантический поиск работает по ключевым словам. Загрузка PDF тоже недоступна."
+          >
+            <span>Embed:</span>
+            <code className="rounded bg-stone-100 px-1 font-mono text-[9px] text-stone-600">
+              keyword-only
+            </code>
+          </div>
+        )}
         <div
           className="flex items-center gap-1.5"
           title={
@@ -392,6 +419,9 @@ function SearchDemo() {
   //   • Поле ввода прижато к низу (sticky-style — обычный flex column tail).
   //   • Справа — панель настроек: системный промпт + параметры генерации.
   // История держится в памяти — follow-up'ы работают между турнами.
+  // llm-info нужен здесь чтобы корректно разрешить ModelKind → реальный tag
+  // (для Cerebras precise=qwen-3-32b, для Ollama precise=qwen2.5:7b).
+  const { data: llmInfo } = useLLMStatus()
   const [turns, setTurns] = useState<ChatTurn[]>([])
   const [input, setInput] = useState('')
   // Параметры генерации.
@@ -491,7 +521,7 @@ function SearchDemo() {
           num_ctx: numCtx,
           extra_system_prompt: extraSystemPrompt.trim() || undefined,
           disabled_regulation_ids: effectiveDisabled,
-          model: modelByKind(modelKind).ollama_tag,
+          model: resolveModelTag(modelKind, llmInfo),
         },
         controller.signal,
       )
@@ -820,6 +850,9 @@ function ChatSettingsPanel({
   modelKind: ModelKind
   onModelKindChange: (k: ModelKind) => void
 }) {
+  // llm-info нужен здесь, чтобы передать в LLMStatusFooter правильный tag
+  // выбранной модели для текущего провайдера (cerebras qwen-3-32b vs ollama qwen2.5:7b).
+  const { data: llmInfoForPanel } = useLLMStatus()
   const [collapsed, setCollapsed] = useState<boolean>(() => loadCollapsed())
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
@@ -1042,16 +1075,18 @@ function ChatSettingsPanel({
       <LLMStatusFooter
         regulationsTotal={regulationsTotal}
         regulationsEnabled={regulationsEnabled}
-        selectedModel={modelByKind(modelKind).ollama_tag}
+        selectedModel={resolveModelTag(modelKind, llmInfoForPanel)}
       />
     </aside>
   )
 }
 
-// Селектор модели LLM — отдельная SettingsSection. Чипы Точная/Быстрая,
-// при наведении показывает trade-off (RAM, скорость, когда выбирать).
-// Если выбранная модель не установлена в Ollama (нет в available_models) —
-// показываем плашку с подсказкой `ollama pull <tag>`.
+// Селектор модели LLM. Каталог моделей провайдер-зависим:
+// — Ollama: precise/fast с RAM/tok/s подсказками (MODEL_CATALOG).
+// — Cerebras / Groq / OpenRouter: модели из llm-info.available_models,
+//   с label/hint из PROVIDER_HINTS (см. llmModels.ts).
+// «Не установлена» плашка имеет смысл только для Ollama (там можно `pull`),
+// для cloud-провайдеров скрыта.
 function ModelPickerSection({
   modelKind,
   onChange,
@@ -1060,22 +1095,29 @@ function ModelPickerSection({
   onChange: (k: ModelKind) => void
 }) {
   const { data: llmInfo } = useLLMStatus()
+  const isOllama = !llmInfo?.provider || llmInfo.provider === 'ollama'
+  const catalog = useMemo(
+    () => buildModelCatalog(llmInfo?.provider, llmInfo?.available_models, llmInfo?.llm_model),
+    [llmInfo?.provider, llmInfo?.available_models, llmInfo?.llm_model],
+  )
   const availableModels = new Set(llmInfo?.available_models ?? [])
   const customized = modelKind !== DEFAULT_MODEL_KIND
-  const selected = modelByKind(modelKind)
+  const selected = catalog.find((m) => m.kind === modelKind) ?? catalog[0] ?? modelByKind(modelKind)
   const isSelectedInstalled =
-    availableModels.size === 0 || availableModels.has(selected.ollama_tag)
+    !isOllama || availableModels.size === 0 || availableModels.has(selected.ollama_tag)
 
   return (
     <SettingsSection icon={Cpu} title="Модель LLM" customized={customized}>
       <div className="space-y-2">
-        {MODEL_CATALOG.map((m) => {
+        {catalog.map((m, idx) => {
           const active = m.kind === modelKind
-          // Если llm-info ещё не пришла, считаем установленным (не пугаем).
-          const installed = availableModels.size === 0 || availableModels.has(m.ollama_tag)
+          // Только для Ollama имеет смысл проверять `installed` (доступность
+          // в `/api/tags`). Для cloud-провайдеров считаем что все из preset'а
+          // живые — проверка случится при первом chat-запросе.
+          const installed = !isOllama || availableModels.size === 0 || availableModels.has(m.ollama_tag)
           return (
             <button
-              key={m.kind}
+              key={`${m.ollama_tag}-${idx}`}
               onClick={() => onChange(m.kind)}
               className={cn(
                 'block w-full rounded border px-2.5 py-2 text-left text-xs transition',
@@ -1106,7 +1148,8 @@ function ModelPickerSection({
                 )}
               </div>
               <div className="mt-1 text-[10px] leading-tight text-stone-500">
-                ~{m.tokens_per_sec} tok/s · {m.ram_gb} ГБ RAM
+                ~{m.tokens_per_sec} tok/s
+                {m.ram_gb > 0 ? ` · ${m.ram_gb} ГБ RAM` : ''}
               </div>
               <div className="mt-0.5 text-[10px] leading-tight text-stone-500">
                 {m.hint}
@@ -1115,7 +1158,7 @@ function ModelPickerSection({
           )
         })}
         <p className="text-[10px] leading-tight text-stone-500">
-          <b>Когда {selected.kind === 'precise' ? 'точная' : 'быстрая'}:</b>{' '}
+          <b>Когда {selected.kind === 'precise' ? 'основная' : 'быстрая'}:</b>{' '}
           {selected.use_when}
         </p>
         {!isSelectedInstalled && (

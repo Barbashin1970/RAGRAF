@@ -67,6 +67,10 @@ class EmbeddingIndex:
         self._sig_cache = None
 
     def is_fresh(self) -> bool:
+        # При выключенных embeddings индекс заведомо «свежий» — пустой,
+        # rebuild() ничего не сделает, нет смысла гонять его на каждый search().
+        if not settings.embeddings_enabled:
+            return True
         return self._signature == self.signature() and bool(self._vectors)
 
     @staticmethod
@@ -92,6 +96,11 @@ class EmbeddingIndex:
         вместо N последовательных await'ов. Ollama батчит на сервере → 1 HTTP
         round-trip вместо N. Для N>5 заметно быстрее, для N=1 эквивалентно.
         """
+        if not settings.embeddings_enabled:
+            # Без embeddings-провайдера индекс пуст; search() сразу вернёт [].
+            self._vectors = {}
+            self._signature = self.signature()
+            return
         from openai import AsyncOpenAI
         client = AsyncOpenAI(
             base_url=settings.openai_base_url or None,

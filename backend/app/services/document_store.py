@@ -118,6 +118,11 @@ async def embed_chunks(chunks: list[str]) -> list[list[float]] | None:
         return []
     from app.config import settings
 
+    if not settings.embeddings_enabled:
+        # Embeddings отключены — документ сохранится с embedding=NULL, retrieval
+        # деградирует на keyword-match (это уже сделано ниже по коду).
+        return None
+
     try:
         from openai import AsyncOpenAI
 
@@ -140,6 +145,9 @@ async def embed_query(query: str) -> list[float] | None:
     if not query.strip():
         return None
     from app.config import settings
+
+    if not settings.embeddings_enabled:
+        return None
 
     try:
         from openai import AsyncOpenAI

@@ -370,6 +370,15 @@ export const sandboxChatResponseSchema = z.object({
 
 export const sandboxLlmInfoSchema = z.object({
   mode: z.enum(['mock', 'real']),
+  // Бэкенд может быть подключён к Ollama (локально) или к облачному
+  // OpenAI-совместимому API (Cerebras / Groq / OpenRouter / OpenAI).
+  // UI меняет логику отображения в зависимости от провайдера:
+  // — для не-Ollama скрываются кнопки load/unload (нет такого API);
+  // — список моделей берётся из available_models, а не из MODEL_CATALOG.
+  provider: z.enum(['ollama', 'cerebras', 'groq', 'openrouter', 'openai', 'mock']).optional(),
+  // Когда false — рисуем баннер «семантический поиск ограничен»
+  // и блокируем форму загрузки PDF/DOCX.
+  embeddings_enabled: z.boolean().optional(),
   ragu_enabled: z.boolean(),
   llm_model: z.string(),
   embed_model: z.string(),

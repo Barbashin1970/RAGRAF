@@ -118,16 +118,19 @@ async def sandbox_chat(req: ChatRequest) -> dict[str, Any]:
 
 @router.get("/sandbox/llm-info")
 async def sandbox_llm_info() -> dict[str, Any]:
-    """Подробная информация о LLM-стеке: текущие модели, доступность Ollama,
-    список установленных моделей, размер семантического индекса, дефолты
-    параметров генерации. Используется UI для отображения «состояние» в шапке
-    Песочницы и в панели управления генерацией.
+    """Подробная информация о LLM-стеке: провайдер, текущая модель,
+    доступность endpoint'а, список моделей (для Ollama — из /api/tags,
+    для облачных провайдеров — preset из кода), флаг embeddings,
+    дефолты параметров генерации. UI рисует по этому ответу шапку
+    Песочницы, банер «embeddings off» и выпадашку моделей.
     """
     from app.services import embedding_index
     from app.config import settings as cfg
 
     info: dict[str, Any] = {
         "mode": sandbox.backend_mode(),
+        "provider": cfg.llm_provider,
+        "embeddings_enabled": cfg.embeddings_enabled,
         "ragu_enabled": cfg.ragu_enabled,
         "llm_model": cfg.ragu_llm_model,
         "embed_model": cfg.ragu_embed_model,
@@ -140,23 +143,24 @@ async def sandbox_llm_info() -> dict[str, Any]:
         },
         "llm_reachable": False,
         "llm_loaded_in_memory": False,
-        "available_models": [],
+        "available_models": _provider_model_presets(cfg.llm_provider, cfg.ragu_llm_model),
         "index_size": 0,
     }
 
-    # Пингуем Ollama без падения если её нет.
-    if cfg.openai_base_url:
+    # Для Ollama — пингуем native эндпойнты /api/tags + /api/ps. Для облачных
+    # провайдеров эти URL не существуют, поэтому считаем endpoint доступным
+    # «оптимистично» по факту наличия base_url+api_key (реальная проверка —
+    # первый chat-запрос, нет смысла тратить запрос на ping).
+    if cfg.llm_provider == "ollama" and cfg.openai_base_url:
         import httpx
         try:
             async with httpx.AsyncClient(timeout=2.0) as client:
-                # /api/tags — список всех скачанных моделей
                 tags_url = cfg.openai_base_url.rstrip("/").rstrip("/v1") + "/api/tags"
                 resp = await client.get(tags_url)
                 if resp.status_code == 200:
                     info["llm_reachable"] = True
                     data = resp.json()
                     info["available_models"] = [m["name"] for m in data.get("models", [])]
-                # /api/ps — модели, загруженные в RAM прямо сейчас
                 ps_url = cfg.openai_base_url.rstrip("/").rstrip("/v1") + "/api/ps"
                 resp = await client.get(ps_url)
                 if resp.status_code == 200:
@@ -165,6 +169,9 @@ async def sandbox_llm_info() -> dict[str, Any]:
                     info["loaded_models"] = loaded
         except Exception:
             pass
+    elif cfg.llm_provider not in ("ollama", "mock"):
+        # Облачные провайдеры — считаем доступным если есть api_key.
+        info["llm_reachable"] = bool(cfg.openai_api_key)
 
     # Размер embedding-индекса — без побочных эффектов (если ещё не построен, не строим).
     try:
@@ -175,6 +182,45 @@ async def sandbox_llm_info() -> dict[str, Any]:
         pass
 
     return info
+
+
+def _provider_model_presets(provider: str, current: str) -> list[str]:
+    """Список моделей по умолчанию для выпадашки UI. Для Ollama он будет
+    переписан реальным `/api/tags` (если доступен) — это fallback на случай
+    когда Ollama не пингуется. Для облачных провайдеров — захардкоженный
+    хороший выбор для русскоязычного демо (free-tier на 2026).
+    """
+    presets: dict[str, list[str]] = {
+        "ollama": [
+            "qwen2.5:7b-instruct-q4_K_M",
+            "qwen2.5:3b-instruct-q4_K_M",
+            "llama3.2:3b",
+        ],
+        "cerebras": [
+            "qwen-3-32b",
+            "llama-3.3-70b",
+            "llama3.1-8b",
+        ],
+        "groq": [
+            "llama-3.3-70b-versatile",
+            "llama-3.1-8b-instant",
+            "qwen-qwq-32b",
+        ],
+        "openrouter": [
+            "qwen/qwen-2.5-72b-instruct:free",
+            "meta-llama/llama-3.3-70b-instruct:free",
+            "deepseek/deepseek-r1:free",
+        ],
+        "openai": [
+            "gpt-4o-mini",
+            "gpt-4o",
+        ],
+        "mock": [],
+    }
+    items = list(presets.get(provider, []))
+    if current and current not in items:
+        items.insert(0, current)
+    return items
 
 
 @router.post("/sandbox/search")
@@ -283,7 +329,23 @@ def sandbox_list_documents() -> dict[str, Any]:
 
 @router.post("/sandbox/documents/upload", status_code=201)
 async def sandbox_upload_document(file: UploadFile = File(...)) -> dict[str, Any]:
-    """Загрузить PDF или DOCX. Запускает полный пайплайн parse → chunk → embed."""
+    """Загрузить PDF или DOCX. Запускает полный пайплайн parse → chunk → embed.
+
+    Когда `settings.embeddings_enabled=False` (демо-режим без embedding-провайдера)
+    отдаём 503 — без векторов retrieval по PDF деградирует до substring-поиска,
+    это бесполезный UX. Лучше явно сказать пользователю что фича выключена,
+    чем дать загрузить документ и потом не суметь по нему отвечать.
+    """
+    from app.config import settings as cfg
+    if not cfg.embeddings_enabled:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Загрузка документов отключена: текущий LLM-провайдер не предоставляет "
+                "embeddings. Включить можно установив EMBEDDINGS_ENABLED=true и подключив "
+                "embedding-провайдер (Ollama bge-m3 локально, либо Gemini text-embedding-004)."
+            ),
+        )
     if not file.filename:
         raise HTTPException(status_code=400, detail="Имя файла обязательно")
     data = await file.read()
@@ -344,6 +406,11 @@ async def sandbox_llm_load(req: ModelOpRequest) -> dict[str, Any]:
     токены, но загружает веса в VRAM/RAM.
     """
     from app.config import settings as cfg
+    if cfg.llm_provider != "ollama":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Управление RAM-загрузкой моделей доступно только для Ollama, текущий провайдер: {cfg.llm_provider}",
+        )
     if not cfg.openai_base_url:
         raise HTTPException(status_code=503, detail="OPENAI_BASE_URL не задан")
     base = cfg.openai_base_url.rstrip("/").rstrip("/v1")
@@ -367,6 +434,11 @@ async def sandbox_llm_unload(req: ModelOpRequest) -> dict[str, Any]:
     Освобождает 2-5 ГБ памяти когда модель больше не нужна. Следующий
     запрос будет с cold-start."""
     from app.config import settings as cfg
+    if cfg.llm_provider != "ollama":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Управление RAM-загрузкой моделей доступно только для Ollama, текущий провайдер: {cfg.llm_provider}",
+        )
     if not cfg.openai_base_url:
         raise HTTPException(status_code=503, detail="OPENAI_BASE_URL не задан")
     base = cfg.openai_base_url.rstrip("/").rstrip("/v1")
