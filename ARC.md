@@ -214,41 +214,50 @@ flowchart TB
 Архитектурная программа RAGRAF (см. [BACKLOG.md § Author/Execute split](BACKLOG.md)) — разделение функциональности на три слоя по типу обработки и стоимости:
 
 ```mermaid
-flowchart LR
+%%{init: {'theme':'neutral', 'themeVariables': {'fontSize': '15px'}, 'flowchart':{'nodeSpacing': 32, 'rankSpacing': 70, 'padding': 14, 'subGraphTitleMargin': {'top': 18, 'bottom': 18}}}}%%
+flowchart TD
   subgraph AUTHOR["🟪 Author Layer · violet #6B46C1"]
-    A1["Студия аналитика /sandbox<br>· Диалог с RAGU (chat)<br>· Извлечь параметры<br>· Семантический поиск"]
-    A2["LLM-инфраструктура<br>· Ollama qwen2.5:7b<br>· bge-m3 эмбеддер<br>· graph_ragu LocalSearchEngine"]
+    direction TB
+    A1["Студия аналитика /sandbox<br>· Локальная LLM (chat с RAGU-retrieval)<br>· Семантический поиск по корпусу<br>· RAGU Studio (override 18 промптов)"]
+    A2["Извлечение параметров /regulations/new-from-text<br>· Rules-based regex + словарь<br>· Predicted_domain · CRUD словаря"]
+    A3["LLM-инфраструктура<br>· Ollama qwen2.5:7b<br>· bge-m3 эмбеддер<br>· graph_ragu LocalSearchEngine"]
   end
 
   subgraph MODEL["🟢 Model Layer · teal #2C7A7B"]
-    M1["Регламенты /regulations<br>· Поля/Слайдеры/Turtle<br>· Flow Editor (Rule DSL)<br>· SHACL Constraints<br>· Граф связей"]
-    M2["Хранилище<br>· DuckDB (Pydantic-домен)<br>· Turtle/SHACL/JSON export<br>· История версий + diff"]
+    direction TB
+    M1["Регламенты /regulations<br>· Поля / Слайдеры / Turtle<br>· Flow Editor (Rule DSL · 8 типов узлов)<br>· SHACL Constraints · Граф связей"]
+    M2["Библиотека датчиков /sensors<br>· Классы → подтипы → поля payload<br>· 22 подтипа · 282 поля (CRUD)"]
+    M3["Хранилище<br>· DuckDB (Pydantic-домен)<br>· Turtle/SHACL/JSON export · SIGMA-bundle<br>· История версий + diff · PROV-O"]
   end
 
   subgraph EXECUTE["🔵 Execute Layer · blue #3182CE"]
-    E1["Симулятор события<br>(out of scope — заглушка)"]
-    E2["Sensor binding · API actions<br>(планируется в SIGMA-compliance backlog)"]
-    E3["Журнал срабатываний<br>(реализуется ядром СИГМА)"]
+    direction TB
+    E1["Симулятор /execute<br>· POST /api/regulations/{id}/execute<br>· Пресеты · подсветка fired-пути<br>· Trace + level + recommendation"]
+    E2["Sensor binding<br>· Sensor-нода в Flow Editor<br>· bindsTo автозаполнение<br>· 3 стратегии резолва readings"]
+    E3["Приёмник событий СИГМЫ<br>⏳ /api/events/ingest — в бэклоге<br>⏳ Журнал срабатываний — в бэклоге<br>⏳ Webhook-actions на OUTPUT"]
   end
 
-  AUTHOR -->|"Производит<br>(редко, дорого)"| MODEL
-  MODEL -.->|"Потребляется<br>(часто, дёшево)"| EXECUTE
+  AUTHOR -->|"Производит<br>(редко, дорого ~30с/инференция)"| MODEL
+  MODEL -->|"Питает<br>(часто, ~10мс на матч)"| EXECUTE
 
-  style AUTHOR fill:#F3E8FF,stroke:#6B46C1
-  style MODEL fill:#E6FFFA,stroke:#2C7A7B
-  style EXECUTE fill:#EBF8FF,stroke:#3182CE
+  classDef author fill:#F3E8FF,stroke:#6B46C1,stroke-width:2px,color:#1f2937
+  classDef model fill:#E6FFFA,stroke:#2C7A7B,stroke-width:2px,color:#1f2937
+  classDef execute fill:#EBF8FF,stroke:#3182CE,stroke-width:2px,color:#1f2937
+  class A1,A2,A3 author
+  class M1,M2,M3 model
+  class E1,E2,E3 execute
 ```
 
 **Семантика разделения:**
 
 | Аспект                  | Author Layer                              | Model Layer                              | Execute Layer                    |
 |-------------------------|-------------------------------------------|------------------------------------------|----------------------------------|
-| **Кто использует**      | Аналитик-методолог                        | Аналитик + (в будущем) оператор          | Runtime СИГМА                    |
+| **Кто использует**      | Аналитик-методолог                        | Аналитик + (в будущем) оператор          | Runtime СИГМА / симулятор        |
 | **Частота**             | Редко (создание/обновление регламента)    | Часто (просмотр/правка)                  | На каждое событие                |
-| **Стоимость одной операции** | ~30 с (LLM-инференция)                | ~1–10 мс (DuckDB read/write)             | ~10 мс (детерминированный матч)  |
-| **Технологии**          | Ollama · qwen2.5:7b · bge-m3 · RAGU       | DuckDB · Pydantic · rdflib · React Flow  | (планируется) асинхронный matcher |
+| **Стоимость одной операции** | ~30 с (LLM-инференция) или ~5 мс (rules-based) | ~1–10 мс (DuckDB read/write)        | ~10 мс (детерминированный матч)  |
+| **Технологии**          | Ollama · qwen2.5:7b · bge-m3 · RAGU · regex+dictionary | DuckDB · Pydantic · rdflib · React Flow  | flow_executor.py · SensorReading-resolver |
 | **Цвет UI**             | violet `#6B46C1`                          | teal `#2C7A7B` (primary)                 | blue `#3182CE`                   |
-| **Что в RAGRAF**        | ✅ Реализовано                            | ✅ Реализовано                           | ⚠ Заглушка                       |
+| **Что в RAGRAF**        | ✅ Реализовано (LLM chat · rules-based extract) | ✅ Реализовано (регламенты + sensor library) | 🟡 Симулятор готов · приёмник СИГМЫ в бэклоге |
 
 Подробнее — [BACKLOG.md → Phase 3 · Execute Layer](BACKLOG.md).
 
