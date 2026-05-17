@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Фон: чёрно-синий slate-900 (#0F172A), совпадает с подвалом landing.
+       Скруглённые углы 12 = ~iOS app icon style. -->
+  <rect width="64" height="64" rx="12" fill="#0F172A"/>
+  <!-- Золотая Σ. Жирный sans-serif, центр контейнера.
+       Использован Unicode-символ U+03A3 (греческая «сигма», знак суммы).
+       Цвет — amber-400 (#FBBF24) с тёплым тоном, хорошо читается на тёмном фоне.
+       font-size 44 при viewBox 64 даёт оптимальное «дыхание» по краям. -->
+  <text x="50%"
+        y="50%"
+        text-anchor="middle"
+        dominant-baseline="central"
+        font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+        font-weight="700"
+        font-size="44"
+        fill="#FBBF24">Σ</text>
+</svg>

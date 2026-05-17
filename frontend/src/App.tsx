@@ -22,9 +22,13 @@ function NavLink({ to, icon: Icon, label }: { to: string; icon: typeof Activity;
       to={to}
       className={cn(
         'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition',
+        // Шапка унифицирована под синюю палитру Σ-лого (см. LandingScreen).
+        // Раньше использовали primary=teal — это цвет Model Layer в design
+        // system (ARC.md §1.5), а в шапке это создавало «кашу» из 3+ цветов.
+        // Active = bg-blue-600 совпадает с Σ-бейджем слева.
         active
-          ? 'bg-primary text-white'
-          : 'text-stone-700 hover:bg-surface-offset',
+          ? 'bg-blue-600 text-white'
+          : 'text-slate-700 hover:bg-blue-50 hover:text-blue-700',
       )}
     >
       <Icon size={16} />
@@ -51,8 +55,8 @@ function ExecutionNavLink() {
       className={cn(
         'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition',
         active
-          ? 'bg-primary text-white'
-          : 'text-stone-700 hover:bg-surface-offset',
+          ? 'bg-blue-600 text-white'
+          : 'text-slate-700 hover:bg-blue-50 hover:text-blue-700',
       )}
     >
       <PlayCircle size={16} />
@@ -60,6 +64,8 @@ function ExecutionNavLink() {
       <span
         className={cn(
           'rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide',
+          // beta-badge остаётся amber — это явный «warning»-сигнал статуса,
+          // должен отличаться от nav-палитры. Универсальная конвенция.
           active ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700',
         )}
       >
@@ -142,7 +148,7 @@ export default function App() {
         <header className="flex items-center gap-3 border-b border-stone-200 bg-white px-4 py-2">
           <Link
             to="/"
-            className="group mr-2 inline-flex items-center gap-1.5 text-lg font-semibold text-primary transition hover:text-primary/80"
+            className="group mr-2 inline-flex items-center gap-1.5 text-lg font-semibold text-blue-700 transition hover:text-blue-800"
             title="На главную «Сигма»"
           >
             <span className="flex h-7 w-7 items-center justify-center rounded-md bg-blue-600 text-white transition group-hover:bg-blue-700">
@@ -173,7 +179,16 @@ export default function App() {
         </header>
       )}
 
-      <main className="min-h-0 flex-1 overflow-hidden">
+      {/* Landing — это длинная single-page страница, она ДОЛЖНА скроллиться
+          вертикально. Внутренние экраны (Регламенты, Студия, Flow Editor)
+          управляют скроллом сами и хотят `overflow-hidden` чтобы не было
+          двойного скролл-бара. Поэтому overflow main зависит от маршрута. */}
+      <main
+        className={cn(
+          'min-h-0 flex-1',
+          isLanding ? 'overflow-y-auto' : 'overflow-hidden',
+        )}
+      >
         <Routes>
           <Route path="/" element={<LandingScreen />} />
           <Route path="/regulations" element={<RegulationList />} />

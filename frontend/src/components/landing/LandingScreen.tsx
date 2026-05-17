@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Activity,
@@ -103,20 +103,35 @@ function SigmaGlyph({ className }: { className?: string }) {
 
 export function LandingScreen() {
   // Sticky-nav: прозрачная над hero, opaque после скролла.
+  //
+  // Раньше слушали `window.scroll` — но landing скроллится внутри
+  // <main overflow-y-auto>, а не на уровне window, поэтому событие
+  // не приходило. IntersectionObserver работает независимо от того, кто
+  // скроллит: следим за тонким sentinel-div'ом в самом начале страницы
+  // и flip'аем state когда он уходит из viewport'а.
   const [scrolled, setScrolled] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40)
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
+    const el = sentinelRef.current
+    if (!el) return
+    const obs = new IntersectionObserver(
+      ([entry]) => setScrolled(!entry.isIntersecting),
+      { threshold: 0, rootMargin: '0px' },
+    )
+    obs.observe(el)
+    return () => obs.disconnect()
   }, [])
 
   const closeMobile = () => setMobileOpen(false)
 
   return (
-    <div className="min-h-full overflow-y-auto bg-slate-50 font-sans text-slate-900 antialiased">
+    <div className="bg-slate-50 font-sans text-slate-900 antialiased">
+      {/* Sentinel для IntersectionObserver — определяет когда мы скроллнули
+          ниже самого верха страницы. h-px = 1px невидимая полоска. */}
+      <div ref={sentinelRef} aria-hidden className="h-px" />
+
       {/* ── Sticky nav ──────────────────────────────────────────────── */}
       <nav
         className={`sticky top-0 z-50 transition-all ${
