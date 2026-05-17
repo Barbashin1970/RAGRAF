@@ -183,6 +183,25 @@ export const ruleDslSchema = z.object({
   edges: z.array(flowEdgeSchema),
 })
 
+// ── Sensor field schemas (Библиотека датчиков) ────────────────────────
+export const sensorFieldSchema = z.object({
+  sensor_type: z.string(),
+  field_name: z.string(),
+  datatype: z.enum(['decimal', 'integer', 'string', 'boolean']),
+  unit: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+  required: z.boolean(),
+  example_value: z.string().nullable().optional(),
+  position: z.number(),
+})
+
+export const sensorFieldsByTypeSchema = z.object({
+  sensor_type: z.string(),
+  fields: z.array(sensorFieldSchema),
+})
+
+export const sensorSchemasListResponse = z.array(sensorFieldsByTypeSchema)
+
 // ── Validation result ────────────────────────────────────────────────────
 
 export const validationErrorSchema = z.object({

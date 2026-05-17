@@ -232,6 +232,33 @@ class GraphPayload(BaseModel):
     meta: dict[str, int] = Field(default_factory=dict)
 
 
+# --- Sensor schema registry --------------------------------------------
+#
+# Каждое поле payload каждого типа датчика описано отдельной записью.
+# Это позволяет аналитику добавлять/менять поля из UI без правок кода —
+# например «у нас новый датчик влажности, добавляю поле `humidity` с
+# единицей %RH к типу `air`». См. event-data-examples/sensors/ как
+# реальный referral; начальный seed строится из этого справочника.
+
+
+class SensorField(BaseModel):
+    """Описание одного поля payload-объекта датчика."""
+    sensor_type: str  # 'p' / 't' / 'flow' / 'noise' / 'detector' / 'fiber' / 'air'
+    field_name: str   # имя поля в payload, напр. 'pressure' / 'event' / 'numberPlate'
+    datatype: Literal["decimal", "integer", "string", "boolean"] = "decimal"
+    unit: str | None = None          # 'atm' / '°C' / 'ppm' / 'µg/m³' / None
+    description: str | None = None    # человекочитаемое описание
+    required: bool = False            # обязательное поле для валидации
+    example_value: str | None = None  # пример (JSON-строка)
+    position: int = 0                 # порядок в UI
+
+
+class SensorFieldsByType(BaseModel):
+    """Группировка для GET /sensor-schemas — все типы и их поля."""
+    sensor_type: str
+    fields: list[SensorField] = Field(default_factory=list)
+
+
 # --- Search (RAGU) ------------------------------------------------------
 
 

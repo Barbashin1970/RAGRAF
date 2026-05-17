@@ -1,5 +1,5 @@
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { Activity, Beaker, BookOpen, ExternalLink, FileJson, ListTree, PlayCircle } from 'lucide-react'
+import { Activity, Beaker, BookOpen, ExternalLink, FileJson, ListTree, PlayCircle, Radar } from 'lucide-react'
 import { GraphView } from '@/components/graph/GraphView'
 import { RegulationList } from '@/components/regulations/RegulationList'
 import { RegulationEditorScreen } from '@/components/regulations/RegulationEditorScreen'
@@ -8,6 +8,7 @@ import { ConstraintEditorScreen } from '@/components/constraints/ConstraintEdito
 import { SandboxScreen } from '@/components/sandbox/SandboxScreen'
 import { SandboxBacklog } from '@/components/sandbox/SandboxBacklog'
 import { RaguStudioScreen } from '@/components/ragu/RaguStudioScreen'
+import { SensorLibraryScreen } from '@/components/sensors/SensorLibraryScreen'
 import { cn } from '@/lib/cn'
 
 function NavLink({ to, icon: Icon, label }: { to: string; icon: typeof Activity; label: string }) {
@@ -134,6 +135,7 @@ export default function App() {
         <nav className="flex items-center gap-1">
           <NavLink to="/sandbox" icon={Beaker} label="Студия аналитика" />
           <NavLink to="/regulations" icon={ListTree} label="Регламенты" />
+          <NavLink to="/sensors" icon={Radar} label="Датчики" />
           <NavLink to="/graph" icon={Activity} label="Граф связей" />
           {/* RAGU Studio переехала внутрь Студии аналитика как 3-й таб
               (см. SandboxScreen). Из шапки убрана чтобы навигация была
@@ -155,6 +157,7 @@ export default function App() {
           <Route path="/regulations/:id/edit" element={<RegulationEditorScreen />} />
           <Route path="/regulations/:id/flow" element={<FlowEditorScreen />} />
           <Route path="/regulations/:id/constraints" element={<ConstraintEditorScreen />} />
+          <Route path="/sensors" element={<SensorLibraryScreen />} />
           <Route path="/graph" element={<GraphView />} />
           <Route path="/sandbox" element={<SandboxScreen />} />
           <Route path="/sandbox/backlog" element={<SandboxBacklog />} />

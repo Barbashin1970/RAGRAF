@@ -3,9 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import datasets, flow, graph, ragu, regulations, sandbox, shacl, search, validate, versions
+from app.api import datasets, flow, graph, ragu, regulations, sandbox, sensor_schemas, shacl, search, validate, versions
 from app.config import settings
-from app.services import regulation_store
+from app.services import regulation_store, sensor_schema_store
 
 
 @asynccontextmanager
@@ -15,6 +15,11 @@ async def lifespan(_: FastAPI):
         regulation_store.init_db()
     except Exception as e:
         print(f"[lifespan] regulation_store.init_db failed: {e}")
+    # Registry полей датчиков — отдельная таблица, идемпотентный seed.
+    try:
+        sensor_schema_store.init_db()
+    except Exception as e:
+        print(f"[lifespan] sensor_schema_store.init_db failed: {e}")
     yield
 
 
@@ -145,3 +150,4 @@ app.include_router(graph.router, prefix="/api", tags=["graph"])
 app.include_router(search.router, prefix="/api", tags=["search"])
 app.include_router(sandbox.router, prefix="/api", tags=["sandbox"])
 app.include_router(ragu.router, prefix="/api", tags=["ragu"])
+app.include_router(sensor_schemas.router, prefix="/api", tags=["sensor-schemas"])

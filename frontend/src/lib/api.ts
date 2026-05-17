@@ -134,6 +134,26 @@ export interface FlowVersion {
   diff_summary?: string | null
 }
 
+// ── Sensor field schemas (Библиотека датчиков) ────────────────────────
+// Зеркалит app/schemas/domain.py: SensorField / SensorFieldsByType.
+// Каждое поле — запись о том, что у датчика типа `sensor_type` есть
+// payload-поле `field_name` определённого `datatype` и т.д.
+export interface SensorFieldSchema {
+  sensor_type: string
+  field_name: string
+  datatype: 'decimal' | 'integer' | 'string' | 'boolean'
+  unit?: string | null
+  description?: string | null
+  required: boolean
+  example_value?: string | null   // JSON-encoded строка
+  position: number
+}
+
+export interface SensorFieldsByType {
+  sensor_type: string
+  fields: SensorFieldSchema[]
+}
+
 // ── Режим «Исполнение» (Execute) ──────────────────────────────────────
 // Зеркалит app/services/flow_executor.py. ETL → POST /execute → ExecutionResult.
 export interface SensorReading {
@@ -190,6 +210,9 @@ import {
   sandboxLlmInfoSchema,
   saveResponseSchema,
   searchResponseSchema,
+  sensorFieldSchema,
+  sensorFieldsByTypeSchema,
+  sensorSchemasListResponse,
   shaclImportResponseSchema,
   sigmaImportResponseSchema,
   sourceUploadResponseSchema,
@@ -557,6 +580,35 @@ export const api = {
         { method: 'DELETE' },
       ),
     getConfig: () => request<RaguConfig>(`/api/ragu/config`),
+  },
+  // ── Библиотека полей датчиков ───────────────────────────────────────
+  // CRUD над DuckDB-таблицей sensor_field_schemas: позволяет аналитику
+  // добавлять/менять payload-поля для типов датчиков без правок кода.
+  sensorSchemas: {
+    list: () =>
+      request(`/api/sensor-schemas`, undefined, sensorSchemasListResponse),
+    listForType: (sensorType: string) =>
+      request(
+        `/api/sensor-schemas/${encodeURIComponent(sensorType)}`,
+        undefined,
+        sensorFieldsByTypeSchema,
+      ),
+    upsert: (sensorType: string, fieldName: string, body: SensorFieldSchema) =>
+      request(
+        `/api/sensor-schemas/${encodeURIComponent(sensorType)}/${encodeURIComponent(fieldName)}`,
+        { method: 'PUT', body: JSON.stringify(body) },
+        sensorFieldSchema,
+      ),
+    delete: (sensorType: string, fieldName: string) =>
+      request<{ ok: boolean; sensor_type: string; field_name: string }>(
+        `/api/sensor-schemas/${encodeURIComponent(sensorType)}/${encodeURIComponent(fieldName)}`,
+        { method: 'DELETE' },
+      ),
+    reseed: () =>
+      request<{ ok: boolean; fields_seeded: number }>(
+        `/api/sensor-schemas/reseed`,
+        { method: 'POST' },
+      ),
   },
 }
 

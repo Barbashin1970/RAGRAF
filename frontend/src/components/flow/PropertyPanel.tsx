@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import type { Node } from 'reactflow'
-import { NODE_KIND_META, type FlowNode, type NodeKind, type Parameter } from '@/lib/api'
+import { api, NODE_KIND_META, type FlowNode, type NodeKind, type Parameter, type SensorFieldSchema } from '@/lib/api'
 import { nanoid } from '@/lib/nanoid'
 import { Button } from '@/components/ui'
 import { cn } from '@/lib/cn'
@@ -274,6 +276,7 @@ function ByType({ type, data, parameters, set }: { type: NodeKind; data: FlowNod
             onChange={(v) => set({ externalId: v || null })}
             monospaced
           />
+          <SensorSchemaPreview sensorType={data.sensorType ?? null} />
         </>
       )
     default:
@@ -340,4 +343,91 @@ function FieldSelect({ label, value, onChange, options }: { label: string; value
       </select>
     </label>
   )
+}
+
+/**
+ * Превью JSON-скелета payload-полей для выбранного типа датчика. Подтягивает
+ * из api.sensorSchemas.listForType — это та же библиотека, что и в /sensors.
+ * Если sensorType не задан — показываем подсказку.
+ */
+function SensorSchemaPreview({ sensorType }: { sensorType: string | null }) {
+  const { data } = useQuery({
+    queryKey: ['sensor-schema', sensorType],
+    queryFn: () => api.sensorSchemas.listForType(sensorType!),
+    enabled: !!sensorType,
+  })
+
+  if (!sensorType) {
+    return (
+      <div className="mt-3 rounded-md border border-dashed border-stone-300 bg-stone-50 px-2 py-2 text-[11px] text-stone-500">
+        Выберите тип датчика выше — здесь появится JSON-схема payload-полей.
+      </div>
+    )
+  }
+
+  const fields: SensorFieldSchema[] = data?.fields ?? []
+  const payload: Record<string, unknown> = {}
+  for (const f of fields) {
+    payload[f.field_name] = decodeExample(f)
+  }
+  const wrapped = {
+    description: `<событие от датчика ${sensorType}>`,
+    timestamp: '2026-05-17T08:42:11Z',
+    payload,
+  }
+
+  return (
+    <div className="mt-3">
+      <div className="mb-1 flex items-center justify-between">
+        <div className="text-[10px] uppercase tracking-wide text-stone-500">
+          JSON-схема payload
+        </div>
+        <Link
+          to="/sensors"
+          className="text-[10px] text-primary hover:underline"
+          title="Открыть «Библиотеку датчиков» — там можно добавить/изменить поля"
+        >
+          редактировать →
+        </Link>
+      </div>
+      {fields.length === 0 ? (
+        <div className="rounded border border-stone-200 bg-stone-50 px-2 py-2 text-[11px] text-stone-500">
+          У типа «{sensorType}» нет полей. Открой <Link to="/sensors" className="text-primary hover:underline">«Датчики»</Link> и добавь.
+        </div>
+      ) : (
+        <pre className="overflow-x-auto whitespace-pre rounded border border-stone-700 bg-stone-900 p-2 font-mono text-[10px] text-stone-100">
+          {JSON.stringify(wrapped, null, 2)}
+        </pre>
+      )}
+      {fields.length > 0 && (
+        <div className="mt-1 text-[10px] text-stone-400">
+          {fields.length} {fields.length === 1 ? 'поле' : 'поля/полей'} в схеме · обязательных: {fields.filter((f) => f.required).length}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Распарсить example_value (JSON-строка) в подходящий sample.
+ * Дублирует логику из SensorLibraryScreen — оба места рисуют одинаковый JSON.
+ */
+function decodeExample(f: SensorFieldSchema): unknown {
+  if (f.example_value) {
+    try {
+      return JSON.parse(f.example_value)
+    } catch {
+      return f.example_value
+    }
+  }
+  switch (f.datatype) {
+    case 'decimal':
+    case 'integer':
+      return 0
+    case 'boolean':
+      return false
+    case 'string':
+    default:
+      return ''
+  }
 }
