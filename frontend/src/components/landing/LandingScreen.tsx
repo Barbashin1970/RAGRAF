@@ -76,15 +76,15 @@ const PIPELINE_STEPS = [
 ]
 
 const EFFECTS = [
-  { icon: Coins, value: '120–180 млн ₽/год', label: 'Снижение потерь от быстрой классификации и маршрутизации событий.' },
-  { icon: Clock, value: '−20–30%', label: 'Сокращение трудозатрат и времени подготовки решений.' },
-  { icon: TrendingUp, value: '300–400 млн ₽/год', label: 'Стратегический эффект при масштабировании.' },
+  { icon: Coins, value: '150 млн ₽/год', label: 'Снижение потерь от быстрой классификации и маршрутизации событий.' },
+  { icon: Clock, value: '−25%', label: 'Сокращение трудозатрат и времени подготовки решений.' },
+  { icon: TrendingUp, value: '350 млн ₽/год', label: 'Стратегический эффект при масштабировании.' },
 ]
 
 const DEPLOYMENTS = [
   { label: 'Кампус НГУ', icon: Building2 },
   { label: 'Наукоград Кольцово', icon: Sparkles },
-  { label: '«СмартСити-Новосибирск»', icon: Zap },
+  { label: 'Мэрия города Новосибирска', icon: Zap },
   { label: 'Другие города РФ', icon: ArrowRight },
 ]
 
@@ -141,7 +141,9 @@ export function LandingScreen() {
         }`}
       >
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
-          <a href="#top" className="flex items-center gap-2 font-bold tracking-tight">
+          {/* Бренд: единый span «Сигма · RAGRAF» в одном размере/весе —
+              как в подвале. Раньше «· RAGRAF» был text-xs (visual mismatch). */}
+          <a href="#top" className="flex items-center gap-2">
             <span
               className={`flex h-8 w-8 items-center justify-center rounded-lg transition ${
                 scrolled ? 'bg-blue-600 text-white' : 'bg-white/15 text-white backdrop-blur'
@@ -149,13 +151,12 @@ export function LandingScreen() {
             >
               <SigmaGlyph className="text-lg" />
             </span>
-            <span className={scrolled ? 'text-slate-900' : 'text-white'}>Сигма</span>
             <span
-              className={`hidden text-xs font-medium sm:inline ${
-                scrolled ? 'text-slate-400' : 'text-blue-200'
+              className={`text-base font-bold tracking-tight ${
+                scrolled ? 'text-slate-900' : 'text-white'
               }`}
             >
-              · RAGRAF
+              Сигма<span className="hidden sm:inline"> · RAGRAF</span>
             </span>
           </a>
 
@@ -549,8 +550,11 @@ export function LandingScreen() {
       {/* ── 8. Footer (sitemap) ──────────────────────────────────────── */}
       <footer className="border-t border-slate-200 bg-slate-900 text-slate-300">
         <div className="mx-auto max-w-5xl px-4 py-14">
-          <div className="grid gap-10 sm:grid-cols-4">
-            <div className="sm:col-span-2">
+          {/* 12-col grid: brand=5, Платформа=3, Ресурсы=4 — последняя колонка
+              шире чтобы внешние ссылки («Открытые данные городов», «Фреймворк
+              КАППА») помещались в одну строку. */}
+          <div className="grid gap-10 sm:grid-cols-12">
+            <div className="sm:col-span-5">
               <div className="flex items-center gap-2">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white">
                   <SigmaGlyph className="text-lg" />
@@ -558,28 +562,33 @@ export function LandingScreen() {
                 <span className="text-base font-bold text-white">Сигма · RAGRAF</span>
               </div>
               <p className="mt-3 max-w-sm text-sm leading-relaxed text-slate-400">
-                Платформа интеллектуального управления городской средой. Создаётся
-                Центром ИИ НГУ по направлению «Строительство и городская среда».
+                Платформа интеллектуального управления строительством и городской
+                средой.
               </p>
               <div className="mt-4 text-xs text-slate-500">
-                Кампус НГУ · Кольцово · СмартСити-Новосибирск · 2026
+                Кампус НГУ · Кольцово · Мэрия города Новосибирска · 2026
               </div>
             </div>
 
-            <FooterColumn title="Платформа">
-              <FooterLink to="/regulations" icon={ListTree} label="Регламенты" />
-              <FooterLink to="/sandbox" icon={MessageSquare} label="Студия аналитика" />
-              <FooterLink to="/sensors" icon={Radar} label="Датчики" />
-              <FooterLink to="/graph" icon={Activity} label="Граф связей" />
-              <FooterLink to="/execute" icon={PlayCircle} label="Исполнение" badge="beta" />
-            </FooterColumn>
+            <div className="sm:col-span-3">
+              <FooterColumn title="Платформа">
+                <FooterLink to="/regulations" icon={ListTree} label="Регламенты" />
+                <FooterLink to="/sandbox" icon={MessageSquare} label="Студия аналитика" />
+                <FooterLink to="/sensors" icon={Radar} label="Датчики" />
+                <FooterLink to="/graph" icon={Activity} label="Граф связей" />
+                <FooterLink to="/execute" icon={PlayCircle} label="Исполнение" badge="beta" />
+              </FooterColumn>
+            </div>
 
-            <FooterColumn title="Ресурсы">
-              <FooterExtLink href="https://github.com/Barbashin1970/RAGRAF" icon={Github} label="GitHub проекта" />
-              <FooterExtLink href="https://sigma-operator.vercel.app/operator" icon={GraduationCap} label="Тренажёр операторов" />
-              <FooterExtLink href="https://nsk-opendata-bot.up.railway.app/" icon={Database} label="Открытые данные городов" />
-              <FooterExtLink href="/docs" icon={BookOpen} label="API Swagger" />
-            </FooterColumn>
+            <div className="sm:col-span-4">
+              <FooterColumn title="Ресурсы">
+                <FooterExtLink href="https://github.com/Barbashin1970/RAGRAF" icon={Github} label="GitHub проекта" />
+                <FooterExtLink href="https://sigma-operator.vercel.app/operator" icon={GraduationCap} label="Тренажёр операторов" />
+                <FooterExtLink href="https://kappa.nsu.ru/" icon={Layers} label="Фреймворк КАППА" />
+                <FooterExtLink href="https://nsk-opendata-bot.up.railway.app/" icon={Database} label="Открытые данные городов" />
+                <FooterExtLink href="/docs" icon={BookOpen} label="API Swagger" />
+              </FooterColumn>
+            </div>
           </div>
 
           <div className="mt-10 border-t border-slate-800 pt-6 text-xs text-slate-500">
@@ -618,7 +627,7 @@ function FooterLink({
     <li>
       <Link
         to={to}
-        className="group inline-flex items-center gap-2 text-sm text-slate-300 transition hover:text-white"
+        className="group inline-flex items-center gap-2 whitespace-nowrap text-sm text-slate-300 transition hover:text-white"
       >
         <Icon size={14} className="text-slate-500 transition group-hover:text-blue-400" />
         {label}
@@ -639,7 +648,7 @@ function FooterExtLink({ href, icon: Icon, label }: { href: string; icon: typeof
         href={href}
         target="_blank"
         rel="noreferrer"
-        className="group inline-flex items-center gap-2 text-sm text-slate-300 transition hover:text-white"
+        className="group inline-flex items-center gap-2 whitespace-nowrap text-sm text-slate-300 transition hover:text-white"
       >
         <Icon size={14} className="text-slate-500 transition group-hover:text-blue-400" />
         {label}
