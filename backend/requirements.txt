@@ -10,6 +10,12 @@ networkx==3.4.2
 python-dotenv==1.0.1
 duckdb>=1.2,<2
 
+# OpenAI Python SDK — клиент для любого OpenAI-совместимого endpoint'а
+# (Cerebras / Groq / Ollama / OpenAI). Все импорты внутри функций (lazy),
+# поэтому без пакета бэкенд стартует, но /sandbox/chat сразу падает в
+# mock с ModuleNotFoundError. На cloud-демо обязателен.
+openai==2.36.0
+
 # Document parsing для аналитика — загрузка PDF/DOCX как контекст в Q&A.
 # Pure-Python, без системных зависимостей.
 pypdf==5.1.0
