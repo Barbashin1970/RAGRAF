@@ -8,9 +8,12 @@ export type NodeKind =
   | 'sensor'
 
 // Тип физического датчика (соответствует `type` в ETL-payload'е СИГМЫ):
-//   p — pressure, t — temperature, d — diameter,
-//   noise — акустический датчик, detector — видеодетектор.
-export type SensorType = 'p' | 't' | 'd' | 'noise' | 'detector'
+//   p     — pressure (манометр),
+//   t     — temperature (термопара / RTD),
+//   flow  — расход м³/ч (электромагнитный/ультразвуковой расходомер),
+//   noise — акустический детектор (например, утечки),
+//   detector — видеодетектор (CCTV-аналитика).
+export type SensorType = 'p' | 't' | 'flow' | 'noise' | 'detector'
 
 export interface FlowNode {
   id: string
@@ -686,7 +689,9 @@ export const SENSOR_TYPE_META: Record<
 > = {
   p:        { label: 'Давление',       short: 'p', bg: 'bg-blue-100',    fg: 'text-blue-700',    ring: 'ring-blue-300' },
   t:        { label: 'Температура',    short: 't', bg: 'bg-rose-100',    fg: 'text-rose-700',    ring: 'ring-rose-300' },
-  d:        { label: 'Диаметр',        short: 'd', bg: 'bg-stone-200',   fg: 'text-stone-700',   ring: 'ring-stone-400' },
+  // Расход (м³/ч) — теплосчётчик / расходомер. Цвет cyan, чтобы рядом с p (blue)
+  // и t (rose) сразу читался как «другой канал гидравлики».
+  flow:     { label: 'Расход м³/ч',    short: 'Q', bg: 'bg-cyan-100',    fg: 'text-cyan-700',    ring: 'ring-cyan-300' },
   noise:    { label: 'Шум',            short: 'N', bg: 'bg-amber-100',   fg: 'text-amber-800',   ring: 'ring-amber-300' },
   detector: { label: 'Видеодетектор',  short: 'V', bg: 'bg-violet-100',  fg: 'text-violet-700',  ring: 'ring-violet-300' },
 }

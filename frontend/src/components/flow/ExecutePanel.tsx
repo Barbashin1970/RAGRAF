@@ -106,20 +106,22 @@ export function ExecutePanel({ regulationId, currentDsl, nodes, onResult }: Prop
       // Догадки для preset'ов по sensor-type. Не идеально, но даёт быстрый
       // прогон без копания в значениях. Аналитик правит точечно.
       const stype = c.sensorType
+      // Эвристические пресеты по типам датчиков. Давление в атм., температура
+      // в °C, расход в м³/ч — порядки взяты из типичных теплосетевых сценариев.
       if (preset === 'norm') {
         if (stype === 'p') next[c.key] = '20.5'
         else if (stype === 't') next[c.key] = '20'
-        else if (stype === 'd') next[c.key] = '5'
+        else if (stype === 'flow') next[c.key] = '10'
         else next[c.key] = '1'
       } else if (preset === 'warning') {
         if (stype === 'p') next[c.key] = '23'
         else if (stype === 't') next[c.key] = '40'
-        else if (stype === 'd') next[c.key] = '7'
+        else if (stype === 'flow') next[c.key] = '25'
         else next[c.key] = '5'
       } else {
         if (stype === 'p') next[c.key] = '50'
         else if (stype === 't') next[c.key] = '100'
-        else if (stype === 'd') next[c.key] = '15'
+        else if (stype === 'flow') next[c.key] = '80'
         else next[c.key] = '10'
       }
     }

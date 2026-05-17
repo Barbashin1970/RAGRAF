@@ -247,12 +247,12 @@ function ByType({ type, data, parameters, set }: { type: NodeKind; data: FlowNod
           <FieldSelect
             label="Тип датчика"
             value={data.sensorType ?? ''}
-            onChange={(v) => set({ sensorType: v === '' ? null : (v as 'p' | 't' | 'd' | 'noise' | 'detector') })}
+            onChange={(v) => set({ sensorType: v === '' ? null : (v as 'p' | 't' | 'flow' | 'noise' | 'detector') })}
             options={[
               { value: '', label: '— не задан —' },
               { value: 'p', label: 'Давление (p)' },
               { value: 't', label: 'Температура (t)' },
-              { value: 'd', label: 'Диаметр (d)' },
+              { value: 'flow', label: 'Расход м³/ч (Q)' },
               { value: 'noise', label: 'Шум' },
               { value: 'detector', label: 'Видеодетектор' },
             ]}

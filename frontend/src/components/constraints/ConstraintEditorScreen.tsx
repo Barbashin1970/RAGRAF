@@ -108,6 +108,18 @@ export function ConstraintEditorScreen() {
   const saving = save.isPending
   const importing = importShacl.isPending
 
+  // dirty = текущие rows отличаются от загруженных constraints. Сравниваем
+  // нормализованную форму (без служебного _new флага) — тот же паттерн что
+  // в RegulationEditorScreen / FlowEditorScreen, чтобы кнопка Сохранить
+  // была бледной когда нечего сохранять.
+  const dirty = useMemo(() => {
+    if (!data) return false
+    const normalize = (cs: Constraint[]) =>
+      JSON.stringify(cs.map((c) => ({ ...c })).sort((a, b) => a.id.localeCompare(b.id)))
+    const stripped: Constraint[] = rows.map(({ _new: _, ...c }) => c)
+    return normalize(data) !== normalize(stripped)
+  }, [data, rows])
+
   const actions = (
     <>
       {/* Import — file-input спрятан в <label>; кастомное поведение нельзя
@@ -159,7 +171,8 @@ export function ConstraintEditorScreen() {
         variant="primary"
         icon={<Save size={13} />}
         loading={saving}
-        onClick={() => save.mutate(rows.map(({ _new, ...c }) => c))}
+        disabled={!dirty || saving}
+        onClick={() => save.mutate(rows.map(({ _new: _, ...c }) => c))}
       >
         {saving ? 'Сохраняю…' : 'Сохранить'}
       </Button>

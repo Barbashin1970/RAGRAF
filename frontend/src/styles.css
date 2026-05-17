@@ -132,6 +132,49 @@ body { font-family: 'Inter', system-ui, sans-serif; }
   height: 8px;
   border: 2px solid white;
   background: #475569;
+  transition: width 120ms ease, height 120ms ease, background 120ms ease, box-shadow 120ms ease;
+}
+
+/* ── Connection UX ─────────────────────────────────────────────────────
+ *
+ * Задача: нить от датчика к входу должна чётко зацепляться. ReactFlow умеет
+ * snap'аться (`connectionRadius`), но визуально пользователь не видит «куда
+ * можно». Включаем `.ragraf-connecting` на wrapper'е во время активного drag'а
+ * (см. FlowCanvas.tsx) и:
+ *
+ *   1. Все target-handle'ы (`type="target"`) — растут и пульсируют teal.
+ *      Это «карта возможных целей»: глаз сразу видит куда тянуть.
+ *
+ *   2. Тот handle, в радиус которого попал курсор, ReactFlow помечает
+ *      классом `.connectionindicator` (внутренний) — мы делаем его ещё ярче,
+ *      эмеральд + крупнее. Это финальный «отпусти здесь» сигнал.
+ *
+ * Цвет teal⇢emerald совпадает с тоном sensor-ноды (см. .rf-node--sensor) и
+ * подсветкой Execute-результата — единый «зелёный = поток данных» язык.
+ */
+.ragraf-connecting .react-flow__handle.target {
+  /* Все target-handle'ы (куда можно тянуть) — крупнее и тёплый цвет, чтобы
+     их заметить. Source-handle, откуда тянем, оставляем нейтральным. */
+  width: 12px;
+  height: 12px;
+  background: rgb(20, 184, 166);  /* teal-500 */
+  box-shadow: 0 0 0 4px rgba(94, 234, 212, 0.45);  /* teal-300 glow */
+}
+
+.ragraf-connecting .react-flow__handle.connectionindicator {
+  /* Под курсором + соединение валидно — финальный сигнал «отпускай».
+     `.connectionindicator` ReactFlow ставит на handle, в радиус которого
+     (см. connectionRadius=45 в FlowCanvas) попал курсор. */
+  width: 14px;
+  height: 14px;
+  background: rgb(16, 185, 129);  /* emerald-500 */
+  box-shadow: 0 0 0 6px rgba(110, 231, 183, 0.6);  /* emerald-300 glow */
+  animation: ragraf-handle-pulse 900ms ease-in-out infinite;
+}
+
+@keyframes ragraf-handle-pulse {
+  0%, 100% { box-shadow: 0 0 0 6px rgba(110, 231, 183, 0.55); }
+  50%      { box-shadow: 0 0 0 9px rgba(110, 231, 183, 0.35); }
 }
 
 /* ── Status-bar под нодой (мини-индикатор валидации, аналог Node-RED ────

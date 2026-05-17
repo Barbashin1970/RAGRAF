@@ -126,6 +126,14 @@ export function FlowEditorScreen() {
   const validating = validateMutation.isPending
   const saving = saveMutation.isPending
 
+  // Несохранённые правки = текущий currentDsl отличается от загруженного.
+  // Сериализуем оба в JSON и сравниваем — самый прямой способ; nodes/edges
+  // нормализованы (см. flowToDsl). Тот же паттерн, что в RegulationEditorScreen.
+  const dirty = useMemo(() => {
+    if (!dsl) return false
+    return JSON.stringify(dsl) !== JSON.stringify(currentDsl)
+  }, [dsl, currentDsl])
+
   const actions = (
     <>
       <Button
@@ -142,6 +150,7 @@ export function FlowEditorScreen() {
         variant="primary"
         icon={<Save size={13} />}
         loading={saving}
+        disabled={!dirty || saving}
         onClick={() => {
           clearErrors()
           saveMutation.mutate(currentDsl)

@@ -6,8 +6,18 @@ import { BaseNode } from './BaseNode'
 // Отличия только в handles. User-label и параметры — только в правой
 // PropertyPanel (Node-RED-style: канвас = структура, панель = детали).
 
+// Input получает левый target-handle, чтобы visual sensor→input edge мог
+// зацепиться (иначе наша sensor-нода рисует выход в пустоту — ребро есть,
+// порта нет). `isValidConnection` в FlowCanvas разрешает попадание только
+// из sensor-нод — это сохраняет старую семантику «input = начало цепочки».
 function InputNode(p: NodeProps<FlowNode>) {
-  return <BaseNode {...p} outputs={[{ position: Position.Right }]} />
+  return (
+    <BaseNode
+      {...p}
+      inputs={[{ id: 'sensor-in', position: Position.Left }]}
+      outputs={[{ position: Position.Right }]}
+    />
+  )
 }
 
 function ThresholdNode(p: NodeProps<FlowNode>) {
