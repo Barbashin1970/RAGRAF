@@ -23,6 +23,14 @@ class Settings(BaseSettings):
     openai_base_url: str = ""
     openai_api_key: str = ""
 
+    # Гибридный режим: chat-генерация уходит на быстрый облачный endpoint
+    # (Cerebras / Groq), а embeddings остаются на локальной Ollama (bge-m3).
+    # Если эти поля не заданы — embeddings идут по тому же base_url/api_key
+    # что и chat (старое поведение). На Railway-демо это False (embeddings
+    # выключены), на локалке гибрид даёт «облачная скорость + PDF-RAG».
+    embedding_base_url: str = ""
+    embedding_api_key: str = ""
+
     # Какой LLM-провайдер за `openai_base_url`. От этого зависит:
     #  - можно ли проксировать Ollama-specific `extra_body.options` (num_ctx,
     #    num_predict) — Cerebras/Groq/OpenAI вернут 400 на неизвестное поле;
@@ -44,6 +52,21 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def effective_embedding_base_url(self) -> str:
+        """URL endpoint'а для embeddings. Возвращает embedding_base_url если
+        задан, иначе fallback на openai_base_url (старое поведение).
+        """
+        return self.embedding_base_url or self.openai_base_url
+
+    @property
+    def effective_embedding_api_key(self) -> str:
+        """API-ключ для embeddings. Аналогично: embedding_api_key с fallback
+        на openai_api_key. Для Ollama сюда уходит литерал "ollama" — не
+        пустая строка, иначе AsyncOpenAI бросает ValueError.
+        """
+        return self.embedding_api_key or self.openai_api_key
 
 
 settings = Settings()

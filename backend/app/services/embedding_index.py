@@ -102,9 +102,11 @@ class EmbeddingIndex:
             self._signature = self.signature()
             return
         from openai import AsyncOpenAI
+        # Гибрид: embeddings могут жить на ОТДЕЛЬНОМ endpoint'е (локальная Ollama
+        # bge-m3), пока chat-генерация идёт в облако. См. config.effective_*.
         client = AsyncOpenAI(
-            base_url=settings.openai_base_url or None,
-            api_key=settings.openai_api_key or "ollama",
+            base_url=settings.effective_embedding_base_url or None,
+            api_key=settings.effective_embedding_api_key or "ollama",
             timeout=60.0,
         )
         ids: list[str] = []
@@ -137,8 +139,8 @@ class EmbeddingIndex:
             return []
         from openai import AsyncOpenAI
         client = AsyncOpenAI(
-            base_url=settings.openai_base_url or None,
-            api_key=settings.openai_api_key or "ollama",
+            base_url=settings.effective_embedding_base_url or None,
+            api_key=settings.effective_embedding_api_key or "ollama",
             timeout=60.0,
         )
         resp = await client.embeddings.create(

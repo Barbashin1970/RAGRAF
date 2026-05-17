@@ -135,6 +135,13 @@ async def sandbox_llm_info() -> dict[str, Any]:
         "llm_model": cfg.ragu_llm_model,
         "embed_model": cfg.ragu_embed_model,
         "base_url": cfg.openai_base_url or None,
+        # Embedding endpoint может отличаться от chat endpoint'а (гибрид:
+        # cloud chat + локальный bge-m3). UI показывает где живут embeddings.
+        "embedding_base_url": cfg.effective_embedding_base_url or None,
+        "hybrid_embeddings": bool(
+            cfg.embedding_base_url
+            and cfg.embedding_base_url != cfg.openai_base_url
+        ),
         "defaults": {"temperature": 0.1, "top_k": 4, "max_tokens": 600},
         "limits": {
             "temperature": [0.0, 1.5],
@@ -197,8 +204,11 @@ def _provider_model_presets(provider: str, current: str) -> list[str]:
             "llama3.2:3b",
         ],
         "cerebras": [
-            "qwen-3-32b",
-            "llama-3.3-70b",
+            # Реальный список из https://api.cerebras.ai/v1/models на 2026.
+            # qwen-3-235b — MoE 235B-A22B, отличный русский, ~1500+ т/с.
+            "qwen-3-235b-a22b-instruct-2507",
+            "gpt-oss-120b",
+            "zai-glm-4.7",
             "llama3.1-8b",
         ],
         "groq": [

@@ -43,8 +43,10 @@ def test_llm_info_defaults_mock_provider(client):
 
 
 def test_llm_info_cerebras_preset(monkeypatch, isolated_data_dir):
-    """При llm_provider=cerebras возвращается соответствующий preset из
-    _provider_model_presets. Конкретно — qwen-3-32b и llama-3.3-70b в списке."""
+    """При llm_provider=cerebras возвращается preset с реальными именами
+    моделей из api.cerebras.ai/v1/models (на 2026 — qwen-3-235b и llama3.1-8b
+    как минимум). Если Cerebras переименует/уберёт модель — этот тест
+    подсветит расхождение и заставит обновить preset в api/sandbox.py."""
     monkeypatch.setenv("LLM_PROVIDER", "cerebras")
     monkeypatch.setenv("OPENAI_BASE_URL", "https://api.cerebras.ai/v1")
     monkeypatch.setenv("OPENAI_API_KEY", "csk-test-key")
@@ -59,8 +61,8 @@ def test_llm_info_cerebras_preset(monkeypatch, isolated_data_dir):
     body = r.json()
     assert body["provider"] == "cerebras"
     models = body["available_models"]
-    assert any("qwen-3-32b" in m for m in models)
-    assert any("llama-3.3-70b" in m for m in models)
+    assert any("qwen-3-235b" in m for m in models), f"got models: {models}"
+    assert "llama3.1-8b" in models, f"got models: {models}"
     # Для cloud-провайдера llm_reachable считаем True по факту наличия api_key
     # (реальный ping не делаем — это первый запрос, не пингуем).
     assert body["llm_reachable"] is True
@@ -230,3 +232,106 @@ async def test_document_store_embed_returns_none_when_disabled(isolated_data_dir
     # Не должен дёрнуть AsyncOpenAI вообще.
     assert await document_store.embed_chunks(["хелло мир"]) is None
     assert await document_store.embed_query("любой запрос") is None
+
+
+# ── Гибрид: разные endpoint'ы для chat и embeddings ───────────────────
+
+
+def test_effective_embedding_url_falls_back_to_openai(monkeypatch, isolated_data_dir):
+    """Когда embedding_base_url не задан — fallback на openai_base_url (старое
+    однопровайдерное поведение)."""
+    monkeypatch.setenv("OPENAI_BASE_URL", "http://localhost:11434/v1")
+    monkeypatch.setenv("OPENAI_API_KEY", "ollama")
+    monkeypatch.delenv("EMBEDDING_BASE_URL", raising=False)
+    monkeypatch.delenv("EMBEDDING_API_KEY", raising=False)
+    import importlib
+    from app import config as config_mod
+    importlib.reload(config_mod)
+    s = config_mod.settings
+    assert s.effective_embedding_base_url == "http://localhost:11434/v1"
+    assert s.effective_embedding_api_key == "ollama"
+
+
+def test_effective_embedding_url_overrides_when_set(monkeypatch, isolated_data_dir):
+    """Когда embedding_base_url задан — используется он, а chat-URL остаётся
+    отдельным. Это и есть гибрид (Cerebras chat + Ollama embed)."""
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://api.cerebras.ai/v1")
+    monkeypatch.setenv("OPENAI_API_KEY", "csk-test")
+    monkeypatch.setenv("EMBEDDING_BASE_URL", "http://localhost:11434/v1")
+    monkeypatch.setenv("EMBEDDING_API_KEY", "ollama")
+    import importlib
+    from app import config as config_mod
+    importlib.reload(config_mod)
+    s = config_mod.settings
+    assert s.openai_base_url == "https://api.cerebras.ai/v1"
+    assert s.openai_api_key == "csk-test"
+    assert s.effective_embedding_base_url == "http://localhost:11434/v1"
+    assert s.effective_embedding_api_key == "ollama"
+
+
+@pytest.mark.asyncio
+async def test_embedding_index_uses_embedding_endpoint(monkeypatch, isolated_data_dir):
+    """В гибрид-режиме rebuild() embedding-индекса должен инициализировать
+    AsyncOpenAI с EMBEDDING_BASE_URL, а не с OPENAI_BASE_URL."""
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://api.cerebras.ai/v1")
+    monkeypatch.setenv("OPENAI_API_KEY", "csk-test")
+    monkeypatch.setenv("EMBEDDING_BASE_URL", "http://localhost:11434/v1")
+    monkeypatch.setenv("EMBEDDING_API_KEY", "ollama")
+    monkeypatch.setenv("EMBEDDINGS_ENABLED", "true")
+    monkeypatch.setenv("LLM_PROVIDER", "cerebras")
+    import importlib
+    from app import config as config_mod
+    importlib.reload(config_mod)
+    from app.services import regulation_store
+    importlib.reload(regulation_store)
+    regulation_store.init_db()
+    from app.services import embedding_index
+    importlib.reload(embedding_index)
+
+    captured: dict = {}
+
+    class FakeEmbeddingsResp:
+        def __init__(self) -> None:
+            self.data = [type("D", (), {"embedding": [0.1, 0.2, 0.3]})() for _ in range(8)]
+
+    class FakeEmbeddings:
+        async def create(self, **kwargs):
+            # echo back N synthetic vectors of correct dimension
+            n = len(kwargs.get("input", []))
+            return type("R", (), {"data": [type("D", (), {"embedding": [0.1] * 3})() for _ in range(n)]})()
+
+    class FakeAsyncOpenAI:
+        def __init__(self, **kwargs) -> None:
+            captured.update(kwargs)
+            self.embeddings = FakeEmbeddings()
+
+    import openai
+    monkeypatch.setattr(openai, "AsyncOpenAI", FakeAsyncOpenAI)
+
+    idx = embedding_index.get_index()
+    await idx.rebuild()
+    assert captured.get("base_url") == "http://localhost:11434/v1", captured
+    assert captured.get("api_key") == "ollama", captured
+
+
+def test_llm_info_exposes_hybrid_flag(monkeypatch, isolated_data_dir):
+    """/api/sandbox/llm-info должен сообщить UI про split endpoint'ов:
+    `hybrid_embeddings=True` и `embedding_base_url` отдельным полем."""
+    monkeypatch.setenv("LLM_PROVIDER", "cerebras")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://api.cerebras.ai/v1")
+    monkeypatch.setenv("OPENAI_API_KEY", "csk-test")
+    monkeypatch.setenv("EMBEDDING_BASE_URL", "http://localhost:11434/v1")
+    monkeypatch.setenv("EMBEDDING_API_KEY", "ollama")
+    monkeypatch.setenv("EMBEDDINGS_ENABLED", "true")
+    import importlib
+    from app import config as config_mod
+    importlib.reload(config_mod)
+    from app.main import app
+    with TestClient(app) as c:
+        r = c.get("/api/sandbox/llm-info")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["hybrid_embeddings"] is True
+    assert body["embedding_base_url"] == "http://localhost:11434/v1"
+    # chat остаётся на Cerebras
+    assert body["base_url"] == "https://api.cerebras.ai/v1"

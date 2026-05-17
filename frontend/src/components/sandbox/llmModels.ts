@@ -84,10 +84,11 @@ type ProviderKey = 'ollama' | 'cerebras' | 'groq' | 'openrouter' | 'openai' | 'm
  * UI: «первая» = precise (дороже/медленнее, но качественнее), «вторая» = fast.
  */
 const PROVIDER_HINTS: Record<string, { label: string; hint: string; tokens_per_sec: number; use_when: string }> = {
-  // Cerebras
-  'qwen-3-32b': { label: 'Qwen3 32B (Cerebras)', hint: '32B-instruct на Cerebras Wafer. Отличный русский, 1800+ т/с.', tokens_per_sec: 1800, use_when: 'Любой сценарий — почти мгновенный ответ.' },
-  'llama-3.3-70b': { label: 'Llama 3.3 70B (Cerebras)', hint: 'Большая модель, лучшая reasoning. Чуть медленнее Qwen3 32B на Cerebras.', tokens_per_sec: 1500, use_when: 'Сложные follow-up, сравнение регламентов.' },
-  'llama3.1-8b': { label: 'Llama 3.1 8B (Cerebras)', hint: 'Лёгкая модель, максимум скорости.', tokens_per_sec: 2200, use_when: 'Приветствия, короткие ответы.' },
+  // Cerebras (актуально на 2026 — реальный список из /v1/models)
+  'qwen-3-235b-a22b-instruct-2507': { label: 'Qwen3 235B (Cerebras)', hint: 'MoE 235B-A22B на Cerebras Wafer. Отличный русский, ~1500 т/с.', tokens_per_sec: 1500, use_when: 'Универсальный выбор — сложные follow-up, сравнение регламентов.' },
+  'gpt-oss-120b': { label: 'GPT-OSS 120B (Cerebras)', hint: 'OpenAI-style 120B reasoning. ~1200 т/с.', tokens_per_sec: 1200, use_when: 'Reasoning-задачи.' },
+  'zai-glm-4.7': { label: 'GLM 4.7 (Cerebras)', hint: 'Zhipu GLM последней версии. Сильный китайский, неплохой русский.', tokens_per_sec: 1300, use_when: 'Альтернатива Qwen.' },
+  'llama3.1-8b': { label: 'Llama 3.1 8B (Cerebras)', hint: 'Лёгкая модель, максимум скорости (~2200 т/с).', tokens_per_sec: 2200, use_when: 'Приветствия, короткие ответы.' },
   // Groq
   'llama-3.3-70b-versatile': { label: 'Llama 3.3 70B (Groq)', hint: 'Universal Llama, ~250 т/с на Groq LPU.', tokens_per_sec: 250, use_when: 'Универсальная — сложные и простые ответы.' },
   'llama-3.1-8b-instant': { label: 'Llama 3.1 8B Instant (Groq)', hint: '~750 т/с, 14К запросов/день. Идеально для follow-up.', tokens_per_sec: 750, use_when: 'Быстрая итерация, follow-up.' },

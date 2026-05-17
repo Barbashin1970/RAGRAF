@@ -126,9 +126,11 @@ async def embed_chunks(chunks: list[str]) -> list[list[float]] | None:
     try:
         from openai import AsyncOpenAI
 
+        # Гибрид: embedding endpoint может отличаться от chat endpoint'а
+        # (например chat=Cerebras, embeddings=локальная Ollama bge-m3).
         client = AsyncOpenAI(
-            base_url=settings.openai_base_url or None,
-            api_key=settings.openai_api_key or "ollama",
+            base_url=settings.effective_embedding_base_url or None,
+            api_key=settings.effective_embedding_api_key or "ollama",
             timeout=120.0,
         )
         resp = await client.embeddings.create(
@@ -153,8 +155,8 @@ async def embed_query(query: str) -> list[float] | None:
         from openai import AsyncOpenAI
 
         client = AsyncOpenAI(
-            base_url=settings.openai_base_url or None,
-            api_key=settings.openai_api_key or "ollama",
+            base_url=settings.effective_embedding_base_url or None,
+            api_key=settings.effective_embedding_api_key or "ollama",
             timeout=60.0,
         )
         resp = await client.embeddings.create(
