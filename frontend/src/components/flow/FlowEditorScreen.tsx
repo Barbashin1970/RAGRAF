@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Edge, Node } from 'reactflow'
 import {
@@ -31,6 +31,7 @@ const FIRED_EDGE_STROKE = 'rgb(16, 185, 129)'
 
 export function FlowEditorScreen() {
   const { id = '' } = useParams<{ id: string }>()
+  const [searchParams, setSearchParams] = useSearchParams()
   const qc = useQueryClient()
   const setErrors = useFlowStore((s) => s.setErrors)
   const clearErrors = useFlowStore((s) => s.clearErrors)
@@ -53,7 +54,19 @@ export function FlowEditorScreen() {
     [nodes, selectedId],
   )
   const [showHistory, setShowHistory] = useState(false)
-  const [showExecute, setShowExecute] = useState(false)
+  // ?run=1 в URL открывает ExecutePanel автоматически. Используется из
+  // /execute (ExecuteScreen) — пользователь жмёт «Симулировать», попадает
+  // сразу в режим симуляции. После открытия параметр чистим, чтобы
+  // refresh страницы не залипал в этом состоянии навсегда.
+  const [showExecute, setShowExecute] = useState(() => searchParams.get('run') === '1')
+  useEffect(() => {
+    if (searchParams.get('run') === '1') {
+      const next = new URLSearchParams(searchParams)
+      next.delete('run')
+      setSearchParams(next, { replace: true })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [panelCollapsed, setPanelCollapsed] = useState(false)
   // Результат последнего Execute — используется для подсветки сработавших
   // узлов/рёбер на канвасе. Очищается «Очистить значения и подсветку» в панели.

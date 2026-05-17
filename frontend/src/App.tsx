@@ -9,6 +9,7 @@ import { SandboxScreen } from '@/components/sandbox/SandboxScreen'
 import { SandboxBacklog } from '@/components/sandbox/SandboxBacklog'
 import { RaguStudioScreen } from '@/components/ragu/RaguStudioScreen'
 import { SensorLibraryScreen } from '@/components/sensors/SensorLibraryScreen'
+import { ExecuteScreen } from '@/components/execute/ExecuteScreen'
 import { cn } from '@/lib/cn'
 
 function NavLink({ to, icon: Icon, label }: { to: string; icon: typeof Activity; label: string }) {
@@ -31,35 +32,38 @@ function NavLink({ to, icon: Icon, label }: { to: string; icon: typeof Activity;
 }
 
 /**
- * Заглушка для будущего раздела «Исполнение» (Phase 3 архитектурной программы):
- * симулятор событий, привязка датчиков (Node-RED-style), webhooks на OUTPUT,
- * журнал срабатываний, мониторинг порогов. Сейчас disabled-кнопка с tooltip'ом —
- * показывает roadmap. См. BACKLOG.md → «Event-driven execution».
+ * Активная навигация на «Исполнение». В отличие от прежней заглушки, теперь
+ * работает симулятор: пользователь выбирает регламент, подаёт тестовый
+ * payload, видит вердикт. Полный event-driven runtime (приёмник событий
+ * от СИГМЫ, webhook на OUTPUT, журнал срабатываний) — в бэклоге.
+ *
+ * Бейдж «beta» сигнализирует частичную готовность: симулятор работает,
+ * боевой режим — в работе. ExecuteScreen объясняет детально что готово.
  */
-function ExecutionPlaceholder() {
+function ExecutionNavLink() {
+  const { pathname } = useLocation()
+  const active = pathname.startsWith('/execute')
   return (
-    <div className="group relative">
-      <button
-        disabled
-        className="inline-flex cursor-not-allowed items-center gap-2 rounded-md px-3 py-1.5 text-sm text-stone-400 opacity-70"
-        type="button"
+    <Link
+      to="/execute"
+      className={cn(
+        'inline-flex items-center gap-2 rounded-md px-3 py-1.5 text-sm transition',
+        active
+          ? 'bg-primary text-white'
+          : 'text-stone-700 hover:bg-surface-offset',
+      )}
+    >
+      <PlayCircle size={16} />
+      Исполнение
+      <span
+        className={cn(
+          'rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide',
+          active ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700',
+        )}
       >
-        <PlayCircle size={16} />
-        Исполнение
-        <span className="rounded-full bg-stone-100 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-stone-500">
-          скоро
-        </span>
-      </button>
-      <div className="pointer-events-none invisible absolute left-0 top-full z-50 mt-1 w-72 rounded-md border border-stone-200 bg-white p-3 text-xs text-stone-700 shadow-lg opacity-0 transition group-hover:visible group-hover:opacity-100">
-        <div className="mb-1.5 font-semibold text-stone-900">Runtime для регламентов</div>
-        <p className="leading-relaxed text-stone-600">
-          Симулятор событий, привязка датчиков (как в Node-RED), webhook-действия на
-          OUTPUT, журнал срабатываний и мониторинг порогов. Здесь регламенты работают{' '}
-          <b>детерминированно, без LLM</b> — на каждое сообщение от датчика.
-        </p>
-        <div className="mt-2 text-[10px] text-stone-400">Архитектурная программа: см. BACKLOG.md → Author/Execute split</div>
-      </div>
-    </div>
+        beta
+      </span>
+    </Link>
   )
 }
 
@@ -140,7 +144,7 @@ export default function App() {
           {/* RAGU Studio переехала внутрь Студии аналитика как 3-й таб
               (см. SandboxScreen). Из шапки убрана чтобы навигация была
               4-уровневой (3 экрана + roadmap), не превращалась в кашу. */}
-          <ExecutionPlaceholder />
+          <ExecutionNavLink />
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <span className="hidden text-xs text-stone-500 lg:inline">
@@ -158,6 +162,7 @@ export default function App() {
           <Route path="/regulations/:id/flow" element={<FlowEditorScreen />} />
           <Route path="/regulations/:id/constraints" element={<ConstraintEditorScreen />} />
           <Route path="/sensors" element={<SensorLibraryScreen />} />
+          <Route path="/execute" element={<ExecuteScreen />} />
           <Route path="/graph" element={<GraphView />} />
           <Route path="/sandbox" element={<SandboxScreen />} />
           <Route path="/sandbox/backlog" element={<SandboxBacklog />} />
