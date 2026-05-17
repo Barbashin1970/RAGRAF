@@ -74,6 +74,15 @@ export function GraphView() {
   const urlDomain = params.get('domain')
   const activeDomain = urlDomain ?? domains[0]?.id ?? null
 
+  // sigma R4: dragfree-хендлер регистрируется через cy.on() один раз и замыкает
+  // activeDomain — без ref'а он бы сохранял позиции под СТАРЫМ доменом, если
+  // юзер перетащил узел сразу после переключения. Эффект бы рано или поздно
+  // переcоздался по изменению `data`, но в окне «домен сменился, граф ещё не
+  // подтянулся» drag-handler видит stale-замыкание. Ref решает это: всегда
+  // читаем последнее значение.
+  const activeDomainRef = useRef(activeDomain)
+  activeDomainRef.current = activeDomain
+
   // Когда домены подгрузились и в URL ничего не было — мягко выставляем первый
   // (через replace, чтобы не плодить history-записи)
   useEffect(() => {
@@ -218,8 +227,10 @@ export function GraphView() {
     cy.on('tap', (evt) => {
       if (evt.target === cy) setSelected(null)
     })
-    // Drag-end: автосохранение раскладки в localStorage.
-    cy.on('dragfree', 'node', () => handleDragFree(activeDomain))
+    // Drag-end: автосохранение раскладки в localStorage. Читаем домен через
+    // ref, чтобы хендлер видел свежее значение даже если эффект ещё не
+    // переcоздался после переключения вкладки (sigma R4).
+    cy.on('dragfree', 'node', () => handleDragFree(activeDomainRef.current))
 
     cyRef.current = cy
     // Сохраним handle на layout для последующего stop'а перед перезапуском.

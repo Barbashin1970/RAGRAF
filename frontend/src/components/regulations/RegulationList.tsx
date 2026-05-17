@@ -282,7 +282,7 @@ export function RegulationList() {
             {importBundle.data.failed.length > 0 && (
               <ul className="mt-1 text-xs text-rose-700">
                 {importBundle.data.failed.map((f, i) => (
-                  <li key={i}>
+                  <li key={f.source_id ?? i}>
                     <code className="rounded bg-rose-100 px-1">{f.source_id}</code> — {f.reason}
                   </li>
                 ))}

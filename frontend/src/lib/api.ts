@@ -7,6 +7,18 @@ export type NodeKind =
   // ребром цепляется к input-ноде. См. README §«Исполнение регламента».
   | 'sensor'
 
+// sigma R6 type-guard: drag/drop из палитры приходит как `string` из
+// HTML5 DataTransfer; до использования сужаем к узкому union'у NodeKind
+// без `as`-каста. Используется в FlowCanvas.onDrop.
+const _NODE_KINDS: readonly NodeKind[] = [
+  'input', 'threshold', 'compare', 'formula', 'switch', 'output',
+  'shacl_constraint', 'sensor',
+] as const
+
+export function isNodeKind(value: unknown): value is NodeKind {
+  return typeof value === 'string' && (_NODE_KINDS as readonly string[]).includes(value)
+}
+
 // Тип физического датчика (соответствует `type` в ETL-payload'е СИГМЫ):
 //   p     — pressure (манометр),
 //   t     — temperature (термопара / RTD),
@@ -254,6 +266,7 @@ import {
   sigmaImportResponseSchema,
   sourceUploadResponseSchema,
   sourceVerifyResponseSchema,
+  userDocumentSchema,
   validationResultSchema,
 } from './schemas'
 import { z } from 'zod'
@@ -566,7 +579,8 @@ export const api = {
         } catch { /* ignore */ }
         throw new Error(detail)
       }
-      return r.json() as Promise<UserDocument>
+      // sigma R6: runtime-валидация network-payload через zod вместо `as`-каста.
+      return userDocumentSchema.parse(await r.json())
     },
     toggleDocument: (docId: string, enabled: boolean) =>
       request<UserDocument>(

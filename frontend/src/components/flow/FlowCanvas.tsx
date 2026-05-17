@@ -18,7 +18,7 @@ import {
 } from 'reactflow'
 import { nanoid } from '@/lib/nanoid'
 import { nodeTypes } from './nodes'
-import type { FlowNode, NodeKind } from '@/lib/api'
+import { isNodeKind, type FlowNode, type NodeKind } from '@/lib/api'
 import { cn } from '@/lib/cn'
 
 interface Props {
@@ -135,8 +135,11 @@ function FlowCanvasInner({ nodes, edges, onChange, onSelect }: Props) {
   const onDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault()
-      const type = e.dataTransfer.getData('application/reactflow-type') as NodeKind
-      if (!type) return
+      // sigma R6: drop из палитры — drag-string. Сужаем через type-guard
+      // вместо `as NodeKind` — если придёт левый mime/значение, тихо игнорим.
+      const raw = e.dataTransfer.getData('application/reactflow-type')
+      if (!isNodeKind(raw)) return
+      const type = raw
       const position = screenToFlowPosition({ x: e.clientX, y: e.clientY })
       const id = `n_${nanoid(6)}`
       const data: FlowNode = { id, type, label: '' }

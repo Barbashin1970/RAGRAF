@@ -434,3 +434,19 @@ export const sandboxCreateFromParamsResponseSchema = z.object({
   domain: z.string().nullable().optional(),
   parameters_count: z.number(),
 })
+
+// NotebookLM-style документы пользователя (источники для chat-контекста).
+// Используется в uploadDocument для runtime-валидации ответа после
+// multipart-upload (request<T>() здесь не работает — FormData идёт напрямую).
+// sigma-audit R6: zod-парсинг закрывает каст `as Promise<UserDocument>`.
+export const userDocumentSchema = z.object({
+  doc_id: z.string(),
+  filename: z.string(),
+  mime_type: z.string(),
+  size_bytes: z.number(),
+  uploaded_at: z.string(),
+  enabled: z.boolean(),
+  total_chunks: z.number(),
+  char_count: z.number(),
+  error: z.string().nullable(),
+})

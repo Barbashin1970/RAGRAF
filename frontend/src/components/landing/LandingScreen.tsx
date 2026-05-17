@@ -23,9 +23,12 @@ import {
   KanbanSquare,
   Layers,
   ListTree,
+  Mail,
+  MapPin,
   Menu,
   MessageSquare,
   Network,
+  Phone,
   PlayCircle,
   Radar,
   Sparkles,
@@ -567,6 +570,30 @@ export function LandingScreen() {
                 Платформа интеллектуального управления строительством и городской
                 средой.
               </p>
+              <div className="mt-4 space-y-1.5 text-xs text-slate-400">
+                <div className="flex items-start gap-2">
+                  <MapPin size={13} className="mt-0.5 shrink-0 text-slate-500" />
+                  <span>630090, г. Новосибирск, ул. Пирогова, 1</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mail size={13} className="shrink-0 text-slate-500" />
+                  <a
+                    href="mailto:ai-center@nsu.ru"
+                    className="transition hover:text-white"
+                  >
+                    ai-center@nsu.ru
+                  </a>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Phone size={13} className="shrink-0 text-slate-500" />
+                  <a
+                    href="tel:+73833731192"
+                    className="transition hover:text-white"
+                  >
+                    +7 (383) 373-11-92
+                  </a>
+                </div>
+              </div>
               <div className="mt-4 text-xs text-slate-500">
                 Кампус НГУ · Кольцово · Мэрия города Новосибирска · 2026
               </div>
