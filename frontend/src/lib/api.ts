@@ -3,6 +3,14 @@
 
 export type NodeKind =
   | 'input' | 'threshold' | 'compare' | 'formula' | 'switch' | 'output' | 'shacl_constraint'
+  // Точка привязки к внешнему сигналу ETL/IoT. На канвасе рисуется кружком,
+  // ребром цепляется к input-ноде. См. README §«Исполнение регламента».
+  | 'sensor'
+
+// Тип физического датчика (соответствует `type` в ETL-payload'е СИГМЫ):
+//   p — pressure, t — temperature, d — diameter,
+//   noise — акустический датчик, detector — видеодетектор.
+export type SensorType = 'p' | 't' | 'd' | 'noise' | 'detector'
 
 export interface FlowNode {
   id: string
@@ -20,6 +28,10 @@ export interface FlowNode {
   priority?: number | null
   constraintRef?: string | null
   unit?: string | null
+  // Sensor-specific (см. backend/app/schemas/domain.py: FlowNode):
+  sensorType?: SensorType | null
+  bindsTo?: string | null
+  externalId?: string | null
 }
 export interface FlowEdge {
   source: string
@@ -113,6 +125,36 @@ export interface FlowVersion {
   comment?: string | null
   dsl_snapshot: RuleDSL
   diff_summary?: string | null
+}
+
+// ── Режим «Исполнение» (Execute) ──────────────────────────────────────
+// Зеркалит app/services/flow_executor.py. ETL → POST /execute → ExecutionResult.
+export interface SensorReading {
+  value: number
+  sensor_id?: string | null
+  param_id?: string | null
+  sensor_type?: SensorType | null
+  external_id?: string | null
+  edge_id?: number | null
+}
+
+export interface NodeTrace {
+  node_id: string
+  node_type: string
+  fired: boolean
+  value?: number | null
+  explanation?: string | null
+}
+
+export interface ExecutionResult {
+  level: number              // 0 = норма, 1..3 = priority output'а
+  regulation_id: string
+  regulation_name: string
+  recommendation?: string | null
+  fired_nodes: string[]
+  fired_edges: string[]      // формат `${source}__${target}` (см. rulesDsl.ts)
+  trace: NodeTrace[]
+  inputs_resolved: Record<string, number>
 }
 
 export interface CyNode { data: { id: string; label: string; type: string; description?: string | null; regulation_id?: string | null; domain?: string | null } }
@@ -313,6 +355,17 @@ export const api = {
       request<FlowVersion>(
         `/api/regulations/${encodeURIComponent(id)}/flow/restore/${encodeURIComponent(versionId)}`,
         { method: 'POST' },
+      ),
+    /**
+     * Прогнать flow с конкретными readings — режим «Исполнение регламента».
+     * dsl передаём inline, чтобы аналитик прогонял live-draft без save'а.
+     * Бэк отвечает level/recommendation/fired_nodes/fired_edges/trace —
+     * UI подсвечивает путь и показывает вердикт.
+     */
+    execute: (id: string, payload: { dsl?: RuleDSL; readings: SensorReading[] }) =>
+      request<ExecutionResult>(
+        `/api/regulations/${encodeURIComponent(id)}/execute`,
+        { method: 'POST', body: JSON.stringify(payload) },
       ),
   },
   constraints: {
@@ -603,6 +656,7 @@ import {
   Calculator,
   GitBranch,
   LogIn,
+  Radar,
   ScanLine,
   Send,
   Shield,
@@ -619,4 +673,20 @@ export const NODE_KIND_META: Record<
   switch:            { label: 'Развилка', className: 'rf-node--switch',    description: 'Маршрут по значениям',        icon: GitBranch },
   output:            { label: 'Выход',    className: 'rf-node--output',    description: 'Действие / рекомендация',     icon: Send },
   shacl_constraint:  { label: 'SHACL',    className: 'rf-node--shacl_constraint', description: 'Внешнее ограничение SHACL', icon: Shield },
+  // Датчик — точка привязки к внешнему сигналу ETL. Кружок, ETL-индикатор.
+  sensor:            { label: 'Датчик',   className: 'rf-node--sensor',    description: 'Точка ввода с датчика ETL',   icon: Radar },
+}
+
+// Палитра цветов для каждого типа физического датчика — используется и в
+// панели запуска (бейджи у инпутов), и на канвасе (заливка кружка).
+// Тон совпадает с тоном domains, чтобы аналитик не путался.
+export const SENSOR_TYPE_META: Record<
+  SensorType,
+  { label: string; short: string; bg: string; fg: string; ring: string }
+> = {
+  p:        { label: 'Давление',       short: 'p', bg: 'bg-blue-100',    fg: 'text-blue-700',    ring: 'ring-blue-300' },
+  t:        { label: 'Температура',    short: 't', bg: 'bg-rose-100',    fg: 'text-rose-700',    ring: 'ring-rose-300' },
+  d:        { label: 'Диаметр',        short: 'd', bg: 'bg-stone-200',   fg: 'text-stone-700',   ring: 'ring-stone-400' },
+  noise:    { label: 'Шум',            short: 'N', bg: 'bg-amber-100',   fg: 'text-amber-800',   ring: 'ring-amber-300' },
+  detector: { label: 'Видеодетектор',  short: 'V', bg: 'bg-violet-100',  fg: 'text-violet-700',  ring: 'ring-violet-300' },
 }

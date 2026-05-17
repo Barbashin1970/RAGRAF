@@ -241,6 +241,39 @@ function ByType({ type, data, parameters, set }: { type: NodeKind; data: FlowNod
       )
     case 'shacl_constraint':
       return <FieldText label="ID ограничения" value={data.constraintRef ?? ''} onChange={(v) => set({ constraintRef: v || null })} monospaced />
+    case 'sensor':
+      return (
+        <>
+          <FieldSelect
+            label="Тип датчика"
+            value={data.sensorType ?? ''}
+            onChange={(v) => set({ sensorType: v === '' ? null : (v as 'p' | 't' | 'd' | 'noise' | 'detector') })}
+            options={[
+              { value: '', label: '— не задан —' },
+              { value: 'p', label: 'Давление (p)' },
+              { value: 't', label: 'Температура (t)' },
+              { value: 'd', label: 'Диаметр (d)' },
+              { value: 'noise', label: 'Шум' },
+              { value: 'detector', label: 'Видеодетектор' },
+            ]}
+          />
+          {/* Привязка к input-ноде регламента — сенсор только указывает «куда
+              лить значение». Выбор из существующих input'ов canvas'а
+              реализуем чуть позже (нужен список нод); пока — свободный текст. */}
+          <FieldText
+            label="ID input-узла"
+            value={data.bindsTo ?? ''}
+            onChange={(v) => set({ bindsTo: v || null })}
+            monospaced
+          />
+          <FieldText
+            label="External ID (ETL)"
+            value={data.externalId ?? ''}
+            onChange={(v) => set({ externalId: v || null })}
+            monospaced
+          />
+        </>
+      )
     default:
       return null
   }

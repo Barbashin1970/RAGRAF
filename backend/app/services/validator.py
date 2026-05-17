@@ -34,10 +34,12 @@ def validate_dsl(dsl: RuleDSL, parameters: list[Parameter] | None = None) -> Val
             continue
         g.add_edge(e.source, e.target)
 
-    # 1. Graph connectivity — no isolated non-IO nodes
+    # 1. Graph connectivity — no isolated non-IO nodes.
+    # Sensor — это «виртуальный» вход (точка привязки к ETL); может быть
+    # положен на канвас и пока не связан с input-нодой — не флагаем как изоляцию.
     for n in dsl.nodes:
         deg = g.degree(n.id)
-        if deg == 0 and n.type not in ("input", "output"):
+        if deg == 0 and n.type not in ("input", "output", "sensor"):
             errors.append(
                 ValidationError(
                     nodeId=n.id,

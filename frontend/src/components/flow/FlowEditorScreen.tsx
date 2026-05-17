@@ -7,20 +7,27 @@ import {
   GitCommitVertical,
   History,
   Network,
+  Play,
   Save,
   Shield,
   Sliders,
   XCircle,
 } from 'lucide-react'
-import { api, type FlowNode, type RuleDSL } from '@/lib/api'
+import { api, type ExecutionResult, type FlowNode, type RuleDSL } from '@/lib/api'
 import { dslToFlow, flowToDsl } from '@/lib/rulesDsl'
 import { useFlowStore } from '@/store/flowStore'
 import { cn } from '@/lib/cn'
 import { Button } from '@/components/ui'
 import { RegulationHeader } from '../regulations/RegulationHeader'
+import { ExecutePanel } from './ExecutePanel'
 import { FlowCanvas } from './FlowCanvas'
 import { NodePalette } from './NodePalette'
 import { PropertyPanel } from './PropertyPanel'
+
+// Маркер «подсветки сработавшего пути» (см. highlightedEdges ниже): наша
+// конкретная заливка ребра. Используем, чтобы отличить НАШУ подсветку от
+// animated:true, которое dslToFlow ставит на ребрах с condition.
+const FIRED_EDGE_STROKE = 'rgb(16, 185, 129)'
 
 export function FlowEditorScreen() {
   const { id = '' } = useParams<{ id: string }>()
@@ -39,7 +46,11 @@ export function FlowEditorScreen() {
   const [edges, setEdges] = useState<Edge[]>([])
   const [selected, setSelected] = useState<Node | null>(null)
   const [showHistory, setShowHistory] = useState(false)
+  const [showExecute, setShowExecute] = useState(false)
   const [panelCollapsed, setPanelCollapsed] = useState(false)
+  // Результат последнего Execute — используется для подсветки сработавших
+  // узлов/рёбер на канвасе. Очищается «Очистить значения и подсветку» в панели.
+  const [executeResult, setExecuteResult] = useState<ExecutionResult | null>(null)
 
   useEffect(() => {
     if (!dsl) return
@@ -82,6 +93,24 @@ export function FlowEditorScreen() {
     [dsl?.rule_id, id, nodes, edges],
   )
 
+  // Подсветка сработавшего пути после Execute. Применяется через className
+  // на wrapper'е react-flow__node (см. .react-flow__node.flow-fired в styles.css)
+  // + animated/stroke на edges. Сброс — кнопкой «Очистить» в ExecutePanel.
+  const firedNodes = useMemo(() => new Set(executeResult?.fired_nodes ?? []), [executeResult])
+  const firedEdges = useMemo(() => new Set(executeResult?.fired_edges ?? []), [executeResult])
+  const highlightedNodes = useMemo<Node[]>(
+    () => nodes.map((n) => (firedNodes.has(n.id) ? { ...n, className: 'flow-fired' } : n)),
+    [nodes, firedNodes],
+  )
+  const highlightedEdges = useMemo<Edge[]>(
+    () => edges.map((e) => (
+      firedEdges.has(e.id) || firedEdges.has(`${e.source}__${e.target}`)
+        ? { ...e, animated: true, style: { stroke: FIRED_EDGE_STROKE, strokeWidth: 2 } }
+        : e
+    )),
+    [edges, firedEdges],
+  )
+
   const updateNodeData = (nodeId: string, patch: Partial<FlowNode>) => {
     setNodes((ns) =>
       ns.map((n) => (n.id === nodeId ? { ...n, data: { ...(n.data as FlowNode), ...patch } } : n)),
@@ -122,9 +151,26 @@ export function FlowEditorScreen() {
       </Button>
       <Button
         size="sm"
+        variant={showExecute ? 'secondary' : 'ghost'}
+        icon={<Play size={13} className="text-emerald-600" />}
+        onClick={() => {
+          setShowExecute((x) => !x)
+          // Взаимно-исключающие правые панели: открыли Run — закрыли History.
+          if (!showExecute) setShowHistory(false)
+        }}
+        aria-pressed={showExecute}
+        className={cn(showExecute && 'border-emerald-300 bg-emerald-50 text-emerald-800')}
+      >
+        Запуск
+      </Button>
+      <Button
+        size="sm"
         variant={showHistory ? 'secondary' : 'ghost'}
         icon={<History size={13} />}
-        onClick={() => setShowHistory((x) => !x)}
+        onClick={() => {
+          setShowHistory((x) => !x)
+          if (!showHistory) setShowExecute(false)
+        }}
         aria-pressed={showHistory}
         className={cn(showHistory && 'border-stone-300 bg-stone-100 text-stone-800')}
       >
@@ -168,17 +214,24 @@ export function FlowEditorScreen() {
             </div>
           )}
           <FlowCanvas
-            nodes={nodes}
-            edges={edges}
+            nodes={highlightedNodes}
+            edges={highlightedEdges}
             onChange={({ nodes, edges }) => {
-              setNodes(nodes)
-              setEdges(edges)
+              setNodes(stripHighlight(nodes))
+              setEdges(stripHighlight(edges))
             }}
             onSelect={setSelected}
           />
         </div>
         {showHistory ? (
           <HistoryPanel regulationId={id} />
+        ) : showExecute ? (
+          <ExecutePanel
+            regulationId={id}
+            currentDsl={currentDsl}
+            nodes={nodes as Node<FlowNode>[]}
+            onResult={setExecuteResult}
+          />
         ) : (
           <PropertyPanel
             node={selected}
@@ -192,6 +245,25 @@ export function FlowEditorScreen() {
       </div>
     </div>
   )
+
+}
+
+// Снять только наши декорации подсветки, не трогая прочие user-properties.
+// Без этого reactflow возвращает в onChange ноды/рёбра с зашитой подсветкой
+// и она не сбросится при «Очистить» в ExecutePanel.
+function stripHighlight<T extends Node | Edge>(items: T[]): T[] {
+  return items.map((item) => {
+    const asNode = item as Node
+    if (asNode.className === 'flow-fired') {
+      return { ...asNode, className: undefined } as unknown as T
+    }
+    const asEdge = item as Edge
+    if (asEdge.style && (asEdge.style as { stroke?: string }).stroke === FIRED_EDGE_STROKE) {
+      const { animated: _a, style: _s, ...rest } = asEdge
+      return rest as unknown as T
+    }
+    return item
+  })
 }
 
 function HistoryPanel({ regulationId }: { regulationId: string }) {

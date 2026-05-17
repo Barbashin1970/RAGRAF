@@ -147,7 +147,10 @@ export const diffResponseSchema = z.object({
 
 export const flowNodeSchema = z.object({
   id: z.string(),
-  type: z.enum(['input', 'threshold', 'compare', 'formula', 'switch', 'output', 'shacl_constraint']),
+  type: z.enum([
+    'input', 'threshold', 'compare', 'formula', 'switch', 'output', 'shacl_constraint',
+    'sensor',
+  ]),
   label: z.string().nullable().optional(),
   position: z.object({ x: z.number(), y: z.number() }).nullable().optional(),
   paramRef: z.string().nullable().optional(),
@@ -161,6 +164,10 @@ export const flowNodeSchema = z.object({
   priority: z.number().nullable().optional(),
   constraintRef: z.string().nullable().optional(),
   unit: z.string().nullable().optional(),
+  // Sensor-specific (см. backend/app/schemas/domain.py: FlowNode).
+  sensorType: z.enum(['p', 't', 'd', 'noise', 'detector']).nullable().optional(),
+  bindsTo: z.string().nullable().optional(),
+  externalId: z.string().nullable().optional(),
 }).passthrough()
 
 export const flowEdgeSchema = z.object({

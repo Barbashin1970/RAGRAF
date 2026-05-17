@@ -107,6 +107,20 @@ body { font-family: 'Inter', system-ui, sans-serif; }
 .rf-node--shacl_constraint              { @apply border-dashed border-stone-400 bg-stone-50; }
 .rf-node--shacl_constraint .rf-node__icon { @apply bg-stone-500; }
 
+/* Sensor — circle vs. rectangle, чтобы аналитик мгновенно отличал
+   «внешний сигнал ETL/IoT» от «логического элемента регламента».
+   Цвет teal — близкий к input(emerald), но отчётливо разный (input ≠ sensor). */
+.rf-node--sensor                 { @apply rounded-full border-teal-500 bg-teal-50; }
+.rf-node--sensor .rf-node__icon  { @apply bg-teal-600 rounded-full; }
+
+/* Подсветка «сработавшего» узла после Run (Execute) — мягкий зелёный glow.
+   Применяется через className на react-flow__node wrapper'е (см. дериватив
+   `displayNodes` в FlowEditorScreen): обрамляем внутренний .rf-node.
+   Дублируем .rf-node--selected-структуру но в другом тоне. */
+.react-flow__node.flow-fired > .rf-node {
+  @apply ring-2 ring-emerald-500 ring-offset-1 shadow-md;
+}
+
 .rf-node--error    { @apply ring-2 ring-rose-500 ring-offset-1; }
 .rf-node--selected { @apply ring-2 ring-primary ring-offset-1; }
 

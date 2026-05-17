@@ -146,3 +146,63 @@ def test_validate_endpoint(client):
     assert v.status_code == 200
     assert "errors" in v.json()
     assert "valid" in v.json()
+
+
+def test_execute_endpoint_runs_flow(client):
+    """Боевой endpoint: ETL-payload → вердикт.
+
+    Шлём DSL inline (без save), чтобы тест не зависел от состояния хранилища
+    флоу. Сэмпл моделирует «pressure=25 атм при ref=20.5±1.5» → out_of_range
+    → output с priority=2.
+    """
+    dsl = {
+        "rule_id": "rule_exec_test",
+        "regulation_id": "pressure-diameter",
+        "nodes": [
+            {"id": "s", "type": "sensor", "sensorType": "p", "bindsTo": "i"},
+            {"id": "i", "type": "input", "paramRef": "pressure"},
+            {"id": "t", "type": "threshold", "refValue": 20.5, "deviation": 1.5},
+            {"id": "o", "type": "output", "text": "Проверьте давление", "priority": 2},
+        ],
+        "edges": [
+            {"source": "s", "target": "i"},
+            {"source": "i", "target": "t"},
+            {"source": "t", "target": "o"},
+        ],
+    }
+    body = {"dsl": dsl, "readings": [{"value": 25.0, "sensor_id": "s"}]}
+    r = client.post("/api/regulations/pressure-diameter/execute", json=body)
+    assert r.status_code == 200, r.text
+    result = r.json()
+    assert result["level"] == 2
+    assert result["recommendation"] == "Проверьте давление"
+    assert "t" in result["fired_nodes"]
+    assert "o" in result["fired_nodes"]
+
+
+def test_execute_endpoint_returns_level_zero_for_in_range(client):
+    dsl = {
+        "rule_id": "rule_exec_test",
+        "regulation_id": "pressure-diameter",
+        "nodes": [
+            {"id": "s", "type": "sensor", "sensorType": "p", "bindsTo": "i"},
+            {"id": "i", "type": "input", "paramRef": "pressure"},
+            {"id": "t", "type": "threshold", "refValue": 20.5, "deviation": 1.5},
+            {"id": "o", "type": "output", "text": "x", "priority": 2},
+        ],
+        "edges": [
+            {"source": "s", "target": "i"},
+            {"source": "i", "target": "t"},
+            {"source": "t", "target": "o"},
+        ],
+    }
+    body = {"dsl": dsl, "readings": [{"value": 20.0, "sensor_id": "s"}]}
+    r = client.post("/api/regulations/pressure-diameter/execute", json=body)
+    assert r.status_code == 200
+    assert r.json()["level"] == 0
+
+
+def test_execute_endpoint_404_for_unknown_regulation(client):
+    body = {"readings": [{"value": 25.0, "param_id": "pressure"}]}
+    r = client.post("/api/regulations/does-not-exist/execute", json=body)
+    assert r.status_code == 404

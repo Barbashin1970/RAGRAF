@@ -96,8 +96,21 @@ class Regulation(BaseModel):
 
 
 NodeKind = Literal[
-    "input", "threshold", "compare", "formula", "switch", "output", "shacl_constraint"
+    "input", "threshold", "compare", "formula", "switch", "output", "shacl_constraint",
+    # Точка привязки к внешнему сигналу ETL/IoT. На канвасе рисуется кружком,
+    # ребром привязан к input-ноде регламента — телеграфирует «вот этот
+    # внешний сигнал наполняет вот этот параметр». См. README §«Исполнение
+    # регламента» и app/services/flow_executor.py.
+    "sensor",
 ]
+
+
+# Тип физического датчика (соответствует `type` в ETL-payload'е СИГМЫ).
+# Литерал держим узким, чтобы UI мог раскрасить кружок по типу:
+#   p — pressure, t — temperature, d — diameter,
+#   noise — акустический датчик, detector — видеодетектор.
+# Расширяемо: при добавлении нового типа правим литерал тут + UI palette.
+SensorType = Literal["p", "t", "d", "noise", "detector"]
 
 
 class FlowNode(BaseModel):
@@ -117,6 +130,17 @@ class FlowNode(BaseModel):
     priority: int | None = None
     constraintRef: str | None = None
     unit: str | None = None
+    # Sensor-specific (только для type == "sensor"):
+    #   sensorType  — категория физического датчика (см. SensorType)
+    #   bindsTo     — id input-ноды, в которую сенсор инжектирует значение.
+    #                 None пока сенсор не привязан (висит на канвасе) — в этом
+    #                 случае executor его игнорирует.
+    #   externalId  — необязательный «ярлык» из ETL (например `edge_1` —
+    #                 идентификатор участка трубопровода). Не используется
+    #                 в логике, но прокидывается обратно в trace для UI.
+    sensorType: SensorType | None = None
+    bindsTo: str | None = None
+    externalId: str | None = None
 
 
 class FlowEdge(BaseModel):

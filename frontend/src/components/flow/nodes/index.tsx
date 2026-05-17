@@ -55,6 +55,13 @@ function ShaclConstraintNode(p: NodeProps<FlowNode>) {
   return <BaseNode {...p} inputs={[{ position: Position.Left }]} outputs={[{ position: Position.Right }]} />
 }
 
+// Sensor — точка входа из ETL: только выход, без входов. Визуально кружок
+// (см. .rf-node--sensor в styles.css), отличающий «внешний сигнал» от
+// «внутреннего параметра регламента» (input-rect).
+function SensorNode(p: NodeProps<FlowNode>) {
+  return <BaseNode {...p} outputs={[{ position: Position.Right }]} />
+}
+
 export const nodeTypes: NodeTypes = {
   input:             InputNode,
   threshold:         ThresholdNode,
@@ -63,4 +70,5 @@ export const nodeTypes: NodeTypes = {
   switch:            SwitchNode,
   output:            OutputNode,
   shacl_constraint:  ShaclConstraintNode,
+  sensor:            SensorNode,
 }
