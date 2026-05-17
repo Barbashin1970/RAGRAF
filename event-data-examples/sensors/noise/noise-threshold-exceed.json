@@ -1,0 +1,13 @@
+{
+  "description": "Превышение уровня шума: 95 дБ при пороге 90 дБ",
+  "timestamp": "2024-10-15T07:46:52Z",
+  "payload": {
+    "event_type": "noise_threshold_exceeded",
+    "sensor_id": "sensor_01",
+    "threshold": 90,
+    "current_value": 95,
+    "unit": "dB",
+    "ts": 1728961612345,
+    "pos": "44.34532N 72.4534543E"
+  }
+}

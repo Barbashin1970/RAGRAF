@@ -1,0 +1,92 @@
+@prefix :    <http://regulations.local/ontology#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+# SHACL-форма валидации регламента «Парковка НГУ / ANPR».
+#
+# Помимо обычных порогов, добавлен pattern-constraint на формат ГРЗ — это и
+# есть «настоящий SHACL use case» для категориального регламента:
+# номер должен соответствовать регексу российского ГРЗ (например A123BC777).
+
+:NsuParkingAnprShape
+    a sh:NodeShape ;
+    sh:targetClass :Regulation ;
+
+    sh:property [ sh:path :name ; sh:datatype xsd:string ; sh:minCount 1 ] ;
+    sh:property [ sh:path :date ; sh:datatype xsd:date   ; sh:minCount 1 ] ;
+
+    sh:property [
+        sh:path         :recognitionConfidence ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 1.0 ;
+        sh:message      "Минимальный confidence ANPR для авто-открытия шлагбаума"@ru
+    ] ;
+    sh:property [
+        sh:path         :recognitionConfidenceDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 0.5
+    ] ;
+
+    sh:property [
+        sh:path         :maxParkingHours ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 168.0 ;
+        sh:message      "Лимит непрерывной стоянки, часы (≤168 = неделя)"@ru
+    ] ;
+    sh:property [
+        sh:path         :maxParkingHoursDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 24.0
+    ] ;
+
+    sh:property [
+        sh:path         :gracePeriodMinutes ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 180.0 ;
+        sh:message      "Льготный период после превышения лимита, мин"@ru
+    ] ;
+    sh:property [
+        sh:path         :gracePeriodMinutesDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 60.0
+    ] ;
+
+    sh:property [
+        sh:path         :operatorFallbackTimeoutSec ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  5.0 ;
+        sh:maxInclusive 300.0 ;
+        sh:message      "SLA оператора КПП на подтверждение по звонку, сек"@ru
+    ] ;
+    sh:property [
+        sh:path         :operatorFallbackTimeoutSecDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 60.0
+    ] ;
+
+    # Категориальное правило: формат ГРЗ. Соответствует ГОСТ Р 50577-2018,
+    # тип 1 (легковые): буква + 3 цифры + 2 буквы + 2-3 цифры региона.
+    # Например A123BC77, A123BC777. Кириллические буквы здесь специально
+    # ограничены латинской транслитерацией (A, B, E, K, M, H, O, P, C, T, Y, X) —
+    # это допустимый алфавит для ГРЗ согласно ГОСТу.
+    sh:property [
+        sh:path         :licensePlatePattern ;
+        sh:datatype     xsd:string ;
+        sh:pattern      "^[ABEKMHOPCTYX][0-9]{3}[ABEKMHOPCTYX]{2}[0-9]{2,3}$" ;
+        sh:message      "ГРЗ должен соответствовать формату ГОСТ Р 50577-2018, тип 1"@ru
+    ] .

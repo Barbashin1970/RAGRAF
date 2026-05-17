@@ -230,7 +230,15 @@ React Flow + Cytoscape + rest тянут ~1.05 MB JS-чанк. Сделать la
 Из существующих NSK_OpenData_Bot YAML-файлов есть черновики на `traffic`, `industrial`, `power` домены. Можно конвертировать в наш формат и расширить покрытие.
 
 ### Event-driven execution (Sigma-style) + датчики на INPUT + API на OUTPUT
-*Complexity: средняя–высокая*
+*Complexity: средняя–высокая · частично сделано (май 2026)*
+
+> **Что сделано:** `sensor`-нода во Flow Editor (визуально кружок, привязка
+> к input через `bindsTo`), [flow_executor.py](backend/app/services/flow_executor.py)
+> с интерпретатором флоу, endpoint `POST /api/regulations/{sid}/execute`,
+> панель «Запуск» в UI с пресетами/подсветкой сработавшего пути.
+> Это закрывает пункт 3 списка ниже (engine `match-event`) и большую
+> часть пункта 4 (UI-симулятор). Подробнее в разделе **«📡 Приёмник
+> событий СИГМЫ»** — там описан следующий шаг.
 
 Описано в Rules-Management.pdf, раздел «Исполнение регламента»: Sigma принимает sensor-события через ETL, делает SPARQL-запрос к онтологии, возвращает обогащённое событие с `level` критичности и `recommendation`.
 
@@ -278,6 +286,113 @@ React Flow + Cytoscape + rest тянут ~1.05 MB JS-чанк. Сделать la
 **Архитектурная ценность:** показывает «Sigma делает то же самое, но через SPARQL и RDF-store; у нас типизированные Pydantic-регламенты + DuckDB → ровно та же семантика без онтологического оверхеда». Это **наш ключевой архитектурный аргумент** против полного RDF-стека.
 
 **Tradeoff:** webhook'и из chat-режима — security risk если не контролировать URL'ы. В sandbox-режиме делать только dry-run + явный allowlist на проде.
+
+---
+
+## 📡 Приёмник событий СИГМЫ (event ingestion)
+
+**Контекст.** СИГМА развёрнута на серверах вне НГУ. ETL/edge-устройства
+шлют события POST'ом в формате `{description, timestamp, payload}` —
+формальный контракт в [event-data-examples/schema.json](event-data-examples/schema.json),
+живые сэмплы — в [event-data-examples/sensors/](event-data-examples/sensors/)
+по типам датчиков (`pressure/`, `temperature/`, `flow/`, `noise/`,
+`video-detector/`). Эмулятор-источник на Triton — в [sigma_event_generator/](event-data-examples/sigma_event_generator/).
+
+Сейчас (май 2026) RAGRAF не принимает события напрямую — это в очередь.
+Реализация ждёт сборки ядра СИГМЫ и понимания задачи от заказчика по
+фактическому endpoint'у/авторизации.
+
+### Endpoint `POST /api/events/ingest`
+*Complexity: средняя*
+
+Принимает SIGMA-event, маппит `payload.<field>` в `SensorReading[]`
+([flow_executor.py](backend/app/services/flow_executor.py)) по
+эвристике: `pressure→p`, `temperature→t`, `flow→flow`, и т.д. Решает
+какие регламенты применять — варианты:
+
+1. **По `payload.source_id`** (UUID источника из СИГМЫ → один или
+   несколько регламентов в реестре)
+2. **По домену события** (`description` или `payload.event` → SPARQL/LLM-классификация → domain → регламенты домена)
+3. **По всем активным регламентам** (брутфорс — для прототипа)
+
+Возвращает `{matched: [{regulation_id, level, recommendation}], skipped: [...]}`.
+
+### UI: журнал событий
+*Complexity: средняя · требует ingest endpoint'а*
+
+Вкладка «События» в навигации — timeline с фильтрами по уровню /
+домену / временному окну. На каждое событие — popover с payload, какие
+регламенты сработали, какой level. Аналитик видит «что прилетало и что
+сработало». Аналог Camunda Cockpit «Process instances».
+
+Хранение в DuckDB: таблица `events` (event_id, received_at, description,
+payload JSON, matched_regulations JSON, levels JSON).
+
+### Реестр источников
+*Complexity: низкая · требует ingest endpoint'а*
+
+Таблица «источник UUID → список регламентов / типов датчиков». В СИГМЕ
+это `sources/<uuid>/events/` — каждый UUID знает свою конфигурацию.
+У нас то же самое: UI «Источники» где аналитик прописывает «датчик
+такой-то шлёт давление с edge_id=12, маппи в регламент pressure-diameter».
+
+### «Зеркальный» режим вместо СИГМЫ
+*Complexity: низкая*
+
+Выставить тот же endpoint что у СИГМЫ (`/api/v1/sources/<uuid>/events/`)
+чтобы [sigma_event_generator/](event-data-examples/sigma_event_generator/)
+мог слать в RAGRAF без правок. Удобно для разработки/демо.
+
+### Auth-слой
+*Complexity: средняя*
+
+Bearer-token или API-key per source. Без авторизации публичный endpoint
+не выставляем. Минимум — `X-RAGRAF-Source-Key` в headers + проверка
+по таблице `sources`.
+
+### Привязка datatypes к payload-полям
+*Complexity: низкая*
+
+Сейчас в `SensorReading` тип определяется по `sensor_type` ('p'/'t'/…).
+Нужен маппинг «название поля payload» → `sensor_type`:
+`pressure → p`, `temperature → t`, `flow → flow`, `level (dB) → noise`,
+`event=digging → detector`. Хранить как таблицу `payload_field_aliases`
+или захардкодить в коде — обсудим когда дойдёт до реализации.
+
+### Интеграция с PostgreSQL видеодетекторов
+*Complexity: средняя*
+
+ORM-схемы продакшна — в [event-data-examples/videodetectors/](event-data-examples/videodetectors/):
+`EventPerson` (76+ атрибутов человека) и `EventNumberPlate`/ANPR
+(номер, марка, цвет, направление). СИГМА уже индексирует туда поток,
+**свой генератор писать не нужно** — RAGRAF просто читает строки и
+мапит в SIGMA-event формат:
+
+```python
+# Псевдокод адаптера
+row = session.query(EventPerson).filter(updated_at > since).limit(100)
+for r in row:
+    yield {
+      "description": f"Человек на {r.camera_name or r.camera_id}",
+      "timestamp": datetime.fromtimestamp(r.timestamp).isoformat(),
+      "payload": {
+        "event_type": "person",
+        "camera_id": r.camera_id,
+        "track_id": r.track_id,
+        "confidence": r.confidence,
+        "bbox": r.bbox,
+        "attributes": _top_n_attributes(r),  # порог 0.5 + argmax по группам
+      }
+    }
+```
+
+**Decision needed:**
+- Полл-модель (RAGRAF опрашивает БД каждые N сек) или push (триггер в Postgres → callback)?
+- Прямой коннект к их Postgres или они выставят REST-обёртку?
+- Где живёт `_top_n_attributes`-логика (сжатие 76 float'ов в top-категории)?
+
+См. сэмпл маппинга в [event-data-examples/sensors/video-detector/](event-data-examples/sensors/video-detector/)
+— `person-detection.json` / `vehicle-anpr.json` иллюстрируют целевую форму.
 
 ---
 

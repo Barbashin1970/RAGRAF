@@ -1,0 +1,21 @@
+{
+  "description": "Авто Toyota Corolla, ГРЗ A123BC777, въезд через Camera-7",
+  "timestamp": "2026-05-17T09:15:42Z",
+  "payload": {
+    "event_type": "anpr",
+    "camera_id": "Camera-7",
+    "camera_name": "Шлагбаум, въезд",
+    "track_id": 678,
+    "confidence": 0.95,
+    "class_id": 2,
+    "bbox": "320,180,820,540",
+    "image_path": "/images/cam07/2026-05-17/09-15-42_track678.jpg",
+    "box_image_path": "/images/cam07/2026-05-17/09-15-42_track678_bbox.jpg",
+    "numberPlate": "A123BC777",
+    "vehicleTypeId": 1,
+    "color": "red",
+    "brand": "Toyota",
+    "model": "Corolla",
+    "direction": 1
+  }
+}

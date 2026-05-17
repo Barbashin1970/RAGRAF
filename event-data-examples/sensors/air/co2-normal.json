@@ -1,0 +1,14 @@
+{
+  "description": "CO2 = 420 ppm — норма свежего воздуха",
+  "timestamp": "2024-10-15T08:00:00Z",
+  "payload": {
+    "event_type": "air_quality_normal",
+    "sensor_id": "sensor_02",
+    "pollutant": "CO2",
+    "concentration": 420,
+    "threshold": 1000,
+    "unit": "ppm",
+    "ts": 1728964800000,
+    "pos": "44.34532N 72.4534543E"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Шаг человека на координатах (1540 м от 0 до 10 км)",
+  "timestamp": "2026-05-17T02:26:05Z",
+  "payload": {
+    "x": 1540,
+    "event": "human_step",
+    "confidence": 0.75
+  }
+}

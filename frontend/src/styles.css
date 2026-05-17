@@ -109,9 +109,11 @@ body { font-family: 'Inter', system-ui, sans-serif; }
 
 /* Sensor — circle vs. rectangle, чтобы аналитик мгновенно отличал
    «внешний сигнал ETL/IoT» от «логического элемента регламента».
-   Цвет teal — близкий к input(emerald), но отчётливо разный (input ≠ sensor). */
-.rf-node--sensor                 { @apply rounded-full border-teal-500 bg-teal-50; }
-.rf-node--sensor .rf-node__icon  { @apply bg-teal-600 rounded-full; }
+   Цвет orange — резко контрастирует с input(emerald): «снаружи» против
+   «внутри регламента». Switch тоже из orange-семейства (orange-400/50),
+   но он прямоугольник и тон тише — конфликта не возникает. */
+.rf-node--sensor                 { @apply rounded-full border-orange-500 bg-orange-100; }
+.rf-node--sensor .rf-node__icon  { @apply bg-orange-600 rounded-full; }
 
 /* Подсветка «сработавшего» узла после Run (Execute) — мягкий зелёный glow.
    Применяется через className на react-flow__node wrapper'е (см. дериватив

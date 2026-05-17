@@ -1,0 +1,68 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент: контроль доступа на парковку НГУ через ANPR (распознавание ГРЗ).
+# Сценарий: камера на въезде/выезде — ML-детектор номеров (см. EventNumberPlate
+# в event-data-examples/videodetectors/grz_postgresql.py).
+#
+# Основная логика (категориальная, не пороги — отражена в recommendation и flow):
+#   1. ANPR прочитал номер → ищем в allowlist (Сотрудники / Гости с пропуском).
+#   2. Если номер найден И confidence ≥ порога → шлагбаум открывается.
+#   3. Если confidence ниже порога ИЛИ номера нет → fallback на входящий звонок:
+#      оператор / водитель звонит с номера из allowlist'а телефонов → шлагбаум
+#      открывается оператором.
+#   4. На выезде повторно сверяется номер, считается время «въезд → выезд» по
+#      track_id и timestamp'ам ANPR-событий.
+#   5. Если на парковке >12 ч (maxParkingHours) — уведомить владельца авто.
+#   6. На конец месяца — отчёт «номер → суммарное время / число посещений».
+#
+# Параметры этого регламента — пороги для категориальной логики:
+#   recognitionConfidence    — минимальный confidence ANPR'а для авто-открытия
+#   maxParkingHours          — лимит непрерывной стоянки
+#   gracePeriodMinutes       — после превышения, до уведомления владельца
+#   operatorFallbackTimeoutSec — окно ожидания подтверждения оператора по звонку
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:recognitionConfidence              a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:recognitionConfidenceDeviation     a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:maxParkingHours                    a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:maxParkingHoursDeviation           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:gracePeriodMinutes                 a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:gracePeriodMinutesDeviation        a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:operatorFallbackTimeoutSec         a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:operatorFallbackTimeoutSecDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:NsuParkingAnprRegulation
+    a                                  :Regulation ;
+    :name                              "Регламент контроля доступа на парковку НГУ (ANPR + фолбэк звонком, лимит стоянки, месячный отчёт)" ;
+    :date                              "2024-09-01"^^xsd:date ;
+
+    # Минимальный confidence ML-детектора ГРЗ для авто-открытия шлагбаума.
+    # Из практики — 0.85 ± 0.05. Ниже — fallback на оператора.
+    :recognitionConfidence             0.85 ;
+    :recognitionConfidenceDeviation    0.05 ;
+
+    # Максимально допустимое непрерывное время на парковке, часы.
+    # 12 ± 0 — жёсткий лимит (пол-рабочих суток).
+    :maxParkingHours                  12.0 ;
+    :maxParkingHoursDeviation          0.0 ;
+
+    # Льготный период после превышения лимита перед уведомлением, минуты.
+    # 15 ± 5 — даём пять-минутный hysteresis на «дойти до машины».
+    :gracePeriodMinutes               15.0 ;
+    :gracePeriodMinutesDeviation       5.0 ;
+
+    # Сколько секунд ждать подтверждения оператора по входящему звонку, сек.
+    # 30 ± 10 — стандартный SLA дежурного на КПП.
+    :operatorFallbackTimeoutSec       30.0 ;
+    :operatorFallbackTimeoutSecDeviation 10.0 ;
+
+    :recommendation                    "ВЪЕЗД. 1) ANPR-камера распознаёт ГРЗ (EventNumberPlate.numberPlate). 2) Если номер в allowlist И confidence ≥ 0.85 — шлагбаум открывается автоматически, фиксируется событие entry(plate, ts, track_id). 3) Если confidence < 0.85 ИЛИ номера нет в списке — fallback: ожидание входящего звонка с номера телефона из phone-allowlist (сам водитель или оператор шлагбаума с КПП) в течение 30 ± 10 сек; оператор сверяет визуально, открывает шлагбаум вручную. 4) Если ни ANPR, ни звонок не сработали — отказ; событие unknown_attempt в журнал. ВЫЕЗД. 1) ANPR повторно читает номер, идентификатор track_id связывается с записью въезда. 2) Считается duration = ts_exit − ts_entry. 3) Если duration > 12 ч + 15 ± 5 мин — уведомление владельца авто по SMS. 4) Если ANPR на выезде сработал, а записи въезда нет — security alert (приоритет 1), ручная проверка. УЧЁТ. На конец каждого месяца формируется отчёт «номер → число посещений → суммарное время → среднее время визита» для аудита и оптимизации мест."@ru .

@@ -1,0 +1,233 @@
+{
+  "rule_id": "rule_nsu_parking_anpr",
+  "regulation_id": "nsu-parking-anpr",
+  "nodes": [
+    {
+      "id": "n_anpr_in_sensor",
+      "type": "sensor",
+      "label": "Камера-ANPR (въезд)",
+      "sensorType": "detector",
+      "externalId": "cam_parking_in_01",
+      "bindsTo": "n_plate_in",
+      "position": { "x": 40, "y": 80 }
+    },
+    {
+      "id": "n_call_sensor",
+      "type": "sensor",
+      "label": "Входящий звонок",
+      "sensorType": "detector",
+      "externalId": "pbx_kpp_main",
+      "bindsTo": "n_phone_in",
+      "position": { "x": 40, "y": 360 }
+    },
+    {
+      "id": "n_anpr_out_sensor",
+      "type": "sensor",
+      "label": "Камера-ANPR (выезд)",
+      "sensorType": "detector",
+      "externalId": "cam_parking_out_01",
+      "bindsTo": "n_plate_out",
+      "position": { "x": 40, "y": 540 }
+    },
+
+    {
+      "id": "n_plate_in",
+      "type": "input",
+      "label": "ГРЗ (въезд)",
+      "paramRef": "licensePlateIn",
+      "position": { "x": 280, "y": 40 }
+    },
+    {
+      "id": "n_conf_in",
+      "type": "input",
+      "label": "Confidence ANPR",
+      "paramRef": "recognitionConfidence",
+      "position": { "x": 280, "y": 160 }
+    },
+    {
+      "id": "n_phone_in",
+      "type": "input",
+      "label": "MSISDN звонящего",
+      "paramRef": "callerMsisdn",
+      "position": { "x": 280, "y": 360 }
+    },
+    {
+      "id": "n_plate_out",
+      "type": "input",
+      "label": "ГРЗ (выезд)",
+      "paramRef": "licensePlateOut",
+      "position": { "x": 280, "y": 540 }
+    },
+
+    {
+      "id": "n_conf_thr",
+      "type": "threshold",
+      "label": "0.85 ± 0.05",
+      "refValue": 0.85,
+      "deviation": 0.05,
+      "unit": "",
+      "position": { "x": 540, "y": 160 }
+    },
+    {
+      "id": "n_conf_cmp",
+      "type": "compare",
+      "label": "conf ≥ 0.85?",
+      "operator": "greater",
+      "position": { "x": 780, "y": 160 }
+    },
+
+    {
+      "id": "n_plate_in_allowlist",
+      "type": "formula",
+      "label": "ГРЗ в allowlist?",
+      "expression": "plate in allowlist_plates",
+      "position": { "x": 540, "y": 40 }
+    },
+    {
+      "id": "n_phone_in_allowlist",
+      "type": "formula",
+      "label": "Телефон в allowlist?",
+      "expression": "msisdn in allowlist_phones",
+      "position": { "x": 540, "y": 360 }
+    },
+
+    {
+      "id": "n_access_decision",
+      "type": "switch",
+      "label": "Разрешение въезда",
+      "cases": [
+        { "label": "auto_open",       "value": "auto_open" },
+        { "label": "operator_open",   "value": "operator_open" },
+        { "label": "denied",          "value": "denied" }
+      ],
+      "position": { "x": 1040, "y": 200 }
+    },
+
+    {
+      "id": "n_barrier_open",
+      "type": "output",
+      "label": "Открыть шлагбаум",
+      "action": "barrier_open",
+      "text": "Поднять шлагбаум. Зафиксировать entry(plate, ts, track_id) для учёта времени стоянки.",
+      "priority": 3,
+      "position": { "x": 1320, "y": 40 }
+    },
+    {
+      "id": "n_operator_fallback",
+      "type": "output",
+      "label": "Запрос оператора",
+      "action": "operator_call_check",
+      "text": "Ожидать входящего звонка с номера из allowlist'а в течение 30 ± 10 сек. Оператор КПП визуально сверяет авто и водителя, открывает шлагбаум вручную.",
+      "priority": 2,
+      "position": { "x": 1320, "y": 200 }
+    },
+    {
+      "id": "n_access_denied",
+      "type": "output",
+      "label": "Отказ во въезде",
+      "action": "log_unknown_attempt",
+      "text": "Шлагбаум не поднимать. Зафиксировать unknown_attempt(plate, ts, image_path) для последующего разбора оператором.",
+      "priority": 2,
+      "position": { "x": 1320, "y": 360 }
+    },
+
+    {
+      "id": "n_duration_calc",
+      "type": "formula",
+      "label": "duration = exit − entry",
+      "expression": "ts_exit - ts_entry",
+      "position": { "x": 540, "y": 540 }
+    },
+    {
+      "id": "n_max_hours_thr",
+      "type": "threshold",
+      "label": "12 ± 0 ч",
+      "refValue": 12.0,
+      "deviation": 0.0,
+      "unit": "ч",
+      "position": { "x": 780, "y": 540 }
+    },
+    {
+      "id": "n_overtime_cmp",
+      "type": "compare",
+      "label": "duration > 12 ч + grace?",
+      "operator": "greater",
+      "position": { "x": 1040, "y": 540 }
+    },
+
+    {
+      "id": "n_owner_notify",
+      "type": "output",
+      "label": "SMS владельцу",
+      "action": "owner_overtime_sms",
+      "text": "Превышение лимита стоянки 12 ч + грейс 15 ± 5 мин. Отправить SMS владельцу по номеру из реестра ГРЗ. Если ответа нет — эскалация на охрану.",
+      "priority": 2,
+      "position": { "x": 1320, "y": 540 }
+    },
+    {
+      "id": "n_exit_log",
+      "type": "output",
+      "label": "Лог выезда",
+      "action": "log_visit",
+      "text": "Записать visit(plate, ts_entry, ts_exit, duration_min) в журнал посещений. Используется в месячном отчёте.",
+      "priority": 3,
+      "position": { "x": 1320, "y": 660 }
+    },
+    {
+      "id": "n_exit_without_entry",
+      "type": "output",
+      "label": "ALERT: выезд без въезда",
+      "action": "security_alert",
+      "text": "ANPR на выезде сработал, но записи въезда не найдено. Возможен сбой системы или несанкционированный проход. Эскалация в охрану, ручная проверка.",
+      "priority": 1,
+      "position": { "x": 1320, "y": 780 }
+    },
+
+    {
+      "id": "n_monthly_report",
+      "type": "output",
+      "label": "Месячный отчёт",
+      "action": "monthly_report",
+      "text": "В первый рабочий день месяца сформировать отчёт по предыдущему месяцу: для каждого ГРЗ — число посещений, суммарное время на парковке, среднее время визита. Отправить руководителю АХЧ + загрузить в архив.",
+      "priority": 3,
+      "position": { "x": 1320, "y": 900 }
+    },
+
+    {
+      "id": "n_shacl_plate",
+      "type": "shacl_constraint",
+      "label": "SHACL: формат ГРЗ",
+      "constraintRef": "Regulation_licensePlatePattern",
+      "position": { "x": 780, "y": 40 }
+    }
+  ],
+  "edges": [
+    { "source": "n_anpr_in_sensor",  "target": "n_plate_in" },
+    { "source": "n_anpr_in_sensor",  "target": "n_conf_in" },
+    { "source": "n_call_sensor",     "target": "n_phone_in" },
+    { "source": "n_anpr_out_sensor", "target": "n_plate_out" },
+
+    { "source": "n_plate_in",   "target": "n_plate_in_allowlist" },
+    { "source": "n_plate_in",   "target": "n_shacl_plate" },
+    { "source": "n_conf_in",    "target": "n_conf_thr" },
+    { "source": "n_conf_thr",   "target": "n_conf_cmp" },
+    { "source": "n_phone_in",   "target": "n_phone_in_allowlist" },
+
+    { "source": "n_plate_in_allowlist", "target": "n_access_decision", "condition": "plate_ok" },
+    { "source": "n_conf_cmp",           "target": "n_access_decision", "condition": "conf_ok" },
+    { "source": "n_phone_in_allowlist", "target": "n_access_decision", "condition": "phone_ok" },
+
+    { "source": "n_access_decision", "target": "n_barrier_open",      "condition": "auto_open" },
+    { "source": "n_access_decision", "target": "n_operator_fallback", "condition": "operator_open" },
+    { "source": "n_access_decision", "target": "n_access_denied",     "condition": "denied" },
+
+    { "source": "n_plate_out",      "target": "n_duration_calc" },
+    { "source": "n_duration_calc",  "target": "n_max_hours_thr" },
+    { "source": "n_max_hours_thr",  "target": "n_overtime_cmp" },
+    { "source": "n_overtime_cmp",   "target": "n_owner_notify",        "condition": "over" },
+    { "source": "n_overtime_cmp",   "target": "n_exit_log",            "condition": "ok" },
+    { "source": "n_plate_out",      "target": "n_exit_without_entry",  "condition": "no_entry_record" },
+
+    { "source": "n_exit_log",       "target": "n_monthly_report" }
+  ]
+}

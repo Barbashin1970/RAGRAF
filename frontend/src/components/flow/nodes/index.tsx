@@ -1,6 +1,37 @@
 import { Position, type NodeProps, type NodeTypes } from 'reactflow'
-import type { FlowNode } from '@/lib/api'
+import {
+  AudioWaveform,
+  Camera,
+  Gauge,
+  Radar,
+  Thermometer,
+  Volume2,
+  Waves,
+  Wind,
+  type LucideIcon,
+} from 'lucide-react'
+import { SENSOR_TYPE_META, type FlowNode, type SensorType } from '@/lib/api'
 import { BaseNode } from './BaseNode'
+
+// Иконка по типу физического датчика. Когда юзер собирает поток в духе
+// «снаружи внутрь», по форме иконки сразу видно «это манометр» / «это
+// расходомер» / «это камера» — не нужно лезть в PropertyPanel.
+//   p     → Gauge        (классическая стрелочная шкала манометра)
+//   t     → Thermometer
+//   flow  → Waves        (поток воды)
+//   noise → Volume2      (динамик / акустика)
+//   detector → Camera    (CCTV)
+//   fiber → AudioWaveform (DAS-сигнал вдоль волокна)
+//   air   → Wind          (атмосфера, качество воздуха)
+const SENSOR_TYPE_ICON: Record<SensorType, LucideIcon> = {
+  p: Gauge,
+  t: Thermometer,
+  flow: Waves,
+  noise: Volume2,
+  detector: Camera,
+  fiber: AudioWaveform,
+  air: Wind,
+}
 
 // Все семь типов используют одинаковый BaseNode-chrome (icon-pill, kind only).
 // Отличия только в handles. User-label и параметры — только в правой
@@ -68,8 +99,22 @@ function ShaclConstraintNode(p: NodeProps<FlowNode>) {
 // Sensor — точка входа из ETL: только выход, без входов. Визуально кружок
 // (см. .rf-node--sensor в styles.css), отличающий «внешний сигнал» от
 // «внутреннего параметра регламента» (input-rect).
+//
+// Иконка и подпись зависят от sensorType: «манометр», «термометр»,
+// «расходомер» и т.д. (см. SENSOR_TYPE_ICON / SENSOR_TYPE_META). Если тип
+// не выбран — обобщённый Radar и метка «Датчик».
 function SensorNode(p: NodeProps<FlowNode>) {
-  return <BaseNode {...p} outputs={[{ position: Position.Right }]} />
+  const stype = p.data.sensorType
+  const icon = stype ? SENSOR_TYPE_ICON[stype] : Radar
+  const label = stype ? SENSOR_TYPE_META[stype].label : 'Датчик'
+  return (
+    <BaseNode
+      {...p}
+      outputs={[{ position: Position.Right }]}
+      iconOverride={icon}
+      labelOverride={label}
+    />
+  )
 }
 
 export const nodeTypes: NodeTypes = {

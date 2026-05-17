@@ -1,0 +1,9 @@
+{
+  "description": "Проезд тяжёлой техники на координатах (4823 м от 0 до 10 км)",
+  "timestamp": "2026-05-17T08:42:11Z",
+  "payload": {
+    "x": 4823,
+    "event": "vehicle_passing",
+    "confidence": 0.91
+  }
+}

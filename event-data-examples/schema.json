@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "$id": "https://ragraf.local/schemas/event.json",
+  "title": "SIGMA Event",
+  "description": "Унифицированный контракт события от любого источника (датчик / видеоаналитика / ETL). При POST в СИГМУ тело может быть как этим объектом, так и обёрткой {\"msg\": <event>}. При GET из СИГМЫ ответ всегда обёрнут — см. README.md §«Wire-формат: обёртка msg».",
+  "type": "object",
+  "oneOf": [
+    {
+      "title": "Bare event",
+      "required": ["description", "timestamp", "payload"],
+      "properties": {
+        "description": { "$ref": "#/definitions/description" },
+        "timestamp":   { "$ref": "#/definitions/timestamp" },
+        "payload":     { "$ref": "#/definitions/payload" }
+      }
+    },
+    {
+      "title": "msg-wrapped event",
+      "required": ["msg"],
+      "properties": {
+        "msg": {
+          "type": "object",
+          "required": ["description", "timestamp", "payload"],
+          "properties": {
+            "description": { "$ref": "#/definitions/description" },
+            "timestamp":   { "$ref": "#/definitions/timestamp" },
+            "payload":     { "$ref": "#/definitions/payload" }
+          }
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "description": {
+      "type": "string",
+      "description": "Краткое описание события для пользователя (см. журнал событий).",
+      "examples": ["Копка на координатах (4;3)", "pressure_drop_detected"]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Время обнаружения события в ISO 8601, UTC."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Распознанные параметры события. Структура произвольная и зависит от датчика — см. sensors/<type>/README.md."
+    }
+  }
+}

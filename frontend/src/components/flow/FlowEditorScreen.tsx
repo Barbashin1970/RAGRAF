@@ -44,7 +44,14 @@ export function FlowEditorScreen() {
 
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
-  const [selected, setSelected] = useState<Node | null>(null)
+  // Храним только id выбранного узла, не сам объект. Иначе PropertyPanel
+  // получает stale-снимок node.data и поля не обновляются, когда мы
+  // патчим nodes через updateNodeData — pull всегда из актуального nodes[].
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const selected = useMemo<Node | null>(
+    () => (selectedId ? nodes.find((n) => n.id === selectedId) ?? null : null),
+    [nodes, selectedId],
+  )
   const [showHistory, setShowHistory] = useState(false)
   const [showExecute, setShowExecute] = useState(false)
   const [panelCollapsed, setPanelCollapsed] = useState(false)
@@ -120,7 +127,7 @@ export function FlowEditorScreen() {
   const deleteNode = (nodeId: string) => {
     setNodes((ns) => ns.filter((n) => n.id !== nodeId))
     setEdges((es) => es.filter((e) => e.source !== nodeId && e.target !== nodeId))
-    setSelected(null)
+    setSelectedId(null)
   }
 
   const validating = validateMutation.isPending
@@ -229,7 +236,7 @@ export function FlowEditorScreen() {
               setNodes(stripHighlight(nodes))
               setEdges(stripHighlight(edges))
             }}
-            onSelect={setSelected}
+            onSelect={(n) => setSelectedId(n?.id ?? null)}
           />
         </div>
         {showHistory ? (

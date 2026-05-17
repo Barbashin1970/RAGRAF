@@ -247,7 +247,7 @@ function ByType({ type, data, parameters, set }: { type: NodeKind; data: FlowNod
           <FieldSelect
             label="Тип датчика"
             value={data.sensorType ?? ''}
-            onChange={(v) => set({ sensorType: v === '' ? null : (v as 'p' | 't' | 'flow' | 'noise' | 'detector') })}
+            onChange={(v) => set({ sensorType: v === '' ? null : (v as 'p' | 't' | 'flow' | 'noise' | 'detector' | 'fiber' | 'air') })}
             options={[
               { value: '', label: '— не задан —' },
               { value: 'p', label: 'Давление (p)' },
@@ -255,6 +255,8 @@ function ByType({ type, data, parameters, set }: { type: NodeKind; data: FlowNod
               { value: 'flow', label: 'Расход м³/ч (Q)' },
               { value: 'noise', label: 'Шум' },
               { value: 'detector', label: 'Видеодетектор' },
+              { value: 'fiber', label: 'Волокно DAS' },
+              { value: 'air', label: 'Качество воздуха (CO2/PM)' },
             ]}
           />
           {/* Привязка к input-ноде регламента — сенсор только указывает «куда

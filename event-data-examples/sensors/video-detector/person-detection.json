@@ -1,0 +1,34 @@
+{
+  "description": "Обнаружен человек на Camera-3 (Парковка, въезд)",
+  "timestamp": "2026-05-17T08:42:11Z",
+  "payload": {
+    "event_type": "person",
+    "camera_id": "Camera-3",
+    "camera_name": "Парковка, въезд",
+    "track_id": 12345,
+    "confidence": 0.93,
+    "class_id": 0,
+    "bbox": "412,256,698,521",
+    "image_path": "/images/cam03/2026-05-17/08-42-11_track12345.jpg",
+    "box_image_path": "/images/cam03/2026-05-17/08-42-11_track12345_bbox.jpg",
+    "attributes": {
+      "gender": "male",
+      "age_group": "17_35",
+      "view": "front",
+      "top_garment": "jacket",
+      "top_color": "blue",
+      "sleeve": "long",
+      "bottom_garment": "trousers",
+      "bottom_color": "black",
+      "shoes": "dark",
+      "haircut": "short",
+      "headwear": "none",
+      "bag": "backpack",
+      "glasses": false,
+      "headphones": false,
+      "tattoo": false,
+      "full_visible": true,
+      "build": "mesomorph"
+    }
+  }
+}

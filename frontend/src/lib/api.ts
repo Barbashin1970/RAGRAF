@@ -12,8 +12,12 @@ export type NodeKind =
 //   t     — temperature (термопара / RTD),
 //   flow  — расход м³/ч (электромагнитный/ультразвуковой расходомер),
 //   noise — акустический детектор (например, утечки),
-//   detector — видеодетектор (CCTV-аналитика).
-export type SensorType = 'p' | 't' | 'flow' | 'noise' | 'detector'
+//   detector — видеодетектор (CCTV-аналитика),
+//   fiber — распределённое оптоволокно (DAS): кабель сам является
+//           датчиком, ML классифицирует событие + позицию вдоль волокна.
+//   air   — качество воздуха (CO2, PM2.5, PM10, …) из проекта ГОРОД-ОМ-ИИ;
+//           edge-агрегатор шлёт семантическое «превышение концентрации».
+export type SensorType = 'p' | 't' | 'flow' | 'noise' | 'detector' | 'fiber' | 'air'
 
 export interface FlowNode {
   id: string
@@ -694,4 +698,11 @@ export const SENSOR_TYPE_META: Record<
   flow:     { label: 'Расход м³/ч',    short: 'Q', bg: 'bg-cyan-100',    fg: 'text-cyan-700',    ring: 'ring-cyan-300' },
   noise:    { label: 'Шум',            short: 'N', bg: 'bg-amber-100',   fg: 'text-amber-800',   ring: 'ring-amber-300' },
   detector: { label: 'Видеодетектор',  short: 'V', bg: 'bg-violet-100',  fg: 'text-violet-700',  ring: 'ring-violet-300' },
+  // Оптоволокно (DAS): категориальное событие + координата вдоль кабеля.
+  // Цвет indigo — отдельная семья «high-tech distributed sensor», не путать
+  // с detector (violet) и noise (amber) — разная физика.
+  fiber:    { label: 'Волокно DAS',    short: 'F', bg: 'bg-indigo-100',  fg: 'text-indigo-700',  ring: 'ring-indigo-300' },
+  // Качество воздуха (ВОЗДУХ-ОМ): CO2 / PM2.5 / PM10 / NO2. Цвет sky —
+  // ассоциация «небо/атмосфера», отличается от p (blue) и flow (cyan).
+  air:      { label: 'Качество возд.', short: 'A', bg: 'bg-sky-100',     fg: 'text-sky-700',     ring: 'ring-sky-300' },
 }

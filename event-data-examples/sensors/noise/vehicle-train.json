@@ -1,0 +1,12 @@
+{
+  "description": "По акустической сигнатуре определён поезд",
+  "timestamp": "2024-10-15T07:46:37Z",
+  "payload": {
+    "event_type": "vehicle_detected_by_noise",
+    "vehicle_type": "train",
+    "confidence": 0.94,
+    "ts": 1728961597344,
+    "coords": "44.34532N 72.4534543E",
+    "sensor_id": "sensor_01"
+  }
+}

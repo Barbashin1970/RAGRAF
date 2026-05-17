@@ -108,20 +108,28 @@ export function ExecutePanel({ regulationId, currentDsl, nodes, onResult }: Prop
       const stype = c.sensorType
       // Эвристические пресеты по типам датчиков. Давление в атм., температура
       // в °C, расход в м³/ч — порядки взяты из типичных теплосетевых сценариев.
+      // Для fiber/detector «значение» = confidence ML-классификатора (0..1).
+      // Для air — концентрация CO2 в ppm (норма ~400, ПДК помещения 1000).
       if (preset === 'norm') {
         if (stype === 'p') next[c.key] = '20.5'
         else if (stype === 't') next[c.key] = '20'
         else if (stype === 'flow') next[c.key] = '10'
+        else if (stype === 'fiber' || stype === 'detector') next[c.key] = '0.3'
+        else if (stype === 'air') next[c.key] = '400'
         else next[c.key] = '1'
       } else if (preset === 'warning') {
         if (stype === 'p') next[c.key] = '23'
         else if (stype === 't') next[c.key] = '40'
         else if (stype === 'flow') next[c.key] = '25'
+        else if (stype === 'fiber' || stype === 'detector') next[c.key] = '0.75'
+        else if (stype === 'air') next[c.key] = '1200'
         else next[c.key] = '5'
       } else {
         if (stype === 'p') next[c.key] = '50'
         else if (stype === 't') next[c.key] = '100'
         else if (stype === 'flow') next[c.key] = '80'
+        else if (stype === 'fiber' || stype === 'detector') next[c.key] = '0.95'
+        else if (stype === 'air') next[c.key] = '5000'
         else next[c.key] = '10'
       }
     }
@@ -131,7 +139,7 @@ export function ExecutePanel({ regulationId, currentDsl, nodes, onResult }: Prop
   return (
     <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-l border-stone-200 bg-white text-sm">
       <div className="flex items-center gap-2 border-b border-stone-200 px-3 py-2">
-        <Radar size={14} className="text-teal-600" />
+        <Radar size={14} className="text-orange-600" />
         <div className="text-xs font-semibold uppercase tracking-wide text-stone-700">
           Исполнение регламента
         </div>

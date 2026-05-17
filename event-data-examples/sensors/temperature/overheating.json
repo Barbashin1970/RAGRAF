@@ -1,0 +1,12 @@
+{
+  "description": "Перегрев теплоносителя на подаче — риск гидроудара",
+  "timestamp": "2026-03-13T11:23:45Z",
+  "payload": {
+    "x": 120.0,
+    "y": 64.5,
+    "temperature": 95.4,
+    "reference": 65.0,
+    "location": "supply",
+    "edge_id": 3
+  }
+}
