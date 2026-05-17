@@ -164,6 +164,8 @@ async def test_every_seeded_regulation_has_validation_shape(store):
     items = store.list_all()
     assert len(items) > 0, "Store должен быть засеян фикстурами для этого теста"
 
+    # sigma:allow P8 — последовательный обход в тесте; набор фикстур маленький
+    # (< 20), и проверяем каждую отдельно для понятной атрибуции asserts.
     for it in items:
         sid = it["id"]
         shapes = await client.get_shapes(sid)
@@ -281,6 +283,8 @@ async def test_bundle_export_uses_real_shapes_when_available(store, heat_reg, mo
     ] .
 """
 
+    # sigma:allow P8 — мок имитирует async RegulationClient.get_shapes;
+    # сигнатура должна быть async-совместимой с реальным клиентом.
     async def fake_get_shapes(self, source_id):
         return custom_shapes
 

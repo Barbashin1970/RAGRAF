@@ -120,6 +120,8 @@ def test_seed_person_subtype_includes_orm_fields(client):
 def test_pdf_netris_detectors_seeded(client):
     """Все 10 детекторов из PDF #13 Нетрис присутствуют."""
     r = client.get("/api/sensor-subtypes").json()
+    # sigma:allow S4 — двухуровневый comprehension по API-ответу. Bounded N:
+    # 7 классов × ≤10 подтипов = ≤70 элементов, не масштабируется с input'ом.
     detector_subs = {s["subtype_id"] for c in r if c["class_id"] == "detector" for s in c["subtypes"]}
     netris = {
         "vd-face", "vd-person", "vd-fall", "vd-anpr", "vd-smoke",
@@ -131,6 +133,8 @@ def test_pdf_netris_detectors_seeded(client):
 def test_pdf_voicelink_detectors_seeded(client):
     """Все 6 детекторов из PDF #14 Войслинк присутствуют."""
     r = client.get("/api/sensor-subtypes").json()
+    # sigma:allow S4 — двухуровневый comprehension по API-ответу. Bounded N:
+    # 7 классов × ≤10 подтипов = ≤70 элементов, не масштабируется с input'ом.
     detector_subs = {s["subtype_id"] for c in r if c["class_id"] == "detector" for s in c["subtypes"]}
     voicelink = {
         "vd-vehicle-brand", "vd-accident", "vd-stop-in-lane",
@@ -200,6 +204,7 @@ def test_reseed_restores_subtypes_and_fields(client):
     assert payload["subtypes_seeded"] > 0
     assert payload["fields_seeded"] > 0
     r = client.get("/api/sensor-subtypes").json()
+    # sigma:allow S4 — bounded N (см. test_pdf_netris_detectors_seeded).
     fiber_subs = {s["subtype_id"] for c in r if c["class_id"] == "fiber" for s in c["subtypes"]}
     assert "fiber-vibration" in fiber_subs
 

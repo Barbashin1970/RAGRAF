@@ -176,6 +176,9 @@ async def build_corpus_bundle(domain: str | None = None) -> tuple[bytes, dict[st
     failed: list[dict[str, Any]] = []
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        # sigma:allow P8 — sequential HTTP к upstream СИГМЕ для каждого
+        # регламента. asyncio.gather бы перегрузил upstream и осложнил
+        # атрибуцию ошибок (failed[].source_id ↔ конкретная регламентация).
         for it in items:
             sid = it["id"]
             try:
@@ -292,6 +295,9 @@ async def import_bundle(zip_bytes: bytes, *, push_shapes: bool = True) -> dict[s
     skipped: list[dict[str, Any]] = []
     failed: list[dict[str, Any]] = []
 
+    # sigma:allow P8 — последовательный импорт. Внутри тела: parse_turtle,
+    # save в DuckDB (lock), опциональный push shapes в upstream. Параллелить
+    # опасно — DuckDB-write + сетевой push к upstream требуют сериализации.
     for folder, files in bundles.items():
         data_ttl = files.get("data_ttl", "")
         shapes_ttl = files.get("shapes_ttl", "")

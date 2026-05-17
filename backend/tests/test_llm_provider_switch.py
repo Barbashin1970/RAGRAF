@@ -103,6 +103,8 @@ async def test_chat_strips_ollama_options_for_cerebras(monkeypatch, isolated_dat
             self.choices = [FakeChoice()]
 
     class FakeCompletions:
+        # sigma:allow P8 — мок имитирует AsyncOpenAI.chat.completions.create,
+        # которая async по контракту OpenAI SDK; await в production-коде есть.
         async def create(self, **kwargs):
             captured_kwargs.update(kwargs)
             return FakeResponse()
@@ -161,6 +163,8 @@ async def test_chat_keeps_ollama_options_for_ollama(monkeypatch, isolated_data_d
             self.choices = [FakeChoice()]
 
     class FakeCompletions:
+        # sigma:allow P8 — мок имитирует AsyncOpenAI.chat.completions.create,
+        # которая async по контракту OpenAI SDK; await в production-коде есть.
         async def create(self, **kwargs):
             captured_kwargs.update(kwargs)
             return FakeResponse()
@@ -295,6 +299,8 @@ async def test_embedding_index_uses_embedding_endpoint(monkeypatch, isolated_dat
             self.data = [type("D", (), {"embedding": [0.1, 0.2, 0.3]})() for _ in range(8)]
 
     class FakeEmbeddings:
+        # sigma:allow P8 — мок имитирует AsyncOpenAI.embeddings.create,
+        # которая async по контракту OpenAI SDK; await в production-коде есть.
         async def create(self, **kwargs):
             # echo back N synthetic vectors of correct dimension
             n = len(kwargs.get("input", []))

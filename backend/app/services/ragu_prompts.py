@@ -17,6 +17,7 @@ Lazy-import `ragu` — если пакет не установлен, переч
 """
 from __future__ import annotations
 
+import itertools
 import re
 from datetime import datetime, timezone
 from typing import Any
@@ -37,11 +38,15 @@ def _extract_variables(template: str) -> list[str]:
     (`relation.subject_name` → `relation`). Это для UI-подсказки «вот какие
     placeholders доступны в этом промпте» — не для validation'а.
     """
-    found: set[str] = set()
-    for m in _JINJA_VAR_RE.finditer(template):
-        found.add(m.group(1).split(".")[0])
-    for m in _JINJA_FOR_RE.finditer(template):
-        found.add(m.group(1).split(".")[0])
+    # Объединяем итераторы var/for-regex через itertools.chain в один
+    # set-comprehension (sigma-audit P5: manual_set_build → set comprehension).
+    found: set[str] = {
+        m.group(1).split(".")[0]
+        for m in itertools.chain(
+            _JINJA_VAR_RE.finditer(template),
+            _JINJA_FOR_RE.finditer(template),
+        )
+    }
     # Отфильтруем Jinja built-ins и keywords.
     excluded = {"loop", "not", "none", "true", "false", "if", "else", "endif", "endfor", "for"}
     return sorted(v for v in found if v.lower() not in excluded)

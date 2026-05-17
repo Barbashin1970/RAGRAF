@@ -190,10 +190,13 @@ if settings.static_dir:
         _index_html = _static_root / "index.html"
 
         @app.get("/{full_path:path}", include_in_schema=False)
-        async def spa_fallback(full_path: str):
+        def spa_fallback(full_path: str):
             # /api/* уже выловлены роутерами выше; если запрос дошёл сюда —
             # это либо реальный файл (vite.svg, favicon.ico), либо
             # клиентский маршрут SPA → отдаём index.html.
+            # Хендлер sync — внутри только Path-операции (resolve/is_file),
+            # которые синхронные. FastAPI выполнит их в threadpool. Раньше
+            # был помечен async без await (sigma-audit P8.3 → исправлено).
             # Блокируем path-traversal: resolve относительно root.
             if full_path:
                 candidate = (_static_root / full_path).resolve()
