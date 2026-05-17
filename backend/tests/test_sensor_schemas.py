@@ -87,20 +87,72 @@ def test_delete_subtype_removes_fields_too(client):
 
 
 def test_seed_anpr_subtype_includes_orm_fields(client):
-    """vd-anpr поля скопированы из EventNumberPlate ORM."""
+    """vd-anpr поля строго по ORM EventNumberPlate (videodetectors/grz_postgresql.py).
+    ORM — источник правды; PDF — второстепенный (может содержать старое наименование)."""
     r = client.get("/api/sensor-schemas/vd-anpr").json()
     field_names = {f["field_name"] for f in r["fields"]}
-    # ORM-поля из grz_postgresql.py
-    for required_field in ("numberPlate", "brand", "model", "color", "direction"):
+    # ORM-поля (snake_case + ANPR-specific именно как в ORM Mapped)
+    for required_field in (
+        "event_type", "camera_id", "camera_name", "timestamp",
+        "image_path", "box_image_path", "confidence", "class_id", "track_id", "bbox",
+        "numberPlate", "vehicleTypeId", "color", "brand", "model", "direction",
+    ):
         assert required_field in field_names, f"Поле {required_field} из ORM не засеяно"
 
 
-def test_seed_person_subtype_includes_person_attributes(client):
-    """vd-person — агрегаты top-N атрибутов из 76-полевого EventPerson."""
+def test_seed_person_subtype_includes_orm_fields(client):
+    """vd-person — общая обвязка из ORM EventPerson + 9 агрегированных атрибутов."""
     r = client.get("/api/sensor-schemas/vd-person").json()
     field_names = {f["field_name"] for f in r["fields"]}
-    for attr in ("gender", "age_group", "top_garment", "top_color"):
-        assert attr in field_names
+    # ORM-обвязка (snake_case как в EventPerson Mapped):
+    for orm_field in (
+        "event_type", "camera_id", "camera_name", "timestamp",
+        "image_path", "image_base64", "box_image_path",
+        "confidence", "class_id", "track_id", "bbox",
+    ):
+        assert orm_field in field_names, f"ORM-поле {orm_field} не засеяно"
+    # 9 агрегированных атрибутов (вывод классификатора, описан в PDF):
+    for attr in ("gender", "age", "headwear", "top_color", "bottom_color",
+                 "top_type", "bottom_type", "handbag", "backpack"):
+        assert attr in field_names, f"Атрибут {attr} не засеян"
+
+
+def test_pdf_netris_detectors_seeded(client):
+    """Все 10 детекторов из PDF #13 Нетрис присутствуют."""
+    r = client.get("/api/sensor-subtypes").json()
+    detector_subs = {s["subtype_id"] for c in r if c["class_id"] == "detector" for s in c["subtypes"]}
+    netris = {
+        "vd-face", "vd-person", "vd-fall", "vd-anpr", "vd-smoke",
+        "vd-fire", "vd-weapon", "vd-motion", "vd-boost", "vd-aggressive",
+    }
+    assert netris.issubset(detector_subs), f"Missing Нетрис: {netris - detector_subs}"
+
+
+def test_pdf_voicelink_detectors_seeded(client):
+    """Все 6 детекторов из PDF #14 Войслинк присутствуют."""
+    r = client.get("/api/sensor-subtypes").json()
+    detector_subs = {s["subtype_id"] for c in r if c["class_id"] == "detector" for s in c["subtypes"]}
+    voicelink = {
+        "vd-vehicle-brand", "vd-accident", "vd-stop-in-lane",
+        "vd-dropped-cargo", "vd-pedestrian", "vd-driver-violation",
+    }
+    assert voicelink.issubset(detector_subs), f"Missing Войслинк: {voicelink - detector_subs}"
+
+
+def test_voicelink_accident_fields(client):
+    """vd-accident — Войслинк event-style payload (event + IDs)."""
+    r = client.get("/api/sensor-schemas/vd-accident").json()
+    names = {f["field_name"] for f in r["fields"]}
+    for f in ("event", "vehicle1_id", "vehicle2_id", "accuracy", "timestamp"):
+        assert f in names, f"Поле {f} из PDF #14 сценарий 2 не засеяно"
+
+
+def test_subtype_has_description(client):
+    """Каждый seeded подтип имеет осмысленное description (info-поле)."""
+    r = client.get("/api/sensor-subtypes").json()
+    for c in r:
+        for s in c["subtypes"]:
+            assert s.get("description"), f"У подтипа {s['subtype_id']} пустое description"
 
 
 def test_put_field_under_specific_subtype(client):

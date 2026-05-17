@@ -37,6 +37,7 @@ export interface FlowNode {
   unit?: string | null
   // Sensor-specific (см. backend/app/schemas/domain.py: FlowNode):
   sensorType?: SensorType | null
+  sensorSubtype?: string | null   // конкретный подтип (vd-anpr / fiber-vibration / ...)
   bindsTo?: string | null
   externalId?: string | null
 }

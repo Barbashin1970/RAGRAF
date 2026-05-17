@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -247,9 +247,13 @@ function ByType({ type, data, parameters, set }: { type: NodeKind; data: FlowNod
       return (
         <>
           <FieldSelect
-            label="Тип датчика"
+            label="Класс датчика"
             value={data.sensorType ?? ''}
-            onChange={(v) => set({ sensorType: v === '' ? null : (v as 'p' | 't' | 'flow' | 'noise' | 'detector' | 'fiber' | 'air') })}
+            onChange={(v) => set({
+              sensorType: v === '' ? null : (v as 'p' | 't' | 'flow' | 'noise' | 'detector' | 'fiber' | 'air'),
+              // При смене класса очищаем подтип — он привязан к классу.
+              sensorSubtype: null,
+            })}
             options={[
               { value: '', label: '— не задан —' },
               { value: 'p', label: 'Давление (p)' },
@@ -260,6 +264,13 @@ function ByType({ type, data, parameters, set }: { type: NodeKind; data: FlowNod
               { value: 'fiber', label: 'Волокно DAS' },
               { value: 'air', label: 'Качество воздуха (CO2/PM)' },
             ]}
+          />
+          {/* Селектор подтипа — список читается из реестра sensor_subtypes
+              для выбранного класса. Если sensorType пуст — селектор пустой. */}
+          <SensorSubtypeSelect
+            sensorType={data.sensorType ?? null}
+            subtypeId={data.sensorSubtype ?? null}
+            onChange={(sub) => set({ sensorSubtype: sub })}
           />
           {/* Привязка к input-ноде регламента — сенсор только указывает «куда
               лить значение». Выбор из существующих input'ов canvas'а
@@ -276,7 +287,10 @@ function ByType({ type, data, parameters, set }: { type: NodeKind; data: FlowNod
             onChange={(v) => set({ externalId: v || null })}
             monospaced
           />
-          <SensorSchemaPreview sensorType={data.sensorType ?? null} />
+          <SensorSchemaPreview
+            sensorType={data.sensorType ?? null}
+            sensorSubtype={data.sensorSubtype ?? null}
+          />
         </>
       )
     default:
@@ -346,24 +360,95 @@ function FieldSelect({ label, value, onChange, options }: { label: string; value
 }
 
 /**
- * Превью JSON-скелета payload-полей для выбранного типа датчика. Подтягивает
- * из api.sensorSchemas.listForSubtype — это та же библиотека, что и в /sensors.
+ * Селектор подтипа датчика — фильтрует список подтипов по выбранному классу.
+ * Если класс не выбран — селектор disabled. Если у класса один generic-подтип
+ * (subtype_id == class_id) — показываем как опцию по умолчанию.
  *
- * Сейчас FlowNode хранит `sensorType` (literal класса), без конкретного
- * подтипа. Поэтому смотрим на «generic»-подтип, у которого subtype_id ==
- * class_id. Когда расширим FlowNode до `sensorSubtype` — заменим параметр.
+ * Источник данных — реестр sensor_subtypes (та же таблица, что в /sensors).
  */
-function SensorSchemaPreview({ sensorType }: { sensorType: string | null }) {
-  const { data } = useQuery({
-    queryKey: ['sensor-schema', sensorType],
-    queryFn: () => api.sensorSchemas.listForSubtype(sensorType!),
+function SensorSubtypeSelect({
+  sensorType, subtypeId, onChange,
+}: { sensorType: string | null; subtypeId: string | null; onChange: (id: string | null) => void }) {
+  const { data: classes = [] } = useQuery({
+    queryKey: ['sensor-subtypes'],
+    queryFn: () => api.sensorSubtypes.list(),
     enabled: !!sensorType,
   })
 
+  const subtypes = useMemo(() => {
+    if (!sensorType) return []
+    return classes.find((c) => c.class_id === sensorType)?.subtypes ?? []
+  }, [classes, sensorType])
+
+  // Найти описание выбранного подтипа — рисуем под селектом для подсказки.
+  const selectedSub = subtypes.find((s) => s.subtype_id === (subtypeId ?? sensorType))
+
   if (!sensorType) {
     return (
+      <label className="mt-2 block">
+        <div className="text-xs text-stone-500">Подтип датчика</div>
+        <select
+          disabled
+          className="mt-1 w-full rounded border border-stone-200 bg-stone-50 px-2 py-1 text-sm text-stone-400"
+        >
+          <option>— сначала выберите класс —</option>
+        </select>
+      </label>
+    )
+  }
+
+  return (
+    <label className="mt-2 block">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-stone-500">Подтип датчика</span>
+        <Link to="/sensors" className="text-[10px] text-primary hover:underline">
+          справочник →
+        </Link>
+      </div>
+      <select
+        className="mt-1 w-full rounded border border-stone-200 bg-white px-2 py-1 text-sm"
+        value={subtypeId ?? sensorType}  // дефолт = generic-подтип класса
+        onChange={(e) => onChange(e.target.value === sensorType ? null : e.target.value)}
+      >
+        {subtypes.map((s) => (
+          <option key={s.subtype_id} value={s.subtype_id}>
+            {s.subtype_id === sensorType ? '(по умолчанию) ' : ''}{s.label}
+          </option>
+        ))}
+        {subtypes.length === 0 && (
+          <option value="">нет зарегистрированных подтипов</option>
+        )}
+      </select>
+      {selectedSub?.description && (
+        <div className="mt-1 rounded border border-stone-200 bg-stone-50 px-2 py-1 text-[10px] leading-snug text-stone-600">
+          {selectedSub.description}
+        </div>
+      )}
+    </label>
+  )
+}
+
+
+/**
+ * Превью JSON-скелета payload-полей. Берёт поля по подтипу (если задан) или
+ * по generic-подтипу класса (subtype_id == class_id).
+ */
+function SensorSchemaPreview({
+  sensorType, sensorSubtype,
+}: { sensorType: string | null; sensorSubtype: string | null }) {
+  // Эффективный subtype: если задан — используем; иначе fallback на generic.
+  const effectiveSubtype = sensorSubtype || sensorType
+
+  const { data } = useQuery({
+    queryKey: ['sensor-schema', effectiveSubtype],
+    queryFn: () => api.sensorSchemas.listForSubtype(effectiveSubtype!),
+    enabled: !!effectiveSubtype,
+  })
+
+  if (!effectiveSubtype) {
+    return (
       <div className="mt-3 rounded-md border border-dashed border-stone-300 bg-stone-50 px-2 py-2 text-[11px] text-stone-500">
-        Выберите тип датчика выше — здесь появится JSON-схема payload-полей.
+        Выберите класс/подтип датчика — здесь появится JSON-схема payload-полей.
       </div>
     )
   }
@@ -374,7 +459,7 @@ function SensorSchemaPreview({ sensorType }: { sensorType: string | null }) {
     payload[f.field_name] = decodeExample(f)
   }
   const wrapped = {
-    description: `<событие от датчика ${sensorType}>`,
+    description: `<событие от ${effectiveSubtype}>`,
     timestamp: '2026-05-17T08:42:11Z',
     payload,
   }
@@ -383,7 +468,7 @@ function SensorSchemaPreview({ sensorType }: { sensorType: string | null }) {
     <div className="mt-3">
       <div className="mb-1 flex items-center justify-between">
         <div className="text-[10px] uppercase tracking-wide text-stone-500">
-          JSON-схема payload
+          JSON-схема payload {sensorSubtype ? '' : '(generic-подтип)'}
         </div>
         <Link
           to="/sensors"
@@ -395,7 +480,7 @@ function SensorSchemaPreview({ sensorType }: { sensorType: string | null }) {
       </div>
       {fields.length === 0 ? (
         <div className="rounded border border-stone-200 bg-stone-50 px-2 py-2 text-[11px] text-stone-500">
-          У типа «{sensorType}» нет полей. Открой <Link to="/sensors" className="text-primary hover:underline">«Датчики»</Link> и добавь.
+          У подтипа «{effectiveSubtype}» нет полей. Открой <Link to="/sensors" className="text-primary hover:underline">«Датчики»</Link> и добавь.
         </div>
       ) : (
         <pre className="overflow-x-auto whitespace-pre rounded border border-stone-700 bg-stone-900 p-2 font-mono text-[10px] text-stone-100">
@@ -404,7 +489,7 @@ function SensorSchemaPreview({ sensorType }: { sensorType: string | null }) {
       )}
       {fields.length > 0 && (
         <div className="mt-1 text-[10px] text-stone-400">
-          {fields.length} {fields.length === 1 ? 'поле' : 'поля/полей'} в схеме · обязательных: {fields.filter((f) => f.required).length}
+          {fields.length} {fields.length === 1 ? 'поле' : 'полей'} · обязательных: {fields.filter((f) => f.required).length}
         </div>
       )}
     </div>

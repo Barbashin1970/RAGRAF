@@ -166,6 +166,7 @@ export const flowNodeSchema = z.object({
   unit: z.string().nullable().optional(),
   // Sensor-specific (см. backend/app/schemas/domain.py: FlowNode).
   sensorType: z.enum(['p', 't', 'flow', 'noise', 'detector', 'fiber', 'air']).nullable().optional(),
+  sensorSubtype: z.string().nullable().optional(),
   bindsTo: z.string().nullable().optional(),
   externalId: z.string().nullable().optional(),
 }).passthrough()

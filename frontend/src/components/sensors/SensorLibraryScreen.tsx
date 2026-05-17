@@ -371,14 +371,14 @@ function FieldsEditor({ subtypeId, classes }: FieldsEditorProps) {
 
   return (
     <div className="flex flex-col gap-4 p-5">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-1 items-start gap-2">
           {subtypeMeta && (() => {
             const m = SENSOR_TYPE_META[subtypeMeta.classId as SensorType]
             return (
               <span
                 className={cn(
-                  'inline-flex h-6 w-6 items-center justify-center rounded-md font-mono text-xs font-bold',
+                  'mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md font-mono text-xs font-bold',
                   m?.bg ?? 'bg-stone-100', m?.fg ?? 'text-stone-700',
                 )}
               >
@@ -386,10 +386,19 @@ function FieldsEditor({ subtypeId, classes }: FieldsEditorProps) {
               </span>
             )
           })()}
-          <h2 className="text-sm font-semibold text-stone-800">
-            {subtypeMeta?.sub.label ?? subtypeId}
-            <span className="ml-2 font-mono text-xs text-stone-500">({subtypeId})</span>
-          </h2>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-semibold text-stone-800">
+              {subtypeMeta?.sub.label ?? subtypeId}
+              <span className="ml-2 font-mono text-xs text-stone-500">({subtypeId})</span>
+            </h2>
+            {/* Описание (info-поле) — paragraph под заголовком. Сюда же
+                выводим PDF-источник из seed-описания. */}
+            {subtypeMeta?.sub.description && (
+              <p className="mt-1 text-xs leading-relaxed text-stone-600">
+                {subtypeMeta.sub.description}
+              </p>
+            )}
+          </div>
         </div>
         <Button
           size="sm"

@@ -125,17 +125,60 @@ SEED_SUBTYPES: list[tuple[str, str, str, str | None]] = [
     ("fiber",    "fiber",    "DAS — акустика (общий)",    "Распределённое оптоволокно, акустический сигнал"),
     ("air",      "air",      "Качество воздуха (общий)",  "Универсальный датчик загрязнения"),
 
-    # ── Видеодетекторы (расширенный набор; ~20 в перспективе) ──
-    ("vd-person",          "detector", "Детектор человека",         "EventPerson ORM: пол, возраст, одежда, аксессуары"),
-    ("vd-anpr",            "detector", "ANPR / распознавание ГРЗ",   "EventNumberPlate ORM: номер, марка, цвет, направление"),
-    ("vd-trash-bin",       "detector", "Мусорный бак (fill-level)",  "IoT-объект, не детекция; mock-генератор"),
-    ("vd-face",            "detector", "Распознавание лица",         "Биометрия (face ID, эмоции, маска)"),
-    ("vd-vehicle-class",   "detector", "Классификация транспорта",   "Тип авто: car / truck / bus / motorcycle"),
-    ("vd-fire-smoke",      "detector", "Огонь / дым",                "Раннее обнаружение возгорания"),
-    ("vd-helmet",          "detector", "Каска / СИЗ-violation",      "PPE-комплаенс на стройплощадке"),
-    ("vd-crowd",           "detector", "Скопление людей",            "Подсчёт плотности толпы"),
-    ("vd-weapon",          "detector", "Оружие",                     "Холодное / огнестрельное в кадре"),
-    ("vd-unattended-bag",  "detector", "Брошенная сумка",            "Antiterror-мониторинг в местах массового пребывания"),
+    # ── Видеодетекторы Нетрис (PDF «13 Выходные данные Детекторов событий Нетрис», 2024) ──
+    # Источник правды по атрибутам person/anpr — ORM videodetectors/*.py;
+    # PDF добавляет recognitionTypeId, шкалу confidence (0..1) и нормализованный
+    # bbox (left/right/top/bottom в долях кадра).
+    ("vd-face",       "detector", "Детектор лица человека",
+        "Нетрис rtk_ngu_srvr · поиск лиц в кадре · нормализованный bbox + image_base64. PDF #13, сценарий 1."),
+    ("vd-person",     "detector", "Детектор силуэта человека",
+        "Нетрис rtk_ngu_sa · силуэт + 9 атрибутов (пол/возраст/одежда/аксессуары) из EventPerson ORM. PDF #13, сценарий 2."),
+    ("vd-fall",       "detector", "Детектор лежащего человека",
+        "Нетрис rtk_ngu_sa · человек упал / неподвижен на земле. eventType=fall. PDF #13, сценарий 3."),
+    ("vd-anpr",       "detector", "Детектор ТС + распознавание ГРЗ",
+        "Нетрис rtk_ngu_anpr · ГОСТ Р 50577-2018 + марка/модель/цвет. EventNumberPlate ORM. PDF #13, сценарий 4."),
+    ("vd-smoke",      "detector", "Детектор дыма",
+        "Нетрис rtk_ngu_srvr · ранее обнаружение задымления. eventType=smoke. PDF #13, сценарий 5."),
+    ("vd-fire",       "detector", "Детектор огня",
+        "Нетрис rtk_ngu_srvr · открытое пламя в кадре. eventType=fire. PDF #13, сценарий 6."),
+    ("vd-weapon",     "detector", "Детектор оружия",
+        "Нетрис rtk_ngu_srvr · пистолет / нож в кадре. eventType=weapon. PDF #13, сценарий 7."),
+    ("vd-motion",     "detector", "Детектор движения в кадре",
+        "Нетрис rtk_ngu_sa · любое движение объекта в указанной зоне. eventType=motion. PDF #13, сценарий 8."),
+    ("vd-boost",      "detector", "Детектор резкого ускорения",
+        "Нетрис rtk_ngu_sa · аномальное ускорение объекта (бегство, разгон ТС). eventType=boost. PDF #13, сценарий 9."),
+    ("vd-aggressive", "detector", "Детектор агрессивного поведения",
+        "Нетрис rtk_ngu_sa · драка / агрессия / угроза в поведении. eventType=aggressive. PDF #13, сценарий 10."),
+
+    # ── Транспортные детекторы Войслинк (PDF «14 Выходные данные Транспортные детекторы Войслинк», 2024) ──
+    # Формат Войслинк отличается от Нетрис: events с собственными ID объектов
+    # (vehicle_id, pedestrian_id), без cameraId / recognitionTypeId.
+    ("vd-vehicle-brand",   "detector", "Войслинк: марка/модель/цвет ТС",
+        "request_counter + message_type=1. Сходно с vd-anpr, но без ГРЗ. PDF #14, сценарий 1."),
+    ("vd-accident",        "detector", "Войслинк: ДТП на перекрестке",
+        "Столкновение двух ТС с идентификаторами vehicle1_id / vehicle2_id. PDF #14, сценарий 2."),
+    ("vd-stop-in-lane",    "detector", "Войслинк: остановка в полосе движения",
+        "Стоянка ТС в зоне движения дольше нормы (duration в сек). PDF #14, сценарий 3."),
+    ("vd-dropped-cargo",   "detector", "Войслинк: выпавший груз на перекрестке",
+        "Объект, оставленный посреди дороги (object_id + time_detected). PDF #14, сценарий 4."),
+    ("vd-pedestrian",      "detector", "Войслинк: детектор пешехода",
+        "Пешеход на проезжей части — opposite от транспортных детекторов. PDF #14, сценарий 5."),
+    ("vd-driver-violation","detector", "Войслинк: ремень / телефон у водителя",
+        "Непристёгнутый ремень и/или использование телефона за рулём. PDF #14, сценарий 6."),
+
+    # ── Прочие видеодетекторы (внутренние заготовки, не из PDF) ──
+    ("vd-trash-bin",      "detector", "Мусорный бак (fill-level)",
+        "IoT-объект, не детекция; mock-генератор из videodetectors/generator.py"),
+    ("vd-vehicle-class",  "detector", "Классификация транспорта (внутренний)",
+        "Грубая категоризация: car / truck / bus / motorcycle / bicycle"),
+    ("vd-fire-smoke",     "detector", "Огонь+дым (комбинированный, deprecated)",
+        "Заменён парой vd-fire / vd-smoke из PDF Нетрис. Оставлен для обратной совместимости."),
+    ("vd-helmet",         "detector", "Каска / СИЗ-violation",
+        "PPE-комплаенс на стройплощадке"),
+    ("vd-crowd",          "detector", "Скопление людей",
+        "Подсчёт плотности толпы"),
+    ("vd-unattended-bag", "detector", "Брошенная сумка",
+        "Antiterror-мониторинг в местах массового пребывания"),
 
     # ── DAS-подтипы (юзер упомянул: vibration / temperature / acoustic) ──
     ("fiber-vibration",  "fiber", "DAS — вибрация",                  "Виброакустический мониторинг линейных объектов"),
@@ -219,45 +262,231 @@ SEED_FIELDS: dict[str, list[tuple[str, str, str | None, str, bool, Any]]] = {
         ("pos",           "string",  None,    "Координаты '<lat>N <lon>E'",                                  False, "44.34532N 72.4534543E"),
     ],
 
-    # ── Видеодетектор: person (из EventPerson ORM, top-N атрибутов) ──
+    # ── vd-person — ORM EventPerson (videodetectors/person_postgresql.py) ──
+    # ORM = источник правды; snake_case, bbox строкой, image_path + image_base64
+    # как отдельные поля, плюс class_id/track_id. PDF #13 — справочно: предлагает
+    # camelCase (cameraId, imageBase64) и нормализованный bbox, но это
+    # «старая версия полей». Здесь — ORM-форма.
+    #
+    # 9 строковых атрибутов (gender/age/headwear/top_color/bottom_color/
+    # top_type/bottom_type/handbag/backpack) — агрегаты из 76 float-полей ORM
+    # (male/female + age_*/top_*/bottom_*/hat_*/...). Их в ORM нет в виде
+    # строк — это вывод классификатора, описанный в PDF.
     "vd-person": [
-        ("event_type", "string",  None, "Всегда 'person'",                            True,  "person"),
-        ("camera_id",  "string",  None, "ID камеры",                                  True,  "Camera-3"),
-        ("camera_name","string",  None, "Имя камеры",                                False, "Парковка"),
-        ("track_id",   "integer", None, "Идентификатор трекинга через кадры",         False, 12345),
-        ("confidence", "decimal", None, "Уверенность детектора объекта",              True,  0.93),
-        ("bbox",       "string",  None, "x1,y1,x2,y2 в пикселях",                     False, "412,256,698,521"),
-        ("image_path", "string",  None, "Путь к полному кадру",                       False, "/images/.../track.jpg"),
-        # Атрибуты человека (агрегаты из 76 ORM-полей):
-        ("gender",        "string",  None, "male / female (top из male/female prob)",    False, "male"),
-        ("age_group",     "string",  None, "0_9 / 10_16 / 17_35 / 36_50 / 50_plus",       False, "17_35"),
-        ("top_garment",   "string",  None, "jacket / coat / vest / hoodie / tshirt / …", False, "jacket"),
-        ("top_color",     "string",  None, "Доминирующий цвет верхней одежды",            False, "blue"),
-        ("bottom_garment","string",  None, "trousers / skirt / shorts",                   False, "trousers"),
-        ("bottom_color",  "string",  None, "Доминирующий цвет нижней одежды",             False, "black"),
-        ("haircut",       "string",  None, "bald / short / medium / long",                False, "short"),
-        ("headwear",      "string",  None, "cap / hat / hood / baseball / none",          False, "none"),
-        ("bag",           "string",  None, "backpack / shoulder / hand / none",           False, "backpack"),
-        ("glasses",       "boolean", None, "Очки",                                        False, False),
-        ("view",          "string",  None, "front / back / side",                         False, "front"),
-        ("full_visible",  "boolean", None, "Полностью виден",                             False, True),
+        # Общая обвязка детектора Нетрис (взято из ORM EventPerson):
+        ("event_type",     "string",  None, "Тип события из ORM (= 'person')",         True,  "person"),
+        ("camera_id",      "string",  None, "ID камеры (ORM Text)",                    True,  "Camera-3"),
+        ("camera_name",    "string",  None, "Человекочитаемое имя камеры",             False, "Парковка"),
+        ("timestamp",      "integer", "ms", "Unix ms (ORM BigInteger)",                True,  1674487988888),
+        ("image_path",     "string",  None, "Путь к полному кадру",                    False, "/images/cam03/.../track.jpg"),
+        ("image_base64",   "string",  None, "Полный кадр в base64 (только person)",    False, ""),
+        ("box_image_path", "string",  None, "Путь к кадру с bbox",                     False, "/images/.../bbox.jpg"),
+        ("confidence",     "decimal", None, "Уверенность детектора объекта",           True,  0.93),
+        ("class_id",       "integer", None, "Класс из выходной модели",                False, 0),
+        ("track_id",       "integer", None, "Идентификатор трекинга через кадры",      False, 12345),
+        ("bbox",           "string",  None, "x1,y1,x2,y2 в пикселях (ORM Text)",       False, "412,256,698,521"),
+        # 9 агрегированных атрибутов (производные от 76 float-полей ORM):
+        ("gender",        "string", None, "мужчина / женщина (top из male/female)",  False, "мужчина"),
+        ("age",           "string", None, "17-35 лет / 36-50 лет / 50+ лет / …",     False, "17-35 лет"),
+        ("headwear",      "string", None, "капюшон / шапка / кепка / нет",           False, "капюшон"),
+        ("top_color",     "string", None, "Цвет верха (топ из top_*)",                False, "чёрный"),
+        ("bottom_color",  "string", None, "Цвет низа (топ из bottom_*)",              False, "чёрный"),
+        ("top_type",      "string", None, "толстовка / куртка / футболка / …",        False, "толстовка"),
+        ("bottom_type",   "string", None, "брюки / джинсы / шорты / юбка / …",        False, "брюки"),
+        ("handbag",       "string", None, "да / нет / не определён",                  False, "да"),
+        ("backpack",      "string", None, "да / нет / не определён",                  False, "не определён"),
     ],
 
-    # ── Видеодетектор: ANPR (из EventNumberPlate ORM) ──
+    # ── vd-anpr — ORM EventNumberPlate (videodetectors/grz_postgresql.py) ──
+    # ORM = источник правды. snake_case, bbox строкой, image_path/box_image_path
+    # (без image_base64 — у anpr его нет, только пути). PDF #13 справочно
+    # рекомендовал camelCase + recognitionTypeId, но это «старая версия».
+    #
+    # ANPR-specific поля (numberPlate/vehicleTypeId/color/brand/model/direction)
+    # сохраняем в их ORM-написании (так как в ORM они camelCase именно так).
     "vd-anpr": [
-        ("event_type",    "string",  None, "Всегда 'anpr'",                  True,  "anpr"),
-        ("camera_id",     "string",  None, "ID камеры",                       True,  "Camera-7"),
-        ("camera_name",   "string",  None, "Имя камеры",                      False, "Шлагбаум"),
-        ("track_id",      "integer", None, "Идентификатор трекинга",          False, 678),
-        ("confidence",    "decimal", None, "Уверенность распознавания",       True,  0.95),
-        ("bbox",          "string",  None, "x1,y1,x2,y2 авто в кадре",        False, "320,180,820,540"),
-        ("image_path",    "string",  None, "Путь к кадру",                    False, "/images/.../anpr.jpg"),
-        ("numberPlate",   "string",  None, "ГРЗ строкой",                     True,  "A123BC777"),
-        ("vehicleTypeId", "integer", None, "Тип авто (внутренний ID)",        False, 1),
-        ("color",         "string",  None, "Цвет авто",                       False, "red"),
-        ("brand",         "string",  None, "Марка",                           False, "Toyota"),
-        ("model",         "string",  None, "Модель",                          False, "Corolla"),
-        ("direction",     "integer", None, "1 = въезд, -1 = выезд",           False, 1),
+        # Общая обвязка детектора (взято из ORM EventNumberPlate):
+        ("event_type",     "string",  None, "Тип события из ORM (= 'anpr')",          True,  "anpr"),
+        ("camera_id",      "string",  None, "ID камеры (ORM Text)",                    True,  "Camera-7"),
+        ("camera_name",    "string",  None, "Имя камеры",                              False, "Шлагбаум"),
+        ("timestamp",      "integer", "ms", "Unix ms (ORM BigInteger)",                True,  1674487988888),
+        ("image_path",     "string",  None, "Путь к полному кадру",                    False, "/images/cam07/.../anpr.jpg"),
+        ("box_image_path", "string",  None, "Путь к кадру с bbox",                     False, "/images/.../anpr_bbox.jpg"),
+        ("confidence",     "decimal", None, "Уверенность 0..1",                        True,  0.95),
+        ("class_id",       "integer", None, "Класс из модели",                          False, 2),
+        ("track_id",       "integer", None, "Идентификатор трекинга",                  False, 678),
+        ("bbox",           "string",  None, "x1,y1,x2,y2 в пикселях (ORM Text)",       False, "320,180,820,540"),
+        # ANPR-специфичные поля (имена ровно как в ORM EventNumberPlate):
+        ("numberPlate",   "string",  None, "ГРЗ строкой (ORM Text)",                   True,  "A465MH154"),
+        ("vehicleTypeId", "integer", None, "Тип ТС (ORM stored as Float, целое по факту)", False, 6),
+        ("color",         "string",  None, "Цвет авто (ORM Text)",                     False, "красный"),
+        ("brand",         "string",  None, "Марка (ORM Text)",                          False, "Hyundai"),
+        ("model",         "string",  None, "Модель (ORM Text)",                         False, "Solaris"),
+        ("direction",     "integer", None, "Направление: 1=въезд, -1=выезд (ORM Integer)", False, 1),
+    ],
+
+    # ── Нетрис: vd-fall (лежащий человек) ──
+    # PDF #13, сценарий 3. Шаблон полей идентичен person, но без атрибутов одежды.
+    "vd-fall": [
+        ("timestamp",         "integer", "ms", "Unix ms",                       True,  1674487988888),
+        ("cameraId",          "string",  None, "UUID камеры",                    True,  "222b6be3-a415-4ae2-a473-e850514b3c10"),
+        ("recognitionTypeId", "string",  None, "Идентификатор модели Нетрис",   True,  "rtk_ngu_sa"),
+        ("eventType",         "string",  None, "Всегда 'fall'",                  True,  "fall"),
+        ("confidence",        "decimal", None, "Уверенность 0..1",               True,  0.723),
+        ("imageBase64",       "string",  None, "Полный кадр в base64",           False, ""),
+        ("boxImageBase64",    "string",  None, "Кроп с bbox в base64",          False, ""),
+        ("box_left",          "decimal", None, "bbox.left (0..1)",               False, 0.634375),
+        ("box_right",         "decimal", None, "bbox.right (0..1)",              False, 0.7054688),
+        ("box_top",           "decimal", None, "bbox.top (0..1)",                False, 0.40555555),
+        ("box_bottom",        "decimal", None, "bbox.bottom (0..1)",             False, 0.44444445),
+    ],
+
+    # ── Нетрис: vd-smoke (детектор дыма) ──
+    # PDF #13, сценарий 5. recognitionTypeId=rtk_ngu_srvr — серверная категория.
+    "vd-smoke": [
+        ("timestamp",         "integer", "ms", "Unix ms",                       True,  1674487988888),
+        ("cameraId",          "string",  None, "UUID камеры",                    True,  "222b6be3-a415-4ae2-a473-e850514b3c10"),
+        ("recognitionTypeId", "string",  None, "Идентификатор модели Нетрис",   True,  "rtk_ngu_srvr"),
+        ("eventType",         "string",  None, "Всегда 'smoke'",                 True,  "smoke"),
+        ("confidence",        "decimal", None, "Уверенность 0..1",               True,  0.723),
+        ("imageBase64",       "string",  None, "Кадр в base64",                  False, ""),
+        ("boxImageBase64",    "string",  None, "Кроп с bbox в base64",          False, ""),
+        ("box_left",          "decimal", None, "bbox.left (0..1)",               False, 0.634375),
+        ("box_right",         "decimal", None, "bbox.right (0..1)",              False, 0.7054688),
+        ("box_top",           "decimal", None, "bbox.top (0..1)",                False, 0.40555555),
+        ("box_bottom",        "decimal", None, "bbox.bottom (0..1)",             False, 0.44444445),
+    ],
+
+    # ── Нетрис: vd-fire (детектор огня) ──
+    "vd-fire": [
+        ("timestamp",         "integer", "ms", "Unix ms",                       True,  1674487988888),
+        ("cameraId",          "string",  None, "UUID камеры",                    True,  "222b6be3-a415-4ae2-a473-e850514b3c10"),
+        ("recognitionTypeId", "string",  None, "Идентификатор модели Нетрис",   True,  "rtk_ngu_srvr"),
+        ("eventType",         "string",  None, "Всегда 'fire'",                  True,  "fire"),
+        ("confidence",        "decimal", None, "Уверенность 0..1",               True,  0.723),
+        ("imageBase64",       "string",  None, "Кадр в base64",                  False, ""),
+        ("boxImageBase64",    "string",  None, "Кроп с bbox в base64",          False, ""),
+        ("box_left",          "decimal", None, "bbox.left (0..1)",               False, 0.634375),
+        ("box_right",         "decimal", None, "bbox.right (0..1)",              False, 0.7054688),
+        ("box_top",           "decimal", None, "bbox.top (0..1)",                False, 0.40555555),
+        ("box_bottom",        "decimal", None, "bbox.bottom (0..1)",             False, 0.44444445),
+    ],
+
+    # ── Нетрис: vd-motion (движение в кадре) ──
+    # PDF #13, сценарий 8. Семейство SA — кроме eventType несёт настройки зон
+    # обнаружения и пересечения линий в самом payload. Здесь храним только
+    # output-поля; settings — отдельная конфигурация на стороне VAS.
+    "vd-motion": [
+        ("timestamp",         "integer", "ms", "Unix ms",                       True,  1674487988888),
+        ("cameraId",          "string",  None, "UUID камеры",                    True,  "222b6be3-a415-4ae2-a473-e850514b3c10"),
+        ("recognitionTypeId", "string",  None, "Идентификатор модели Нетрис",   True,  "rtk_ngu_sa"),
+        ("eventType",         "string",  None, "Всегда 'motion'",                True,  "motion"),
+        ("confidence",        "decimal", None, "Уверенность 0..1",               True,  0.723),
+        ("imageBase64",       "string",  None, "Кадр в base64",                  False, ""),
+        ("boxImageBase64",    "string",  None, "Кроп с bbox в base64",          False, ""),
+        ("box_left",          "decimal", None, "bbox.left (0..1)",               False, 0.634375),
+        ("box_right",         "decimal", None, "bbox.right (0..1)",              False, 0.7054688),
+        ("box_top",           "decimal", None, "bbox.top (0..1)",                False, 0.40555555),
+        ("box_bottom",        "decimal", None, "bbox.bottom (0..1)",             False, 0.44444445),
+    ],
+
+    # ── Нетрис: vd-boost (резкое ускорение объекта) ──
+    "vd-boost": [
+        ("timestamp",         "integer", "ms", "Unix ms",                       True,  1674487988888),
+        ("cameraId",          "string",  None, "UUID камеры",                    True,  "222b6be3-a415-4ae2-a473-e850514b3c10"),
+        ("recognitionTypeId", "string",  None, "Идентификатор модели Нетрис",   True,  "rtk_ngu_sa"),
+        ("eventType",         "string",  None, "Всегда 'boost'",                 True,  "boost"),
+        ("confidence",        "decimal", None, "Уверенность 0..1",               True,  0.723),
+        ("imageBase64",       "string",  None, "Кадр в base64",                  False, ""),
+        ("boxImageBase64",    "string",  None, "Кроп с bbox в base64",          False, ""),
+        ("box_left",          "decimal", None, "bbox.left (0..1)",               False, 0.634375),
+        ("box_right",         "decimal", None, "bbox.right (0..1)",              False, 0.7054688),
+        ("box_top",           "decimal", None, "bbox.top (0..1)",                False, 0.40555555),
+        ("box_bottom",        "decimal", None, "bbox.bottom (0..1)",             False, 0.44444445),
+    ],
+
+    # ── Нетрис: vd-aggressive (агрессивное поведение) ──
+    "vd-aggressive": [
+        ("timestamp",         "integer", "ms", "Unix ms",                       True,  1674487988888),
+        ("cameraId",          "string",  None, "UUID камеры",                    True,  "222b6be3-a415-4ae2-a473-e850514b3c10"),
+        ("recognitionTypeId", "string",  None, "Идентификатор модели Нетрис",   True,  "rtk_ngu_sa"),
+        ("eventType",         "string",  None, "Всегда 'aggressive'",            True,  "aggressive"),
+        ("confidence",        "decimal", None, "Уверенность 0..1",               True,  0.723),
+        ("imageBase64",       "string",  None, "Кадр в base64",                  False, ""),
+        ("boxImageBase64",    "string",  None, "Кроп с bbox в base64",          False, ""),
+        ("box_left",          "decimal", None, "bbox.left (0..1)",               False, 0.634375),
+        ("box_right",         "decimal", None, "bbox.right (0..1)",              False, 0.7054688),
+        ("box_top",           "decimal", None, "bbox.top (0..1)",                False, 0.40555555),
+        ("box_bottom",        "decimal", None, "bbox.bottom (0..1)",             False, 0.44444445),
+    ],
+
+    # ── Войслинк: vd-vehicle-brand (марка/модель/цвет ТС) ──
+    # PDF #14, сценарий 1. Другой формат — нет cameraId / box, зато request_counter.
+    "vd-vehicle-brand": [
+        ("timestamp",       "integer", "ms", "Unix ms",                         True,  1674487988888),
+        ("request_counter", "integer", None, "Счётчик запросов Войслинк",      True,  22),
+        ("message_type",    "integer", None, "Тип сообщения (1 для brand)",     True,  1),
+        ("confidence",      "decimal", None, "Уверенность 0..1",                 True,  0.723),
+        ("color",           "string",  None, "Цвет ТС (uppercase, e.g. RED)",   True,  "RED"),
+        ("vehicle_type",    "integer", None, "Тип ТС (внутренний код)",         True,  6),
+        ("brand",           "string",  None, "Марка",                            True,  "Hyundai"),
+        ("model",           "string",  None, "Модель",                           True,  "Solaris"),
+    ],
+
+    # ── Войслинк: vd-accident (ДТП на перекрестке) ──
+    # PDF #14, сценарий 2. Семейство «event-driven»: event-строка + IDs объектов.
+    "vd-accident": [
+        ("event",        "string",  None, "Всегда 'accident'",            True,  "accident"),
+        ("vehicle1_id",  "integer", None, "ID первого ТС",                 True,  5),
+        ("vehicle2_id",  "integer", None, "ID второго ТС",                 True,  10),
+        ("timestamp",    "integer", "ms", "Unix ms",                       True,  1674487988888),
+        ("box_left",     "decimal", None, "bbox.left (0..1)",              False, 0.634375),
+        ("box_right",    "decimal", None, "bbox.right (0..1)",             False, 0.7054688),
+        ("box_top",      "decimal", None, "bbox.top (0..1)",               False, 0.40555555),
+        ("box_bottom",   "decimal", None, "bbox.bottom (0..1)",            False, 0.44444445),
+        ("accuracy",     "decimal", None, "Уверенность ML 0..1 (синоним confidence в формате Войслинк)", True, 0.92),
+    ],
+
+    # ── Войслинк: vd-stop-in-lane (остановка в полосе) ──
+    "vd-stop-in-lane": [
+        ("event",      "string",  None, "Всегда 'stop'",                  True,  "stop"),
+        ("vehicle_id", "integer", None, "ID ТС",                           True,  7),
+        ("timestamp",  "integer", "ms", "Unix ms",                         True,  1674487988888),
+        ("box_left",   "decimal", None, "bbox.left (0..1)",                False, 0.634375),
+        ("box_right",  "decimal", None, "bbox.right (0..1)",               False, 0.7054688),
+        ("box_top",    "decimal", None, "bbox.top (0..1)",                 False, 0.40555555),
+        ("box_bottom", "decimal", None, "bbox.bottom (0..1)",              False, 0.44444445),
+        ("duration",   "integer", "s",  "Сколько секунд стоит",            True,  60),
+    ],
+
+    # ── Войслинк: vd-dropped-cargo (выпавший груз) ──
+    "vd-dropped-cargo": [
+        ("event",         "string",  None, "Всегда 'dropped'",            True,  "dropped"),
+        ("object_id",     "integer", None, "ID объекта",                  True,  56),
+        ("box_left",      "decimal", None, "bbox.left (0..1)",            False, 0.634375),
+        ("box_right",     "decimal", None, "bbox.right (0..1)",           False, 0.7054688),
+        ("box_top",       "decimal", None, "bbox.top (0..1)",             False, 0.40555555),
+        ("box_bottom",    "decimal", None, "bbox.bottom (0..1)",          False, 0.44444445),
+        ("time_detected", "integer", "s",  "Сколько секунд лежит",        True,  60),
+    ],
+
+    # ── Войслинк: vd-pedestrian (пешеход на дороге) ──
+    "vd-pedestrian": [
+        ("event",         "string",  None, "Всегда 'pedestrian'",         True,  "pedestrian"),
+        ("pedestrian_id", "integer", None, "ID пешехода",                  True,  54),
+        ("box_left",      "decimal", None, "bbox.left (0..1)",             False, 0.634375),
+        ("box_right",     "decimal", None, "bbox.right (0..1)",            False, 0.7054688),
+        ("box_top",       "decimal", None, "bbox.top (0..1)",              False, 0.40555555),
+        ("box_bottom",    "decimal", None, "bbox.bottom (0..1)",           False, 0.44444445),
+        ("accuracy",      "decimal", None, "Уверенность ML 0..1",          True,  0.95),
+    ],
+
+    # ── Войслинк: vd-driver-violation (ремень / телефон) ──
+    "vd-driver-violation": [
+        ("event",        "string",  None, "Всегда 'driver_violation'",         True, "driver_violation"),
+        ("no_seatbelt",  "boolean", None, "true = ремень НЕ пристёгнут",       True, False),
+        ("phone",        "boolean", None, "true = водитель использует телефон", True, True),
+        ("accuracy",     "decimal", None, "Уверенность ML 0..1",                True, 0.91),
     ],
 
     # ── Видеодетектор: trash-bin (из mock-генератора) ──
@@ -272,18 +501,22 @@ SEED_FIELDS: dict[str, list[tuple[str, str, str | None, str, bool, Any]]] = {
         ("lon",          "decimal", None, "Долгота",                      False, 37.6105),
     ],
 
-    # ── Видеодетектор: face (биометрия) ──
+    # ── Нетрис: vd-face (детектор лица человека) — PDF #13, сценарий 1 ──
+    # Формат полностью соответствует JSON-выходу Нетрис: timestamp / cameraId /
+    # recognitionTypeId / eventType / confidence / imageBase64 / boxImageBase64 +
+    # box {left, right, top, bottom} как доли кадра.
     "vd-face": [
-        ("event_type", "string",  None, "Всегда 'face'",                True,  "face"),
-        ("camera_id",  "string",  None, "ID камеры",                    True,  "Camera-1"),
-        ("track_id",   "integer", None, "Трекинг ID",                   False, 99),
-        ("confidence", "decimal", None, "Уверенность детекции",          True,  0.91),
-        ("bbox",       "string",  None, "Bbox лица",                    False, "200,100,280,200"),
-        ("face_id",    "string",  None, "FaceID (если есть в базе)",     False, "FP-12345"),
-        ("emotion",    "string",  None, "happy / sad / neutral / angry", False, "neutral"),
-        ("mask",       "boolean", None, "Маска надета",                  False, False),
-        ("age_group",  "string",  None, "Возрастная группа",             False, "17_35"),
-        ("gender",     "string",  None, "male / female",                 False, "female"),
+        ("timestamp",         "integer", "ms", "Unix ms",                       True,  1674487988888),
+        ("cameraId",          "string",  None, "UUID камеры",                    True,  "222b6be3-a415-4ae2-a473-e850514b3c10"),
+        ("recognitionTypeId", "string",  None, "Идентификатор модели Нетрис",   True,  "rtk_ngu_srvr"),
+        ("eventType",         "string",  None, "Всегда 'face'",                  True,  "face"),
+        ("confidence",        "decimal", None, "Уверенность 0..1",               True,  0.723),
+        ("imageBase64",       "string",  None, "Полный кадр в base64",           False, ""),
+        ("boxImageBase64",    "string",  None, "Кроп с bbox в base64",          False, ""),
+        ("box_left",          "decimal", None, "bbox.left (0..1)",               False, 0.634375),
+        ("box_right",         "decimal", None, "bbox.right (0..1)",              False, 0.7054688),
+        ("box_top",           "decimal", None, "bbox.top (0..1)",                False, 0.40555555),
+        ("box_bottom",        "decimal", None, "bbox.bottom (0..1)",             False, 0.44444445),
     ],
 
     # ── Видеодетектор: vehicle-class ──
@@ -330,13 +563,19 @@ SEED_FIELDS: dict[str, list[tuple[str, str, str | None, str, bool, Any]]] = {
         ("area_id",    "string",  None, "Зона мониторинга",                False, "stadium-sector-3"),
     ],
 
-    # ── Видеодетектор: weapon ──
+    # ── Нетрис: vd-weapon (детектор оружия) — PDF #13, сценарий 7 ──
     "vd-weapon": [
-        ("event_type", "string",  None, "Всегда 'weapon_detected'",       True,  "weapon_detected"),
-        ("camera_id",  "string",  None, "ID камеры",                       True,  "Camera-11"),
-        ("confidence", "decimal", None, "Уверенность",                     True,  0.78),
-        ("bbox",       "string",  None, "Bbox оружия",                     False, "320,200,400,260"),
-        ("weapon_type","string",  None, "knife / firearm / blunt",         False, "knife"),
+        ("timestamp",         "integer", "ms", "Unix ms",                       True,  1674487988888),
+        ("cameraId",          "string",  None, "UUID камеры",                    True,  "222b6be3-a415-4ae2-a473-e850514b3c10"),
+        ("recognitionTypeId", "string",  None, "Идентификатор модели Нетрис",   True,  "rtk_ngu_srvr"),
+        ("eventType",         "string",  None, "Всегда 'weapon'",                True,  "weapon"),
+        ("confidence",        "decimal", None, "Уверенность 0..1",               True,  0.723),
+        ("imageBase64",       "string",  None, "Кадр в base64",                  False, ""),
+        ("boxImageBase64",    "string",  None, "Кроп с bbox в base64",          False, ""),
+        ("box_left",          "decimal", None, "bbox.left (0..1)",               False, 0.634375),
+        ("box_right",         "decimal", None, "bbox.right (0..1)",              False, 0.7054688),
+        ("box_top",           "decimal", None, "bbox.top (0..1)",                False, 0.40555555),
+        ("box_bottom",        "decimal", None, "bbox.bottom (0..1)",             False, 0.44444445),
     ],
 
     # ── Видеодетектор: unattended-bag ──

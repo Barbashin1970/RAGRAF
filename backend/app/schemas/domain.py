@@ -144,14 +144,19 @@ class FlowNode(BaseModel):
     constraintRef: str | None = None
     unit: str | None = None
     # Sensor-specific (только для type == "sensor"):
-    #   sensorType  — категория физического датчика (см. SensorType)
-    #   bindsTo     — id input-ноды, в которую сенсор инжектирует значение.
-    #                 None пока сенсор не привязан (висит на канвасе) — в этом
-    #                 случае executor его игнорирует.
-    #   externalId  — необязательный «ярлык» из ETL (например `edge_1` —
-    #                 идентификатор участка трубопровода). Не используется
-    #                 в логике, но прокидывается обратно в trace для UI.
+    #   sensorType    — категория физического датчика (см. SensorType)
+    #   sensorSubtype — конкретный подтип (например 'vd-anpr', 'fiber-vibration').
+    #                   Если задан, JSON-схема payload берётся из реестра
+    #                   sensor_field_schemas по subtype_id; иначе — из generic-
+    #                   подтипа, у которого subtype_id == sensorType.
+    #   bindsTo       — id input-ноды, в которую сенсор инжектирует значение.
+    #                   None пока сенсор не привязан (висит на канвасе) — в этом
+    #                   случае executor его игнорирует.
+    #   externalId    — необязательный «ярлык» из ETL (например `edge_1` —
+    #                   идентификатор участка трубопровода). Не используется
+    #                   в логике, но прокидывается обратно в trace для UI.
     sensorType: SensorType | None = None
+    sensorSubtype: str | None = None
     bindsTo: str | None = None
     externalId: str | None = None
 
