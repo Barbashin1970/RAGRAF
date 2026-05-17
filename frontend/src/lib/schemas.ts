@@ -183,9 +183,24 @@ export const ruleDslSchema = z.object({
   edges: z.array(flowEdgeSchema),
 })
 
-// ── Sensor field schemas (Библиотека датчиков) ────────────────────────
+// ── Sensor field schemas + subtypes (Библиотека датчиков) ────────────
+export const sensorSubtypeSchema = z.object({
+  subtype_id: z.string(),
+  class_id: z.string(),
+  label: z.string(),
+  description: z.string().nullable().optional(),
+  position: z.number(),
+})
+
+export const sensorClassWithSubtypesSchema = z.object({
+  class_id: z.string(),
+  subtypes: z.array(sensorSubtypeSchema),
+})
+
+export const sensorSubtypesListResponse = z.array(sensorClassWithSubtypesSchema)
+
 export const sensorFieldSchema = z.object({
-  sensor_type: z.string(),
+  subtype_id: z.string(),
   field_name: z.string(),
   datatype: z.enum(['decimal', 'integer', 'string', 'boolean']),
   unit: z.string().nullable().optional(),
@@ -196,7 +211,7 @@ export const sensorFieldSchema = z.object({
 })
 
 export const sensorFieldsByTypeSchema = z.object({
-  sensor_type: z.string(),
+  subtype_id: z.string(),
   fields: z.array(sensorFieldSchema),
 })
 

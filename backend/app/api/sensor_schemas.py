@@ -1,60 +1,118 @@
-"""REST для библиотеки полей датчиков — CRUD над sensor_field_schemas.
+"""REST для библиотеки подтипов датчиков и их полей.
 
-Юзкейсы UI:
-  GET    /api/sensor-schemas               → все типы + их поля
-  GET    /api/sensor-schemas/{type}        → поля одного типа
-  PUT    /api/sensor-schemas/{type}/{field} → создать/обновить поле
-  DELETE /api/sensor-schemas/{type}/{field} → удалить поле
-  POST   /api/sensor-schemas/reseed         → сбросить и пересеять из SEED_FIELDS
+Двух-уровневая модель:
+  GET    /api/sensor-subtypes               → все подтипы, сгруппированные по классам
+  POST   /api/sensor-subtypes               → создать новый подтип (например, новый видеодетектор)
+  PUT    /api/sensor-subtypes/{id}          → обновить мета (label / description / position)
+  DELETE /api/sensor-subtypes/{id}          → удалить подтип (каскадно — его поля)
 
-UI «Библиотека датчиков» — это master-details: список типов слева, таблица
-полей справа, инлайн-форма добавления внизу.
+  GET    /api/sensor-schemas                → все subtype_id → массив полей
+  GET    /api/sensor-schemas/{subtype_id}   → поля одного подтипа
+  PUT    /api/sensor-schemas/{subtype_id}/{field_name} → upsert поле
+  DELETE /api/sensor-schemas/{subtype_id}/{field_name} → удалить
+
+  POST   /api/sensor-schemas/reseed         → сбросить + пересеять (subtypes + fields)
+
+UI «Библиотека датчиков» рендерит дерево: классы (root) → подтипы (children)
+→ таблица полей (right panel).
 """
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
-from app.schemas.domain import SensorField, SensorFieldsByType
+from app.schemas.domain import (
+    SensorClassWithSubtypes,
+    SensorField,
+    SensorFieldsByType,
+    SensorSubtype,
+)
 from app.services import sensor_schema_store
 
 router = APIRouter()
 
 
-@router.get("/sensor-schemas")
-def get_all() -> list[SensorFieldsByType]:
-    """Все типы датчиков + их поля. Структура: массив групп."""
-    grouped = sensor_schema_store.list_all()
+# ── Subtypes ───────────────────────────────────────────────────────────
+
+
+@router.get("/sensor-subtypes")
+def get_subtypes() -> list[SensorClassWithSubtypes]:
+    """Все подтипы, сгруппированные по класс_id — формат для tree-UI."""
+    subs = sensor_schema_store.list_subtypes()
+    grouped: dict[str, list[SensorSubtype]] = {}
+    for s in subs:
+        grouped.setdefault(s.class_id, []).append(s)
     return [
-        SensorFieldsByType(sensor_type=stype, fields=fields)
+        SensorClassWithSubtypes(class_id=cls, subtypes=items)
+        for cls, items in grouped.items()
+    ]
+
+
+@router.post("/sensor-subtypes")
+def create_subtype(payload: SensorSubtype) -> SensorSubtype:
+    if not payload.subtype_id.strip():
+        raise HTTPException(status_code=400, detail="subtype_id обязателен")
+    if not payload.class_id.strip():
+        raise HTTPException(status_code=400, detail="class_id обязателен")
+    existing = sensor_schema_store.get_subtype(payload.subtype_id)
+    if existing is not None:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Подтип '{payload.subtype_id}' уже существует — используйте PUT для обновления",
+        )
+    return sensor_schema_store.upsert_subtype(payload)
+
+
+@router.put("/sensor-subtypes/{subtype_id}")
+def update_subtype(subtype_id: str, payload: SensorSubtype) -> SensorSubtype:
+    if payload.subtype_id != subtype_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"subtype_id в теле ({payload.subtype_id}) не совпадает с URL ({subtype_id})",
+        )
+    return sensor_schema_store.upsert_subtype(payload)
+
+
+@router.delete("/sensor-subtypes/{subtype_id}")
+def remove_subtype(subtype_id: str) -> dict[str, object]:
+    existed = sensor_schema_store.delete_subtype(subtype_id)
+    if not existed:
+        raise HTTPException(status_code=404, detail=f"Подтип '{subtype_id}' не найден")
+    return {"ok": True, "subtype_id": subtype_id}
+
+
+# ── Fields ─────────────────────────────────────────────────────────────
+
+
+@router.get("/sensor-schemas")
+def get_all_fields() -> list[SensorFieldsByType]:
+    grouped = sensor_schema_store.list_all_fields()
+    return [
+        SensorFieldsByType(subtype_id=stype, fields=fields)
         for stype, fields in grouped.items()
     ]
 
 
-@router.get("/sensor-schemas/{sensor_type}")
-def get_for_type(sensor_type: str) -> SensorFieldsByType:
-    fields = sensor_schema_store.list_for_type(sensor_type)
-    return SensorFieldsByType(sensor_type=sensor_type, fields=fields)
+@router.get("/sensor-schemas/{subtype_id}")
+def get_fields_for_subtype(subtype_id: str) -> SensorFieldsByType:
+    fields = sensor_schema_store.list_fields_for_subtype(subtype_id)
+    return SensorFieldsByType(subtype_id=subtype_id, fields=fields)
 
 
-@router.put("/sensor-schemas/{sensor_type}/{field_name}")
-def put_field(sensor_type: str, field_name: str, payload: SensorField) -> SensorField:
-    """Upsert одного поля. URL — source of truth для (sensor_type, field_name);
-    тело может содержать те же поля, но если есть расхождение — 400."""
-    if payload.sensor_type != sensor_type:
+@router.put("/sensor-schemas/{subtype_id}/{field_name}")
+def put_field(subtype_id: str, field_name: str, payload: SensorField) -> SensorField:
+    if payload.subtype_id != subtype_id:
         raise HTTPException(
             status_code=400,
-            detail=f"sensor_type в теле ({payload.sensor_type}) не совпадает с URL ({sensor_type})",
+            detail=f"subtype_id в теле ({payload.subtype_id}) не совпадает с URL ({subtype_id})",
         )
     if payload.field_name != field_name:
         raise HTTPException(
             status_code=400,
             detail=f"field_name в теле ({payload.field_name}) не совпадает с URL ({field_name})",
         )
-    sensor_schema_store.upsert(payload)
-    # Перечитать чтобы вернуть с актуальным `position` (для нового поля он
-    # рассчитывается в store).
+    sensor_schema_store.upsert_field(payload)
     fresh = [
-        f for f in sensor_schema_store.list_for_type(sensor_type)
+        f for f in sensor_schema_store.list_fields_for_subtype(subtype_id)
         if f.field_name == field_name
     ]
     if not fresh:
@@ -62,20 +120,15 @@ def put_field(sensor_type: str, field_name: str, payload: SensorField) -> Sensor
     return fresh[0]
 
 
-@router.delete("/sensor-schemas/{sensor_type}/{field_name}")
-def delete_field(sensor_type: str, field_name: str) -> dict[str, object]:
-    existed = sensor_schema_store.delete(sensor_type, field_name)
+@router.delete("/sensor-schemas/{subtype_id}/{field_name}")
+def delete_field(subtype_id: str, field_name: str) -> dict[str, object]:
+    existed = sensor_schema_store.delete_field(subtype_id, field_name)
     if not existed:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Поле {sensor_type}.{field_name} не найдено",
-        )
-    return {"ok": True, "sensor_type": sensor_type, "field_name": field_name}
+        raise HTTPException(status_code=404, detail=f"Поле {subtype_id}.{field_name} не найдено")
+    return {"ok": True, "subtype_id": subtype_id, "field_name": field_name}
 
 
 @router.post("/sensor-schemas/reseed")
 def reseed() -> dict[str, object]:
-    """Сброс к дефолтному набору полей. Все пользовательские правки теряются —
-    используется при «обнулить библиотеку» из UI."""
-    count = sensor_schema_store.reseed()
-    return {"ok": True, "fields_seeded": count}
+    counts = sensor_schema_store.reseed()
+    return {"ok": True, **counts}

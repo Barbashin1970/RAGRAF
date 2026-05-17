@@ -347,13 +347,16 @@ function FieldSelect({ label, value, onChange, options }: { label: string; value
 
 /**
  * Превью JSON-скелета payload-полей для выбранного типа датчика. Подтягивает
- * из api.sensorSchemas.listForType — это та же библиотека, что и в /sensors.
- * Если sensorType не задан — показываем подсказку.
+ * из api.sensorSchemas.listForSubtype — это та же библиотека, что и в /sensors.
+ *
+ * Сейчас FlowNode хранит `sensorType` (literal класса), без конкретного
+ * подтипа. Поэтому смотрим на «generic»-подтип, у которого subtype_id ==
+ * class_id. Когда расширим FlowNode до `sensorSubtype` — заменим параметр.
  */
 function SensorSchemaPreview({ sensorType }: { sensorType: string | null }) {
   const { data } = useQuery({
     queryKey: ['sensor-schema', sensorType],
-    queryFn: () => api.sensorSchemas.listForType(sensorType!),
+    queryFn: () => api.sensorSchemas.listForSubtype(sensorType!),
     enabled: !!sensorType,
   })
 

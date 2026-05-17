@@ -336,6 +336,41 @@ payload JSON, matched_regulations JSON, levels JSON).
 У нас то же самое: UI «Источники» где аналитик прописывает «датчик
 такой-то шлёт давление с edge_id=12, маппи в регламент pressure-diameter».
 
+### Граф связей × Библиотека датчиков × ETL match-event
+*Complexity: средняя*
+
+Сейчас граф (`/api/graph`, [graph_builder.py](backend/app/services/graph_builder.py)) показывает только `Regulation → Parameter / Constraint / Recommendation`. Каждый регламент — изолированный остров. Это документация структуры, а не runtime-инструмент.
+
+**Гэп**: когда в СИГМУ прилетает событие (например `{"event":"digging","x":3946,"confidence":0.88}`), ETL должен ответить «какой регламент применить». Сейчас связь от полей payload до регламента нигде не материализована — она разбросана по четырём хранилищам:
+- `sensor_field_schemas` знает «у `fiber` есть поля `event`, `x`, `confidence`»
+- `flow.json` знает «регламент R слушает `fiber`-датчик» (FlowNode `type=sensor`)
+- `flow.json` знает «sensor.bindsTo→input.paramRef цепочку»
+- `regulations.parameters` знает «у регламента есть параметр X»
+
+**Что делать**:
+
+1. Расширить `graph_builder` двумя новыми типами вершин и тремя рёбрами:
+   - `SensorClass` (p / t / flow / detector / fiber / noise / air)
+   - `SensorField` (event, pressure, concentration, …)
+   - `SensorClass --has_field--> SensorField`
+   - `Regulation --listens_to--> SensorClass` — собрать через `flow_storage.load_flow(reg.id)`, найти FlowNode типа sensor
+   - `Parameter --fed_by--> SensorClass` — протянуть через `sensor.bindsTo → input.paramRef`
+
+2. UI: toggle «показать датчики» в шапке GraphView. Без него — старая картина. С ним — поверх рисуются sensor-узлы и связи; SensorField'ы свёрнуты по умолчанию (раскрываются кликом по SensorClass).
+
+3. Рантайм-эндпоинт `POST /api/etl/match-event` body=`{description, payload}` → `[{regulation_id, matched_fields, score}]`. Алгоритм:
+   - По ключам payload (`event`, `concentration`, …) найти подходящие `SensorField`
+   - От них поднять на `SensorClass`
+   - Найти регламенты с FlowNode `sensor.sensorType == X`
+   - Вернуть отсортированный список по совпадению полей + required
+
+**Польза**:
+- Методист видит «что в системе связано»: один регламент слушает два датчика, два регламента слушают один датчик, у этого класса датчиков нет ни одного регламента (gap).
+- Оператор при разборе «почему событие не сработало» сразу видит на графе: подходящих регламентов нет.
+- ETL/СИГМА получает HTTP-точку для рутинга событий без знания внутренней структуры RAGRAF.
+
+**Tradeoff**: граф быстро разрастётся (7 SensorClass + ~50 SensorField + cross-edges). Без двух мер станет нечитаемым — нужен collapse/expand по умолчанию и toggle-слой. По сути это означает, что **граф нельзя строить «всё в куче»** — нужно ввести зум-уровни (a-la Camunda Cockpit).
+
 ### «Зеркальный» режим вместо СИГМЫ
 *Complexity: низкая*
 

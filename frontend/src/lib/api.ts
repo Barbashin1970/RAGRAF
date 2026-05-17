@@ -134,12 +134,27 @@ export interface FlowVersion {
   diff_summary?: string | null
 }
 
-// ── Sensor field schemas (Библиотека датчиков) ────────────────────────
-// Зеркалит app/schemas/domain.py: SensorField / SensorFieldsByType.
-// Каждое поле — запись о том, что у датчика типа `sensor_type` есть
-// payload-поле `field_name` определённого `datatype` и т.д.
+// ── Sensor field schemas + subtypes (Библиотека датчиков) ────────────
+// Зеркалит app/schemas/domain.py. Двух-уровневая структура:
+//   class_id ('detector', 'fiber', ...) — литерал SensorType
+//   subtype_id ('vd-anpr', 'fiber-vibration', ...) — конкретная модель,
+//                                                    содержит свои поля
+// Поля живут под subtype_id, а не под class_id.
+export interface SensorSubtype {
+  subtype_id: string
+  class_id: string
+  label: string
+  description?: string | null
+  position: number
+}
+
+export interface SensorClassWithSubtypes {
+  class_id: string
+  subtypes: SensorSubtype[]
+}
+
 export interface SensorFieldSchema {
-  sensor_type: string
+  subtype_id: string
   field_name: string
   datatype: 'decimal' | 'integer' | 'string' | 'boolean'
   unit?: string | null
@@ -150,7 +165,7 @@ export interface SensorFieldSchema {
 }
 
 export interface SensorFieldsByType {
-  sensor_type: string
+  subtype_id: string
   fields: SensorFieldSchema[]
 }
 
@@ -213,6 +228,8 @@ import {
   sensorFieldSchema,
   sensorFieldsByTypeSchema,
   sensorSchemasListResponse,
+  sensorSubtypeSchema,
+  sensorSubtypesListResponse,
   shaclImportResponseSchema,
   sigmaImportResponseSchema,
   sourceUploadResponseSchema,
@@ -581,31 +598,56 @@ export const api = {
       ),
     getConfig: () => request<RaguConfig>(`/api/ragu/config`),
   },
-  // ── Библиотека полей датчиков ───────────────────────────────────────
-  // CRUD над DuckDB-таблицей sensor_field_schemas: позволяет аналитику
-  // добавлять/менять payload-поля для типов датчиков без правок кода.
+  // ── Библиотека датчиков: подтипы + их поля ─────────────────────────
+  // Двух-уровневая структура.
+  //   Класс (литерал SensorType) — статичен в коде.
+  //   Подтип — конкретная модель, добавляется/удаляется из UI.
+  //   Поля привязаны к подтипу.
+  // Аналитик через эти endpoints добавляет 20+ видеодетекторов или
+  // DAS-подтипов без правок в коде.
+  sensorSubtypes: {
+    list: () =>
+      request(`/api/sensor-subtypes`, undefined, sensorSubtypesListResponse),
+    create: (sub: SensorSubtype) =>
+      request(
+        `/api/sensor-subtypes`,
+        { method: 'POST', body: JSON.stringify(sub) },
+        sensorSubtypeSchema,
+      ),
+    update: (subtypeId: string, sub: SensorSubtype) =>
+      request(
+        `/api/sensor-subtypes/${encodeURIComponent(subtypeId)}`,
+        { method: 'PUT', body: JSON.stringify(sub) },
+        sensorSubtypeSchema,
+      ),
+    delete: (subtypeId: string) =>
+      request<{ ok: boolean; subtype_id: string }>(
+        `/api/sensor-subtypes/${encodeURIComponent(subtypeId)}`,
+        { method: 'DELETE' },
+      ),
+  },
   sensorSchemas: {
     list: () =>
       request(`/api/sensor-schemas`, undefined, sensorSchemasListResponse),
-    listForType: (sensorType: string) =>
+    listForSubtype: (subtypeId: string) =>
       request(
-        `/api/sensor-schemas/${encodeURIComponent(sensorType)}`,
+        `/api/sensor-schemas/${encodeURIComponent(subtypeId)}`,
         undefined,
         sensorFieldsByTypeSchema,
       ),
-    upsert: (sensorType: string, fieldName: string, body: SensorFieldSchema) =>
+    upsert: (subtypeId: string, fieldName: string, body: SensorFieldSchema) =>
       request(
-        `/api/sensor-schemas/${encodeURIComponent(sensorType)}/${encodeURIComponent(fieldName)}`,
+        `/api/sensor-schemas/${encodeURIComponent(subtypeId)}/${encodeURIComponent(fieldName)}`,
         { method: 'PUT', body: JSON.stringify(body) },
         sensorFieldSchema,
       ),
-    delete: (sensorType: string, fieldName: string) =>
-      request<{ ok: boolean; sensor_type: string; field_name: string }>(
-        `/api/sensor-schemas/${encodeURIComponent(sensorType)}/${encodeURIComponent(fieldName)}`,
+    delete: (subtypeId: string, fieldName: string) =>
+      request<{ ok: boolean; subtype_id: string; field_name: string }>(
+        `/api/sensor-schemas/${encodeURIComponent(subtypeId)}/${encodeURIComponent(fieldName)}`,
         { method: 'DELETE' },
       ),
     reseed: () =>
-      request<{ ok: boolean; fields_seeded: number }>(
+      request<{ ok: boolean; subtypes_seeded: number; fields_seeded: number }>(
         `/api/sensor-schemas/reseed`,
         { method: 'POST' },
       ),

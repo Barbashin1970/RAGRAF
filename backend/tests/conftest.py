@@ -30,12 +30,22 @@ def isolated_data_dir(tmp_path, monkeypatch):
     importlib.reload(config_mod)
     from app.services import regulation_store
     importlib.reload(regulation_store)
+    # sensor_schema_store держит свой singleton-_conn; без reload он
+    # выживает между тестами и проносит данные одного теста в следующий.
+    from app.services import sensor_schema_store
+    importlib.reload(sensor_schema_store)
     yield
-    # cleanup: закрыть DuckDB connection
+    # cleanup: закрыть DuckDB connections обоих stores
     try:
         if regulation_store._conn is not None:
             regulation_store._conn.close()
             regulation_store._conn = None
+    except Exception:
+        pass
+    try:
+        if sensor_schema_store._conn is not None:
+            sensor_schema_store._conn.close()
+            sensor_schema_store._conn = None
     except Exception:
         pass
 

@@ -1,81 +1,105 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, RefreshCw, Save, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Plus, RefreshCw, Save, Trash2, X } from 'lucide-react'
 import {
   api,
   NODE_KIND_META,
   SENSOR_TYPE_META,
+  type SensorClassWithSubtypes,
   type SensorFieldSchema,
+  type SensorSubtype,
   type SensorType,
 } from '@/lib/api'
 import { Button } from '@/components/ui'
 import { cn } from '@/lib/cn'
 
 /**
- * Экран «Библиотека датчиков»: master-details для CRUD над DuckDB-таблицей
- * sensor_field_schemas.
+ * «Библиотека датчиков» — CRUD для дерева классов / подтипов / полей.
  *
- * Layout:
- *   ┌────────────────┬──────────────────────────────────────────┐
- *   │ Типы датчиков  │  Поля выбранного типа                    │
- *   │  ▢ p           │  ┌─ name ──── type ── unit ─── desc ──┐  │
- *   │  ▢ t           │  │ pressure   decimal атм   …          │  │
- *   │  ▢ flow ▾      │  └──────────────────────────────────────┘ │
- *   │  ▢ air         │  [ + Добавить поле ]                      │
- *   │  ▢ detector    │                                            │
- *   │  ▢ fiber       │  JSON-превью (payload-skeleton)            │
- *   │  ▢ noise       │  { "pressure": 20.5, "reference": ... }   │
- *   └────────────────┴──────────────────────────────────────────┘
+ *  Tree (left)                 Details (right)
+ *  ▼ Видеодетекторы (10)        Поля выбранного подтипа (например vd-anpr):
+ *    ▢ CCTV (общий)              ┌ name ───── type ── unit ── desc ────┐
+ *    ▢ vd-anpr                  │ numberPlate string —    ГРЗ строкой │
+ *    ▢ vd-person                 └──────────────────────────────────────┘
+ *    ▢ vd-trash-bin              [ + Добавить поле ]
+ *    [ + Добавить подтип ]
+ *  ▼ Оптоволокно DAS (3)        JSON-пример события (skeleton):
+ *    ▢ DAS — акустика            { description, timestamp, payload: {…} }
+ *    ▢ fiber-vibration
+ *    ▢ fiber-temperature
+ *  ▼ Давление (1)
+ *    ▢ Манометр (общий)
+ *  …
  *
- * Source-of-truth — backend. Все правки идут через api.sensorSchemas.upsert/
- * delete и мгновенно invalidate'ят react-query кеш.
+ * Все правки идут через REST → DuckDB; queryClient инвалидируется после
+ * каждого upsert/delete.
  */
 
 const DATATYPES: Array<SensorFieldSchema['datatype']> = ['decimal', 'integer', 'string', 'boolean']
 
 export function SensorLibraryScreen() {
   const qc = useQueryClient()
-  const { data: all = [], isLoading } = useQuery({
-    queryKey: ['sensor-schemas'],
-    queryFn: () => api.sensorSchemas.list(),
+  const { data: classes = [], isLoading } = useQuery({
+    queryKey: ['sensor-subtypes'],
+    queryFn: () => api.sensorSubtypes.list(),
   })
 
-  const [selectedType, setSelectedType] = useState<string>('p')
-  const [draftField, setDraftField] = useState<SensorFieldSchema | null>(null)
+  // expandedClasses — какие классы раскрыты в дереве. По умолчанию открыт detector
+  // (с большим количеством видеодетекторов).
+  const [expandedClasses, setExpandedClasses] = useState<Set<string>>(
+    () => new Set(['detector']),
+  )
+  const toggleClass = (cls: string) => {
+    setExpandedClasses((s) => {
+      const next = new Set(s)
+      if (next.has(cls)) next.delete(cls)
+      else next.add(cls)
+      return next
+    })
+  }
 
-  const upsert = useMutation({
-    mutationFn: (f: SensorFieldSchema) => api.sensorSchemas.upsert(f.sensor_type, f.field_name, f),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sensor-schemas'] }),
+  const [selectedSubtype, setSelectedSubtype] = useState<string | null>('detector')
+  const [draftSubtype, setDraftSubtype] = useState<{ class_id: string } | null>(null)
+
+  const createSubtype = useMutation({
+    mutationFn: (sub: SensorSubtype) => api.sensorSubtypes.create(sub),
+    onSuccess: (created) => {
+      qc.invalidateQueries({ queryKey: ['sensor-subtypes'] })
+      setSelectedSubtype(created.subtype_id)
+      setDraftSubtype(null)
+    },
   })
-  const remove = useMutation({
-    mutationFn: ({ st, fn }: { st: string; fn: string }) => api.sensorSchemas.delete(st, fn),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sensor-schemas'] }),
+
+  const deleteSubtype = useMutation({
+    mutationFn: (subtypeId: string) => api.sensorSubtypes.delete(subtypeId),
+    onSuccess: (_, subtypeId) => {
+      qc.invalidateQueries({ queryKey: ['sensor-subtypes'] })
+      qc.invalidateQueries({ queryKey: ['sensor-schema', subtypeId] })
+      if (selectedSubtype === subtypeId) setSelectedSubtype(null)
+    },
   })
+
   const reseed = useMutation({
     mutationFn: () => api.sensorSchemas.reseed(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sensor-schemas'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sensor-subtypes'] })
+      qc.invalidateQueries({ queryKey: ['sensor-schema'] })
+    },
   })
-
-  const currentGroup = useMemo(
-    () => all.find((g) => g.sensor_type === selectedType),
-    [all, selectedType],
-  )
 
   return (
     <div className="flex h-full flex-col bg-stone-50">
       <header className="flex items-center gap-3 border-b border-stone-200 bg-white px-5 py-3">
         <div className="flex items-center gap-2">
-          <div className={cn('rf-node rf-node--sensor', 'min-h-0 min-w-0')} style={{ minHeight: 0, minWidth: 0 }}>
+          <div className="rf-node rf-node--sensor" style={{ minHeight: 0, minWidth: 0 }}>
             <div className="rf-node__icon !w-7">
-              {NODE_KIND_META.sensor.icon && (
-                <NODE_KIND_META.sensor.icon size={14} />
-              )}
+              {NODE_KIND_META.sensor.icon && <NODE_KIND_META.sensor.icon size={14} />}
             </div>
           </div>
           <div>
             <h1 className="text-base font-semibold text-stone-900">Библиотека датчиков</h1>
             <p className="text-xs text-stone-500">
-              Поля payload для каждого типа датчика. Используется в редакторе потока и валидации входящих событий.
+              Классы и подтипы датчиков. Поля payload настраиваются под конкретный подтип — для добавления нового достаточно нажать «+ Добавить подтип» и описать его поля.
             </p>
           </div>
         </div>
@@ -85,12 +109,11 @@ export function SensorLibraryScreen() {
             variant="ghost"
             icon={<RefreshCw size={13} />}
             onClick={() => {
-              if (confirm('Сбросить все правки и пересеять дефолтный набор?')) {
+              if (confirm('Сбросить ВСЕ правки и пересеять дефолтный набор подтипов и полей?')) {
                 reseed.mutate()
               }
             }}
             loading={reseed.isPending}
-            title="Восстановить дефолтный сид (все пользовательские правки потеряются)"
           >
             Пересеять
           </Button>
@@ -98,75 +121,47 @@ export function SensorLibraryScreen() {
       </header>
 
       <div className="flex min-h-0 flex-1">
-        {/* Master: типы датчиков */}
-        <aside className="flex w-56 shrink-0 flex-col gap-1 overflow-y-auto border-r border-stone-200 bg-white p-3">
+        {/* Левая колонка: дерево классов / подтипов */}
+        <aside className="flex w-72 shrink-0 flex-col overflow-y-auto border-r border-stone-200 bg-white p-3">
           <div className="mb-1 px-1 text-[10px] font-semibold uppercase tracking-wide text-stone-500">
-            Типы датчиков
+            Классы и подтипы
           </div>
           {isLoading && <div className="px-2 text-xs text-stone-500">Загрузка…</div>}
-          {all.map((g) => {
-            const meta = SENSOR_TYPE_META[g.sensor_type as SensorType]
-            const active = g.sensor_type === selectedType
-            return (
-              <button
-                key={g.sensor_type}
-                type="button"
-                onClick={() => setSelectedType(g.sensor_type)}
-                className={cn(
-                  'flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left text-sm transition',
-                  active
-                    ? 'border-stone-400 bg-stone-100 font-semibold'
-                    : 'border-stone-200 bg-white hover:bg-stone-50',
-                )}
-              >
-                <span className="flex items-center gap-1.5">
-                  <span
-                    className={cn(
-                      'inline-flex h-5 w-5 items-center justify-center rounded-md font-mono text-[10px] font-bold',
-                      meta?.bg ?? 'bg-stone-100', meta?.fg ?? 'text-stone-700',
-                    )}
-                  >
-                    {meta?.short ?? g.sensor_type[0]?.toUpperCase()}
-                  </span>
-                  <span className="truncate">{meta?.label ?? g.sensor_type}</span>
-                </span>
-                <span className="font-mono text-[10px] text-stone-500">{g.fields.length}</span>
-              </button>
-            )
-          })}
-        </aside>
-
-        {/* Details: поля выбранного типа */}
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-          {currentGroup ? (
-            <FieldsEditor
-              group={currentGroup}
-              draftField={draftField}
-              onStartDraft={() => setDraftField({
-                sensor_type: selectedType,
-                field_name: '',
-                datatype: 'decimal',
-                unit: null,
-                description: null,
-                required: false,
-                example_value: null,
-                position: 0,
-              })}
-              onCancelDraft={() => setDraftField(null)}
-              onSaveDraft={(f) => {
-                upsert.mutate(f, { onSuccess: () => setDraftField(null) })
+          {classes.map((cls) => (
+            <ClassTreeNode
+              key={cls.class_id}
+              cls={cls}
+              expanded={expandedClasses.has(cls.class_id)}
+              onToggle={() => toggleClass(cls.class_id)}
+              selectedSubtype={selectedSubtype}
+              onSelectSubtype={(id) => {
+                setSelectedSubtype(id)
+                setDraftSubtype(null)
               }}
-              onUpdate={(f) => upsert.mutate(f)}
-              onDelete={(f) => {
-                if (confirm(`Удалить поле «${f.field_name}» из типа «${f.sensor_type}»?`)) {
-                  remove.mutate({ st: f.sensor_type, fn: f.field_name })
+              draftActive={draftSubtype?.class_id === cls.class_id}
+              onStartDraft={() => {
+                setDraftSubtype({ class_id: cls.class_id })
+                if (!expandedClasses.has(cls.class_id)) toggleClass(cls.class_id)
+              }}
+              onCancelDraft={() => setDraftSubtype(null)}
+              onCreateDraft={(sub) => createSubtype.mutate(sub)}
+              creatingDraft={createSubtype.isPending}
+              onDeleteSubtype={(subtypeId, label) => {
+                if (confirm(`Удалить подтип «${label}»? Его поля будут удалены каскадно.`)) {
+                  deleteSubtype.mutate(subtypeId)
                 }
               }}
-              saving={upsert.isPending}
             />
+          ))}
+        </aside>
+
+        {/* Правая колонка: поля выбранного подтипа */}
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          {selectedSubtype ? (
+            <FieldsEditor subtypeId={selectedSubtype} classes={classes} />
           ) : (
             <div className="grid flex-1 place-items-center text-sm text-stone-500">
-              Выберите тип датчика слева
+              Выберите подтип в дереве слева
             </div>
           )}
         </main>
@@ -175,105 +170,318 @@ export function SensorLibraryScreen() {
   )
 }
 
-interface FieldsEditorProps {
-  group: { sensor_type: string; fields: SensorFieldSchema[] }
-  draftField: SensorFieldSchema | null
+
+// ── Tree-node для одного класса (collapsible) ─────────────────────────
+
+
+interface ClassTreeNodeProps {
+  cls: SensorClassWithSubtypes
+  expanded: boolean
+  onToggle: () => void
+  selectedSubtype: string | null
+  onSelectSubtype: (id: string) => void
+  draftActive: boolean
   onStartDraft: () => void
   onCancelDraft: () => void
-  onSaveDraft: (f: SensorFieldSchema) => void
-  onUpdate: (f: SensorFieldSchema) => void
-  onDelete: (f: SensorFieldSchema) => void
-  saving: boolean
+  onCreateDraft: (sub: SensorSubtype) => void
+  creatingDraft: boolean
+  onDeleteSubtype: (id: string, label: string) => void
 }
 
-function FieldsEditor({
-  group, draftField, onStartDraft, onCancelDraft, onSaveDraft, onUpdate, onDelete, saving,
-}: FieldsEditorProps) {
-  const meta = SENSOR_TYPE_META[group.sensor_type as SensorType]
+function ClassTreeNode({
+  cls,
+  expanded,
+  onToggle,
+  selectedSubtype,
+  onSelectSubtype,
+  draftActive,
+  onStartDraft,
+  onCancelDraft,
+  onCreateDraft,
+  creatingDraft,
+  onDeleteSubtype,
+}: ClassTreeNodeProps) {
+  const meta = SENSOR_TYPE_META[cls.class_id as SensorType]
+  return (
+    <div className="mb-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-1 rounded-md px-1 py-1 text-left text-sm hover:bg-stone-50"
+      >
+        {expanded ? <ChevronDown size={14} className="text-stone-500" /> : <ChevronRight size={14} className="text-stone-500" />}
+        <span
+          className={cn(
+            'inline-flex h-5 w-5 items-center justify-center rounded-md font-mono text-[10px] font-bold',
+            meta?.bg ?? 'bg-stone-100', meta?.fg ?? 'text-stone-700',
+          )}
+        >
+          {meta?.short ?? cls.class_id[0]?.toUpperCase()}
+        </span>
+        <span className="flex-1 truncate font-medium text-stone-800">
+          {meta?.label ?? cls.class_id}
+        </span>
+        <span className="font-mono text-[10px] text-stone-500">{cls.subtypes.length}</span>
+      </button>
+      {expanded && (
+        <div className="mt-0.5 ml-3 border-l border-stone-200 pl-2">
+          {cls.subtypes.map((sub) => {
+            const active = sub.subtype_id === selectedSubtype
+            const isGeneric = sub.subtype_id === cls.class_id
+            return (
+              <div key={sub.subtype_id} className="group flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => onSelectSubtype(sub.subtype_id)}
+                  className={cn(
+                    'flex flex-1 items-center gap-1 truncate rounded px-1.5 py-1 text-left text-[12px]',
+                    active ? 'bg-stone-100 font-semibold text-stone-900' : 'text-stone-700 hover:bg-stone-50',
+                  )}
+                  title={sub.description ?? sub.label}
+                >
+                  <span className="truncate">{sub.label}</span>
+                </button>
+                {!isGeneric && (
+                  <button
+                    type="button"
+                    onClick={() => onDeleteSubtype(sub.subtype_id, sub.label)}
+                    className="invisible rounded p-0.5 text-rose-600 hover:bg-rose-50 group-hover:visible"
+                    title="Удалить подтип"
+                  >
+                    <Trash2 size={11} />
+                  </button>
+                )}
+              </div>
+            )
+          })}
+          {draftActive ? (
+            <DraftSubtypeRow
+              classId={cls.class_id}
+              onCancel={onCancelDraft}
+              onCreate={onCreateDraft}
+              creating={creatingDraft}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={onStartDraft}
+              className="mt-1 flex w-full items-center gap-1 rounded px-1.5 py-1 text-[11px] text-primary hover:bg-stone-50"
+            >
+              <Plus size={11} />
+              Добавить подтип
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+
+function DraftSubtypeRow({
+  classId, onCancel, onCreate, creating,
+}: { classId: string; onCancel: () => void; onCreate: (sub: SensorSubtype) => void; creating: boolean }) {
+  const [subtypeId, setSubtypeId] = useState('')
+  const [label, setLabel] = useState('')
+  return (
+    <div className="mt-1 flex flex-col gap-1 rounded border border-amber-300 bg-amber-50 p-2">
+      <input
+        className="rounded border border-stone-300 px-1.5 py-1 font-mono text-[11px]"
+        placeholder="subtype_id (например vd-license-plate)"
+        value={subtypeId}
+        onChange={(e) => setSubtypeId(e.target.value)}
+        autoFocus
+      />
+      <input
+        className="rounded border border-stone-300 px-1.5 py-1 text-[11px]"
+        placeholder="Название для UI"
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+      />
+      <div className="flex items-center justify-end gap-1">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="rounded p-1 text-stone-500 hover:bg-stone-100"
+          title="Отмена"
+        >
+          <X size={12} />
+        </button>
+        <Button
+          size="sm"
+          variant="primary"
+          icon={<Save size={11} />}
+          disabled={!subtypeId.trim() || !label.trim() || creating}
+          loading={creating}
+          onClick={() => onCreate({
+            subtype_id: subtypeId.trim(),
+            class_id: classId,
+            label: label.trim(),
+            description: null,
+            position: 0,
+          })}
+        >
+          Создать
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+
+// ── Правая колонка: поля выбранного подтипа ───────────────────────────
+
+
+interface FieldsEditorProps {
+  subtypeId: string
+  classes: SensorClassWithSubtypes[]
+}
+
+function FieldsEditor({ subtypeId, classes }: FieldsEditorProps) {
+  const qc = useQueryClient()
+  const { data, isLoading } = useQuery({
+    queryKey: ['sensor-schema', subtypeId],
+    queryFn: () => api.sensorSchemas.listForSubtype(subtypeId),
+  })
+
+  const [draftField, setDraftField] = useState<SensorFieldSchema | null>(null)
+
+  const upsert = useMutation({
+    mutationFn: (f: SensorFieldSchema) => api.sensorSchemas.upsert(f.subtype_id, f.field_name, f),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['sensor-schema', subtypeId] })
+    },
+  })
+
+  const remove = useMutation({
+    mutationFn: (fieldName: string) => api.sensorSchemas.delete(subtypeId, fieldName),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['sensor-schema', subtypeId] }),
+  })
+
+  // Найти подтип и его класс — для отрисовки заголовка.
+  const subtypeMeta = useMemo(() => {
+    for (const c of classes) {
+      const found = c.subtypes.find((s) => s.subtype_id === subtypeId)
+      if (found) return { sub: found, classId: c.class_id }
+    }
+    return null
+  }, [classes, subtypeId])
+
+  const fields = data?.fields ?? []
+
   return (
     <div className="flex flex-col gap-4 p-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span
-            className={cn(
-              'inline-flex h-6 w-6 items-center justify-center rounded-md font-mono text-xs font-bold',
-              meta?.bg ?? 'bg-stone-100', meta?.fg ?? 'text-stone-700',
-            )}
-          >
-            {meta?.short ?? group.sensor_type[0]?.toUpperCase()}
-          </span>
+          {subtypeMeta && (() => {
+            const m = SENSOR_TYPE_META[subtypeMeta.classId as SensorType]
+            return (
+              <span
+                className={cn(
+                  'inline-flex h-6 w-6 items-center justify-center rounded-md font-mono text-xs font-bold',
+                  m?.bg ?? 'bg-stone-100', m?.fg ?? 'text-stone-700',
+                )}
+              >
+                {m?.short ?? subtypeMeta.classId[0]?.toUpperCase()}
+              </span>
+            )
+          })()}
           <h2 className="text-sm font-semibold text-stone-800">
-            {meta?.label ?? group.sensor_type}
-            <span className="ml-2 font-mono text-xs text-stone-500">({group.sensor_type})</span>
+            {subtypeMeta?.sub.label ?? subtypeId}
+            <span className="ml-2 font-mono text-xs text-stone-500">({subtypeId})</span>
           </h2>
         </div>
         <Button
           size="sm"
           variant="primary"
           icon={<Plus size={13} />}
-          onClick={onStartDraft}
+          onClick={() => setDraftField({
+            subtype_id: subtypeId,
+            field_name: '',
+            datatype: 'decimal',
+            unit: null,
+            description: null,
+            required: false,
+            example_value: null,
+            position: 0,
+          })}
           disabled={draftField !== null}
         >
           Добавить поле
         </Button>
       </div>
 
-      <table className="w-full table-fixed text-sm">
-        <thead>
-          <tr className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
-            <th className="w-1/5 py-2 pr-2 font-medium">Поле</th>
-            <th className="w-[100px] py-2 pr-2 font-medium">Тип</th>
-            <th className="w-[90px] py-2 pr-2 font-medium">Ед.</th>
-            <th className="py-2 pr-2 font-medium">Описание</th>
-            <th className="w-[80px] py-2 pr-2 text-center font-medium">Обяз.</th>
-            <th className="w-[140px] py-2 pr-2 font-medium">Пример</th>
-            <th className="w-[80px] py-2"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {group.fields.map((f) => (
-            <FieldRow key={f.field_name} field={f} onSave={onUpdate} onDelete={onDelete} saving={saving} />
-          ))}
-          {draftField && (
-            <FieldRow
-              field={draftField}
-              isDraft
-              onSave={onSaveDraft}
-              onCancel={onCancelDraft}
-              saving={saving}
-            />
-          )}
-          {group.fields.length === 0 && !draftField && (
-            <tr>
-              <td colSpan={7} className="py-6 text-center text-sm text-stone-500">
-                У типа пока нет полей. Нажмите «Добавить поле».
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+      {isLoading ? (
+        <div className="text-sm text-stone-500">Загрузка полей…</div>
+      ) : (
+        <>
+          <table className="w-full table-fixed text-sm">
+            <thead>
+              <tr className="border-b border-stone-200 text-left text-xs uppercase tracking-wide text-stone-500">
+                <th className="w-1/5 py-2 pr-2 font-medium">Поле</th>
+                <th className="w-[100px] py-2 pr-2 font-medium">Тип</th>
+                <th className="w-[90px] py-2 pr-2 font-medium">Ед.</th>
+                <th className="py-2 pr-2 font-medium">Описание</th>
+                <th className="w-[80px] py-2 pr-2 text-center font-medium">Обяз.</th>
+                <th className="w-[140px] py-2 pr-2 font-medium">Пример</th>
+                <th className="w-[80px] py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {fields.map((f) => (
+                <FieldRow
+                  key={f.field_name}
+                  field={f}
+                  onSave={(updated) => upsert.mutate(updated)}
+                  onDelete={() => {
+                    if (confirm(`Удалить поле «${f.field_name}»?`)) remove.mutate(f.field_name)
+                  }}
+                  saving={upsert.isPending}
+                />
+              ))}
+              {draftField && (
+                <FieldRow
+                  field={draftField}
+                  isDraft
+                  onSave={(f) => {
+                    upsert.mutate(f, { onSuccess: () => setDraftField(null) })
+                  }}
+                  onCancel={() => setDraftField(null)}
+                  saving={upsert.isPending}
+                />
+              )}
+              {fields.length === 0 && !draftField && (
+                <tr>
+                  <td colSpan={7} className="py-6 text-center text-sm text-stone-500">
+                    У подтипа нет полей. Нажмите «Добавить поле».
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
 
-      <JsonPreview group={group} />
+          <JsonPreview subtypeId={subtypeId} fields={fields} />
+        </>
+      )}
     </div>
   )
 }
+
+
+// ── Field row (inline-редактирование) ─────────────────────────────────
+
 
 interface FieldRowProps {
   field: SensorFieldSchema
   isDraft?: boolean
   onSave: (f: SensorFieldSchema) => void
   onCancel?: () => void
-  onDelete?: (f: SensorFieldSchema) => void
+  onDelete?: () => void
   saving: boolean
 }
 
 function FieldRow({ field, isDraft, onSave, onCancel, onDelete, saving }: FieldRowProps) {
   const [local, setLocal] = useState<SensorFieldSchema>(field)
-  // Когда снаружи приходит обновлённый field (например после успешного save),
-  // ресинхронимся. Не делаем useEffect — local держится правкой ровно одной
-  // строки; пользователь либо «Сохранил» (и пушится через onSave), либо
-  // переключился на другую строку, локальный state создастся заново.
-
   const dirty = JSON.stringify(local) !== JSON.stringify(field)
 
   return (
@@ -340,6 +548,7 @@ function FieldRow({ field, isDraft, onSave, onCancel, onDelete, saving }: FieldR
                 variant="primary"
                 icon={<Save size={11} />}
                 disabled={!local.field_name.trim() || saving}
+                loading={saving}
                 onClick={() => onSave(local)}
               >
                 Создать
@@ -368,7 +577,7 @@ function FieldRow({ field, isDraft, onSave, onCancel, onDelete, saving }: FieldR
                 <Save size={13} />
               </button>
               <button
-                onClick={() => onDelete?.(local)}
+                onClick={onDelete}
                 className="rounded p-1 text-rose-600 hover:bg-rose-50"
                 title="Удалить поле"
                 type="button"
@@ -383,18 +592,17 @@ function FieldRow({ field, isDraft, onSave, onCancel, onDelete, saving }: FieldR
   )
 }
 
-/**
- * JSON-skeleton текущей конфигурации полей. Отрисовывается под таблицей и в
- * PropertyPanel sensor-ноды (см. флоу-редактор). Аналитик копирует это как
- * образец payload для своего датчика.
- */
-function JsonPreview({ group }: { group: { sensor_type: string; fields: SensorFieldSchema[] } }) {
+
+// ── JSON-preview под таблицей ─────────────────────────────────────────
+
+
+function JsonPreview({ subtypeId, fields }: { subtypeId: string; fields: SensorFieldSchema[] }) {
   const payload: Record<string, unknown> = {}
-  for (const f of group.fields) {
+  for (const f of fields) {
     payload[f.field_name] = decodeExample(f)
   }
   const wrapped = {
-    description: `<краткое описание события от датчика ${group.sensor_type}>`,
+    description: `<событие от ${subtypeId}>`,
     timestamp: '2026-05-17T08:42:11Z',
     payload,
   }
@@ -408,26 +616,13 @@ function JsonPreview({ group }: { group: { sensor_type: string; fields: SensorFi
   )
 }
 
-/**
- * Распарсить example_value (JSON-строка) в подходящий sample.
- * Если distorted/empty — даём дефолт по datatype.
- */
 function decodeExample(f: SensorFieldSchema): unknown {
   if (f.example_value) {
-    try {
-      return JSON.parse(f.example_value)
-    } catch {
-      return f.example_value
-    }
+    try { return JSON.parse(f.example_value) } catch { return f.example_value }
   }
   switch (f.datatype) {
-    case 'decimal':
-    case 'integer':
-      return 0
-    case 'boolean':
-      return false
-    case 'string':
-    default:
-      return ''
+    case 'decimal': case 'integer': return 0
+    case 'boolean': return false
+    case 'string': default: return ''
   }
 }

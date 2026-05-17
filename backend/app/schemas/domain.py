@@ -241,9 +241,28 @@ class GraphPayload(BaseModel):
 # реальный referral; начальный seed строится из этого справочника.
 
 
+class SensorSubtype(BaseModel):
+    """Подтип датчика — конкретная модель внутри класса.
+
+    Класс — это литерал `SensorType` ('detector', 'fiber', …) — coarse-grained
+    семейство (видеодетектор / оптоволокно DAS / …). Подтип — конкретный
+    «продукт» внутри класса (ANPR / person / trash-bin / das-vibration /
+    das-acoustic). У каждого подтипа свой набор payload-полей.
+
+    Под одним классом могут быть desятки подтипов (например, ~20
+    видеодетекторов). Аналитик добавляет их из UI через CRUD на /sensors —
+    никаких правок в коде не требуется.
+    """
+    subtype_id: str             # глобально уникальный, kebab-case: 'anpr', 'das-acoustic'
+    class_id: str               # один из литералов SensorType: 'detector', 'fiber', ...
+    label: str                  # 'ANPR (распознавание ГРЗ)' — для UI
+    description: str | None = None
+    position: int = 0           # порядок внутри класса
+
+
 class SensorField(BaseModel):
-    """Описание одного поля payload-объекта датчика."""
-    sensor_type: str  # 'p' / 't' / 'flow' / 'noise' / 'detector' / 'fiber' / 'air'
+    """Описание одного поля payload-объекта датчика. Привязано к подтипу."""
+    subtype_id: str   # FK на SensorSubtype.subtype_id
     field_name: str   # имя поля в payload, напр. 'pressure' / 'event' / 'numberPlate'
     datatype: Literal["decimal", "integer", "string", "boolean"] = "decimal"
     unit: str | None = None          # 'atm' / '°C' / 'ppm' / 'µg/m³' / None
@@ -254,9 +273,15 @@ class SensorField(BaseModel):
 
 
 class SensorFieldsByType(BaseModel):
-    """Группировка для GET /sensor-schemas — все типы и их поля."""
-    sensor_type: str
+    """Поля одного подтипа — для GET /api/sensor-schemas/{subtype_id}."""
+    subtype_id: str
     fields: list[SensorField] = Field(default_factory=list)
+
+
+class SensorClassWithSubtypes(BaseModel):
+    """Класс датчиков (литерал SensorType) и его подтипы — для tree-UI."""
+    class_id: str
+    subtypes: list[SensorSubtype] = Field(default_factory=list)
 
 
 # --- Search (RAGU) ------------------------------------------------------
