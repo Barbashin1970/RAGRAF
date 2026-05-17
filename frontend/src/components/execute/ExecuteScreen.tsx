@@ -138,8 +138,8 @@ function StatusGrid() {
     },
     {
       icon: CheckCircle2,
-      label: 'Библиотека датчиков (классы / подтипы)',
-      hint: '/sensors — CRUD по полям payload для каждого подтипа',
+      label: 'Схемы событий датчиков (классы / подтипы)',
+      hint: '/sensors — CRUD по полям payload JSON-события для каждого подтипа',
     },
   ]
   const wip: Array<{ icon: typeof Clock; label: string; hint: string }> = [

@@ -1,0 +1,99 @@
+@prefix :    <http://regulations.local/ontology#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:KoltsovoEddsModeEscalationShape
+    a sh:NodeShape ;
+    sh:targetClass :Regulation ;
+
+    sh:property [
+        sh:path     :name ;
+        sh:datatype xsd:string ;
+        sh:minCount 1 ;
+        sh:message  "Регламент должен содержать имя"@ru
+    ] ;
+    sh:property [
+        sh:path     :date ;
+        sh:datatype xsd:date ;
+        sh:minCount 1
+    ] ;
+
+    sh:property [
+        sh:path         :activationTimeMinutes ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive   1.0 ;
+        sh:maxInclusive 120.0 ;
+        sh:message      "Время оповещения и активации повышенной готовности, мин"@ru
+    ] ;
+    sh:property [
+        sh:path         :activationTimeMinutesDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 30.0
+    ] ;
+
+    sh:property [
+        sh:path         :monitoringIntervalMinutes ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive   5.0 ;
+        sh:maxInclusive 240.0 ;
+        sh:message      "Периодичность сбора обстановки в повышенной готовности, мин"@ru
+    ] ;
+    sh:property [
+        sh:path         :monitoringIntervalMinutesDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 60.0
+    ] ;
+
+    sh:property [
+        sh:path         :reportIntervalHours ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.25 ;
+        sh:maxInclusive 24.0 ;
+        sh:message      "Периодичность доклада в ЦУКС в режиме ЧС, часы"@ru
+    ] ;
+    sh:property [
+        sh:path         :reportIntervalHoursDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive  6.0
+    ] ;
+
+    sh:property [
+        sh:path         :powerSwitchoverSeconds ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive   1.0 ;
+        sh:maxInclusive 300.0 ;
+        sh:message      "Время переключения на резервное питание, с"@ru
+    ] ;
+    sh:property [
+        sh:path         :powerSwitchoverSecondsDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive 60.0
+    ] ;
+
+    sh:property [
+        sh:path         :dutyShiftSize ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  1.0 ;
+        sh:maxInclusive 20.0 ;
+        sh:message      "Численность ОДС в режиме ЧС, чел."@ru
+    ] ;
+    sh:property [
+        sh:path         :dutyShiftSizeDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive  0.0 ;
+        sh:maxInclusive  8.0
+    ] .

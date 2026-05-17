@@ -1,0 +1,72 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент: мониторинг автономных дымовых пожарных извещателей (АДПИ GSM)
+# на территории р.п. Кольцово в ЕДДС МКУ «СВЕТОЧ».
+# Источник: «Положение о ЕДДС», Приложение 1 к приказу № 15 от 04.12.2020,
+# §4.1 (мониторинг АДПИ GSM), §5.4.1 (повседневная деятельность), §10.2 (АРМ
+# оператора интеллектуальных транспортных систем и видеонаблюдения).
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+# Время от срабатывания АДПИ GSM до отображения тревоги на АРМ ЕДДС, секунды.
+# Норма 15 ± 5 с — типовое окно GSM-доставки SMS+канала с подтверждением.
+:alarmDeliverySeconds          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:alarmDeliverySecondsDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Время подтверждения тревоги оператором (звонок жильцу или контакт по адресу),
+# минуты. Норма 5 ± 2 — стандартное окно для отсечения ложных срабатываний.
+:operatorConfirmMinutes          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:operatorConfirmMinutesDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Время до передачи подтверждённой тревоги в пожарную ДДС «01», минуты.
+# Норма 1 ± 0.5 — экстренная передача после подтверждения.
+:fireDispatchMinutes          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:fireDispatchMinutesDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Максимальное число одновременно обслуживаемых АДПИ-устройств на одно АРМ.
+# Норма 500 ± 100 — типовое значение для GSM-консолей муниципального уровня.
+:devicesPerWorkstation          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:devicesPerWorkstationDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Допустимая доля ложных срабатываний за месяц, %. Норма 5 ± 2 % — превышение
+# говорит о необходимости настройки порогов / замены устройств.
+:falseAlarmRatePercent          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:falseAlarmRatePercentDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Уровень заряда батареи извещателя, при котором генерируется уведомление о
+# необходимости замены, %. Норма 20 ± 5 % — типовая граница «низкий заряд».
+:lowBatteryThresholdPercent          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:lowBatteryThresholdPercentDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:KoltsovoEddsAdpiMonitoringRegulation
+    a                                  :Regulation ;
+    :name                              "Регламент мониторинга автономных дымовых пожарных извещателей АДПИ GSM (ЕДДС р.п. Кольцово)" ;
+    :date                              "2020-12-04"^^xsd:date ;
+
+    :alarmDeliverySeconds              15.0 ;
+    :alarmDeliverySecondsDeviation      5.0 ;
+
+    :operatorConfirmMinutes             5.0 ;
+    :operatorConfirmMinutesDeviation    2.0 ;
+
+    :fireDispatchMinutes                1.0 ;
+    :fireDispatchMinutesDeviation       0.5 ;
+
+    :devicesPerWorkstation            500.0 ;
+    :devicesPerWorkstationDeviation   100.0 ;
+
+    :falseAlarmRatePercent              5.0 ;
+    :falseAlarmRatePercentDeviation     2.0 ;
+
+    :lowBatteryThresholdPercent        20.0 ;
+    :lowBatteryThresholdPercentDeviation 5.0 ;
+
+    :recommendation                    "Мониторинг АДПИ GSM в ЕДДС р.п. Кольцово (на основе § 4.1 «Основные задачи ЕДДС» и § 5.4.1 Положения о ЕДДС МКУ «СВЕТОЧ» №15 от 04.12.2020): \n\n1. ПРИЁМ СИГНАЛА — тревога от АДПИ GSM поступает по сотовому каналу на АРМ оператора интеллектуальных транспортных систем и видеонаблюдения (§ 10.2). Время доставки 15 ± 5 секунд. \n\n2. ПОДТВЕРЖДЕНИЕ — оператор в течение 5 ± 2 минут пытается подтвердить тревогу: звонок собственнику, контакт ответственного по адресу, проверка через камеры видеонаблюдения (если доступны). \n\n3. ПЕРЕДАЧА В «01» — при подтверждении пожара либо при отсутствии связи в течение окна подтверждения — передача в пожарную ДДС «01» за 1 ± 0.5 минуты с указанием точного адреса, типа объекта (жилой дом, общежитие, социальный объект), наличия людей. \n\n4. РЕГИСТРАЦИЯ — в КСА ЕДДС создаётся карточка происшествия с привязкой к адресу и устройству; голосовые переговоры записываются (см. регламент koltsovo-edds-call-112). \n\n5. КАЧЕСТВО СЕРВИСА: \n   - максимум 500 ± 100 устройств на одно АРМ; \n   - допустимая доля ложных срабатываний 5 ± 2 % в месяц; \n   - при превышении — анализ конкретных устройств, настройка порогов или замена. \n\n6. ОБСЛУЖИВАНИЕ — извещатели сообщают о низком заряде батареи при остатке 20 ± 5 %; ЕДДС формирует уведомление собственнику/УК с напоминанием о замене элемента питания. \n\n7. ЭКСКАЛАЦИЯ — при массовом срабатывании в одном квартале (≥ 3 устройства) — переход в режим повышенной готовности (см. регламент koltsovo-edds-mode-escalation) и доклад в ЦУКС ГУ МЧС России по НСО." .

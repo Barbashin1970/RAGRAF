@@ -1,0 +1,155 @@
+{
+  "rule_id": "rule_koltsovo_edds_adpi_monitoring",
+  "regulation_id": "koltsovo-edds-adpi-monitoring",
+  "nodes": [
+    {
+      "id": "n_delivery_in",
+      "type": "input",
+      "label": "Доставка тревоги",
+      "paramRef": "alarmDeliverySeconds",
+      "position": { "x": 60, "y": 60 }
+    },
+    {
+      "id": "n_delivery_thr",
+      "type": "threshold",
+      "label": "15 ± 5 с",
+      "refValue": 15.0,
+      "deviation": 5.0,
+      "unit": "с",
+      "position": { "x": 320, "y": 60 }
+    },
+    {
+      "id": "n_delivery_cmp",
+      "type": "compare",
+      "label": "канал GSM ок?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 60 }
+    },
+
+    {
+      "id": "n_confirm_in",
+      "type": "input",
+      "label": "Окно подтверждения",
+      "paramRef": "operatorConfirmMinutes",
+      "position": { "x": 60, "y": 200 }
+    },
+    {
+      "id": "n_confirm_thr",
+      "type": "threshold",
+      "label": "5 ± 2 мин",
+      "refValue": 5.0,
+      "deviation": 2.0,
+      "unit": "мин",
+      "position": { "x": 320, "y": 200 }
+    },
+    {
+      "id": "n_confirm_cmp",
+      "type": "compare",
+      "label": "подтвердили / нет?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 200 }
+    },
+
+    {
+      "id": "n_false_in",
+      "type": "input",
+      "label": "Ложные срабатывания, %",
+      "paramRef": "falseAlarmRatePercent",
+      "position": { "x": 60, "y": 340 }
+    },
+    {
+      "id": "n_false_thr",
+      "type": "threshold",
+      "label": "5 ± 2 %",
+      "refValue": 5.0,
+      "deviation": 2.0,
+      "unit": "%",
+      "position": { "x": 320, "y": 340 }
+    },
+    {
+      "id": "n_false_cmp",
+      "type": "compare",
+      "label": "качество в норме?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 340 }
+    },
+
+    {
+      "id": "n_decision",
+      "type": "switch",
+      "label": "Решение оператора",
+      "cases": [
+        { "label": "ложная",       "value": "false_alarm" },
+        { "label": "подтверждено", "value": "confirmed_fire" },
+        { "label": "нет связи",    "value": "no_contact" },
+        { "label": "массовая ≥3",  "value": "mass_event" }
+      ],
+      "position": { "x": 820, "y": 200 }
+    },
+
+    {
+      "id": "n_dispatch_fire",
+      "type": "output",
+      "label": "В пожарную ДДС «01»",
+      "action": "dispatch_to_fire",
+      "text": "Подтверждённый пожар или нет связи с собственником — передача в пожарную ДДС «01» за 1 ± 0.5 минуты. Указать адрес, тип объекта (жилой дом, общежитие, соцобъект), наличие людей, состояние подъездных путей. Параллельно: открыть карточку в КСА ЕДДС.",
+      "priority": 1,
+      "position": { "x": 1080, "y": 60 }
+    },
+    {
+      "id": "n_low_battery",
+      "type": "output",
+      "label": "Низкий заряд → УК / собственнику",
+      "action": "notify_battery",
+      "text": "Извещатель сообщил о низком заряде батареи (≤ 20 ± 5 %): сформировать уведомление собственнику и/или управляющей компании с напоминанием о замене элемента питания. Контроль замены — в течение 14 дней; повторное уведомление при отсутствии действий.",
+      "priority": 3,
+      "position": { "x": 1080, "y": 200 }
+    },
+    {
+      "id": "n_quality_review",
+      "type": "output",
+      "label": "Превышение ложных → анализ",
+      "action": "quality_review",
+      "text": "Доля ложных срабатываний > 5 ± 2 % за месяц: эскалация в техническую службу — анализ конкретных устройств (адрес, серийный номер), настройка чувствительности порогов или замена. Отчёт включается в ежемесячный анализ функционирования (§ 6.6 Положения).",
+      "priority": 3,
+      "position": { "x": 1080, "y": 340 }
+    },
+    {
+      "id": "n_mass_escalate",
+      "type": "output",
+      "label": "Массовое срабатывание → ЦУКС",
+      "action": "escalate_mass_fire",
+      "text": "≥ 3 устройства АДПИ сработали в одном квартале / районе: перевод ЕДДС в режим повышенной готовности (см. koltsovo-edds-mode-escalation), параллельный устный доклад в ЦУКС ГУ МЧС России по НСО (см. koltsovo-edds-cuks-report). Оповещение населения примыкающих домов.",
+      "priority": 1,
+      "position": { "x": 1080, "y": 470 }
+    },
+
+    {
+      "id": "n_shacl_delivery",
+      "type": "shacl_constraint",
+      "label": "SHACL: alarmDeliverySeconds",
+      "constraintRef": "Regulation_alarmDeliverySeconds",
+      "position": { "x": 820, "y": 60 }
+    }
+  ],
+  "edges": [
+    { "source": "n_delivery_in",  "target": "n_delivery_thr" },
+    { "source": "n_delivery_thr", "target": "n_delivery_cmp" },
+    { "source": "n_delivery_cmp", "target": "n_decision", "condition": "delivered" },
+
+    { "source": "n_confirm_in",   "target": "n_confirm_thr" },
+    { "source": "n_confirm_thr",  "target": "n_confirm_cmp" },
+    { "source": "n_confirm_cmp",  "target": "n_decision", "condition": "confirm_window" },
+
+    { "source": "n_false_in",  "target": "n_false_thr" },
+    { "source": "n_false_thr", "target": "n_false_cmp" },
+    { "source": "n_false_cmp", "target": "n_quality_review", "condition": "above_5pct" },
+
+    { "source": "n_decision", "target": "n_dispatch_fire",   "condition": "confirmed_fire" },
+    { "source": "n_decision", "target": "n_dispatch_fire",   "condition": "no_contact" },
+    { "source": "n_decision", "target": "n_low_battery",     "condition": "low_battery" },
+    { "source": "n_decision", "target": "n_mass_escalate",   "condition": "mass_event" },
+
+    { "source": "n_delivery_cmp", "target": "n_shacl_delivery" }
+  ]
+}

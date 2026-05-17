@@ -1,0 +1,149 @@
+{
+  "rule_id": "rule_koltsovo_edds_call_112",
+  "regulation_id": "koltsovo-edds-call-112",
+  "nodes": [
+    {
+      "id": "n_answer_in",
+      "type": "input",
+      "label": "Время ответа",
+      "paramRef": "answerTimeSeconds",
+      "position": { "x": 60, "y": 60 }
+    },
+    {
+      "id": "n_answer_thr",
+      "type": "threshold",
+      "label": "6 ± 2 с",
+      "refValue": 6.0,
+      "deviation": 2.0,
+      "unit": "с",
+      "position": { "x": 320, "y": 60 }
+    },
+    {
+      "id": "n_answer_cmp",
+      "type": "compare",
+      "label": "ответ вовремя?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 60 }
+    },
+
+    {
+      "id": "n_handling_in",
+      "type": "input",
+      "label": "Длительность опроса",
+      "paramRef": "handlingTimeSeconds",
+      "position": { "x": 60, "y": 200 }
+    },
+    {
+      "id": "n_handling_thr",
+      "type": "threshold",
+      "label": "90 ± 30 с",
+      "refValue": 90.0,
+      "deviation": 30.0,
+      "unit": "с",
+      "position": { "x": 320, "y": 200 }
+    },
+    {
+      "id": "n_handling_cmp",
+      "type": "compare",
+      "label": "опрос завершён?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 200 }
+    },
+
+    {
+      "id": "n_dispatch_in",
+      "type": "input",
+      "label": "Передача в ДДС",
+      "paramRef": "dispatchTimeMinutes",
+      "position": { "x": 60, "y": 340 }
+    },
+    {
+      "id": "n_dispatch_thr",
+      "type": "threshold",
+      "label": "2 ± 1 мин",
+      "refValue": 2.0,
+      "deviation": 1.0,
+      "unit": "мин",
+      "position": { "x": 320, "y": 340 }
+    },
+    {
+      "id": "n_dispatch_cmp",
+      "type": "compare",
+      "label": "карточка ушла?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 340 }
+    },
+
+    {
+      "id": "n_route",
+      "type": "switch",
+      "label": "Профиль ДДС",
+      "cases": [
+        { "label": "01 / пожарная", "value": "fire" },
+        { "label": "02 / полиция",  "value": "police" },
+        { "label": "03 / скорая",   "value": "ambulance" },
+        { "label": "04 / газ",      "value": "gas" },
+        { "label": "ДДС предприятия", "value": "enterprise" }
+      ],
+      "position": { "x": 820, "y": 200 }
+    },
+
+    {
+      "id": "n_notify_dds",
+      "type": "output",
+      "label": "Передать в ДДС",
+      "action": "dispatch_to_dds",
+      "text": "Зарегистрировать вызов в КСА ЕДДС, передать карточку в профильную ДДС в течение 2 ± 1 минут. При угрозе жизни — параллельный вызов профильной службы немедленно. Контакт ЕДДС р.п. Кольцово: круглосуточный СОД 336-56-47, тел/факс 112 — 306-67-93.",
+      "priority": 1,
+      "position": { "x": 1080, "y": 60 }
+    },
+    {
+      "id": "n_log_record",
+      "type": "output",
+      "label": "Запись 30 ± 5 сут",
+      "action": "voice_log_retention",
+      "text": "Все переговоры оператора 112 записываются и хранятся на дисковом массиве 30 ± 5 суток (§ 10.2 Положения о ЕДДС). При запросе вышестоящих органов — выгрузка по идентификатору карточки происшествия.",
+      "priority": 3,
+      "position": { "x": 1080, "y": 200 }
+    },
+    {
+      "id": "n_escalate_cuks",
+      "type": "output",
+      "label": "При ЧС выше локального → ЦУКС",
+      "action": "escalate_to_cuks",
+      "text": "При классификации происшествия как ЧС выше локального характера — немедленный доклад старшему оперативному дежурному и далее в ЦУКС ГУ МЧС России по НСО (см. регламент koltsovo-edds-cuks-report). Глава р.п. Кольцово и первый зам. председателя КЧС и ОПБ — параллельно.",
+      "priority": 1,
+      "position": { "x": 1080, "y": 340 }
+    },
+
+    {
+      "id": "n_shacl_answer",
+      "type": "shacl_constraint",
+      "label": "SHACL: answerTimeSeconds",
+      "constraintRef": "Regulation_answerTimeSeconds",
+      "position": { "x": 820, "y": 60 }
+    }
+  ],
+  "edges": [
+    { "source": "n_answer_in",   "target": "n_answer_thr" },
+    { "source": "n_answer_thr",  "target": "n_answer_cmp" },
+    { "source": "n_answer_cmp",  "target": "n_log_record", "condition": "ok" },
+
+    { "source": "n_handling_in",  "target": "n_handling_thr" },
+    { "source": "n_handling_thr", "target": "n_handling_cmp" },
+    { "source": "n_handling_cmp", "target": "n_route",       "condition": "completed" },
+
+    { "source": "n_dispatch_in",  "target": "n_dispatch_thr" },
+    { "source": "n_dispatch_thr", "target": "n_dispatch_cmp" },
+    { "source": "n_dispatch_cmp", "target": "n_notify_dds",  "condition": "in_time" },
+
+    { "source": "n_route", "target": "n_notify_dds",     "condition": "fire" },
+    { "source": "n_route", "target": "n_notify_dds",     "condition": "police" },
+    { "source": "n_route", "target": "n_notify_dds",     "condition": "ambulance" },
+    { "source": "n_route", "target": "n_notify_dds",     "condition": "gas" },
+    { "source": "n_route", "target": "n_notify_dds",     "condition": "enterprise" },
+    { "source": "n_route", "target": "n_escalate_cuks",  "condition": "regional" },
+
+    { "source": "n_answer_cmp", "target": "n_shacl_answer" }
+  ]
+}

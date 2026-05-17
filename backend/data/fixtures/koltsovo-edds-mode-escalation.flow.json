@@ -1,0 +1,145 @@
+{
+  "rule_id": "rule_koltsovo_edds_mode_escalation",
+  "regulation_id": "koltsovo-edds-mode-escalation",
+  "nodes": [
+    {
+      "id": "n_event_in",
+      "type": "input",
+      "label": "Время активации",
+      "paramRef": "activationTimeMinutes",
+      "position": { "x": 60, "y": 60 }
+    },
+    {
+      "id": "n_event_thr",
+      "type": "threshold",
+      "label": "15 ± 5 мин",
+      "refValue": 15.0,
+      "deviation": 5.0,
+      "unit": "мин",
+      "position": { "x": 320, "y": 60 }
+    },
+    {
+      "id": "n_event_cmp",
+      "type": "compare",
+      "label": "оповестили вовремя?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 60 }
+    },
+
+    {
+      "id": "n_monitor_in",
+      "type": "input",
+      "label": "Период мониторинга",
+      "paramRef": "monitoringIntervalMinutes",
+      "position": { "x": 60, "y": 200 }
+    },
+    {
+      "id": "n_monitor_thr",
+      "type": "threshold",
+      "label": "30 ± 10 мин",
+      "refValue": 30.0,
+      "deviation": 10.0,
+      "unit": "мин",
+      "position": { "x": 320, "y": 200 }
+    },
+    {
+      "id": "n_monitor_cmp",
+      "type": "compare",
+      "label": "ритм сбора данных?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 200 }
+    },
+
+    {
+      "id": "n_power_in",
+      "type": "input",
+      "label": "Переключение питания",
+      "paramRef": "powerSwitchoverSeconds",
+      "position": { "x": 60, "y": 340 }
+    },
+    {
+      "id": "n_power_thr",
+      "type": "threshold",
+      "label": "30 ± 10 с",
+      "refValue": 30.0,
+      "deviation": 10.0,
+      "unit": "с",
+      "position": { "x": 320, "y": 340 }
+    },
+    {
+      "id": "n_power_cmp",
+      "type": "compare",
+      "label": "ИБП → дизель?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 340 }
+    },
+
+    {
+      "id": "n_mode",
+      "type": "switch",
+      "label": "Режим ЕДДС",
+      "cases": [
+        { "label": "повседневная",     "value": "routine" },
+        { "label": "повышенная",       "value": "elevated" },
+        { "label": "чрезвычайная",     "value": "emergency" },
+        { "label": "ГО / военное время", "value": "civil_defense" }
+      ],
+      "position": { "x": 820, "y": 200 }
+    },
+
+    {
+      "id": "n_notify_kchs",
+      "type": "output",
+      "label": "Оповестить КЧС и ОПБ",
+      "action": "notify_kchs_opb",
+      "text": "В режиме повышенной готовности оповестить должностных лиц КЧС и ОПБ, администрацию р.п. Кольцово, взаимодействующие ДДС предприятий за 15 ± 5 минут. Получить данные наблюдения и контроля за обстановкой, подготовить предложения по силам и средствам РСЧС.",
+      "priority": 2,
+      "position": { "x": 1080, "y": 60 }
+    },
+    {
+      "id": "n_emergency_mode",
+      "type": "output",
+      "label": "Режим ЧС",
+      "action": "enter_emergency_mode",
+      "text": "Перевод в режим ЧС: все информационные потоки между ДДС и силами РСЧС идут через ЕДДС. Доклад в ЦУКС ГУ МЧС России по НСО каждый 1 ± 0.5 ч. Контроль границ зоны ЧС и оповещение населения. Размер ОДС наращивается до 5 ± 2 человек. Выполнение указаний ОШ ЛЧС ГУ МЧС.",
+      "priority": 1,
+      "position": { "x": 1080, "y": 200 }
+    },
+    {
+      "id": "n_backup_power",
+      "type": "output",
+      "label": "Резервное питание",
+      "action": "backup_power_switchover",
+      "text": "При обрыве основного питания: ИБП удерживает работу пульта без перерыва. Параллельно — запуск дизель-генератора, переключение нагрузки за 30 ± 10 секунд (§ 10.2 Положения, требование к источникам гарантированного и резервного электропитания).",
+      "priority": 1,
+      "position": { "x": 1080, "y": 340 }
+    },
+
+    {
+      "id": "n_shacl_act",
+      "type": "shacl_constraint",
+      "label": "SHACL: activationTimeMinutes",
+      "constraintRef": "Regulation_activationTimeMinutes",
+      "position": { "x": 820, "y": 60 }
+    }
+  ],
+  "edges": [
+    { "source": "n_event_in",   "target": "n_event_thr" },
+    { "source": "n_event_thr",  "target": "n_event_cmp" },
+    { "source": "n_event_cmp",  "target": "n_mode",         "condition": "trigger" },
+
+    { "source": "n_monitor_in", "target": "n_monitor_thr" },
+    { "source": "n_monitor_thr","target": "n_monitor_cmp" },
+    { "source": "n_monitor_cmp","target": "n_notify_kchs",  "condition": "elevated_rhythm" },
+
+    { "source": "n_power_in",  "target": "n_power_thr" },
+    { "source": "n_power_thr", "target": "n_power_cmp" },
+    { "source": "n_power_cmp", "target": "n_backup_power", "condition": "power_loss" },
+
+    { "source": "n_mode", "target": "n_notify_kchs",     "condition": "elevated" },
+    { "source": "n_mode", "target": "n_emergency_mode",  "condition": "emergency" },
+    { "source": "n_mode", "target": "n_emergency_mode",  "condition": "civil_defense" },
+
+    { "source": "n_event_cmp", "target": "n_shacl_act" }
+  ]
+}

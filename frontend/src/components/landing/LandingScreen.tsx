@@ -18,7 +18,9 @@ import {
   Flame,
   Github,
   GraduationCap,
+  HardHat,
   HeartPulse,
+  KanbanSquare,
   Layers,
   ListTree,
   Menu,
@@ -586,6 +588,8 @@ export function LandingScreen() {
                 <FooterExtLink href="https://github.com/Barbashin1970/RAGRAF/blob/main/ARC.md" icon={FileText} label="Архитектура RAGRAF" />
                 <FooterExtLink href="https://github.com/Barbashin1970/RAGRAF/blob/main/ARC-SIGMA.md" icon={FileText} label="Архитектура Сигма" />
                 <FooterExtLink href="https://sigma-operator.vercel.app/operator" icon={GraduationCap} label="Тренажёр операторов" />
+                <FooterExtLink href="https://stroyka-alpha.vercel.app/" icon={HardHat} label="Тест по ИИ для строителей" />
+                <FooterExtLink href="https://leyka-nsu.vercel.app" icon={KanbanSquare} label="Управление проектами ЦИИ НГУ" />
                 <FooterExtLink href="https://kappa.nsu.ru/" icon={Layers} label="Фреймворк КАППА" />
                 <FooterExtLink href="https://nsk-opendata-bot.up.railway.app/" icon={Database} label="Открытые данные городов" />
                 <FooterExtLink href="/docs" icon={BookOpen} label="API Swagger" />

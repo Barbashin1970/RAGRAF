@@ -473,14 +473,14 @@ function SensorSchemaPreview({
         <Link
           to="/sensors"
           className="text-[10px] text-primary hover:underline"
-          title="Открыть «Библиотеку датчиков» — там можно добавить/изменить поля"
+          title="Открыть «Схемы событий датчиков» — там можно добавить/изменить поля payload"
         >
           редактировать →
         </Link>
       </div>
       {fields.length === 0 ? (
         <div className="rounded border border-stone-200 bg-stone-50 px-2 py-2 text-[11px] text-stone-500">
-          У подтипа «{effectiveSubtype}» нет полей. Открой <Link to="/sensors" className="text-primary hover:underline">«Датчики»</Link> и добавь.
+          У подтипа «{effectiveSubtype}» нет полей payload. Открой <Link to="/sensors" className="text-primary hover:underline">«Схемы событий»</Link> и добавь.
         </div>
       ) : (
         <pre className="overflow-x-auto whitespace-pre rounded border border-stone-700 bg-stone-900 p-2 font-mono text-[10px] text-stone-100">

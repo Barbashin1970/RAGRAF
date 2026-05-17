@@ -1,0 +1,147 @@
+{
+  "rule_id": "rule_koltsovo_edds_cuks_report",
+  "regulation_id": "koltsovo-edds-cuks-report",
+  "nodes": [
+    {
+      "id": "n_affected_in",
+      "type": "input",
+      "label": "Число пострадавших",
+      "paramRef": "affectedPeopleThreshold",
+      "position": { "x": 60, "y": 60 }
+    },
+    {
+      "id": "n_affected_thr",
+      "type": "threshold",
+      "label": "10 ± 5 чел.",
+      "refValue": 10.0,
+      "deviation": 5.0,
+      "unit": "чел.",
+      "position": { "x": 320, "y": 60 }
+    },
+    {
+      "id": "n_affected_cmp",
+      "type": "compare",
+      "label": "выше локального?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 60 }
+    },
+
+    {
+      "id": "n_damage_in",
+      "type": "input",
+      "label": "Материальный ущерб",
+      "paramRef": "damageThresholdMillionRub",
+      "position": { "x": 60, "y": 200 }
+    },
+    {
+      "id": "n_damage_thr",
+      "type": "threshold",
+      "label": "5 ± 1 млн ₽",
+      "refValue": 5.0,
+      "deviation": 1.0,
+      "unit": "млн ₽",
+      "position": { "x": 320, "y": 200 }
+    },
+    {
+      "id": "n_damage_cmp",
+      "type": "compare",
+      "label": "превышен порог?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 200 }
+    },
+
+    {
+      "id": "n_verbal_in",
+      "type": "input",
+      "label": "Время устного доклада",
+      "paramRef": "verbalReportMinutes",
+      "position": { "x": 60, "y": 340 }
+    },
+    {
+      "id": "n_verbal_thr",
+      "type": "threshold",
+      "label": "3 ± 1 мин",
+      "refValue": 3.0,
+      "deviation": 1.0,
+      "unit": "мин",
+      "position": { "x": 320, "y": 340 }
+    },
+    {
+      "id": "n_verbal_cmp",
+      "type": "compare",
+      "label": "доложили вовремя?",
+      "operator": "outside_range",
+      "position": { "x": 580, "y": 340 }
+    },
+
+    {
+      "id": "n_severity",
+      "type": "switch",
+      "label": "Уровень ЧС",
+      "cases": [
+        { "label": "локальная",       "value": "local" },
+        { "label": "муниципальная",   "value": "municipal" },
+        { "label": "межмуниципальная","value": "intermunicipal" },
+        { "label": "региональная",    "value": "regional" }
+      ],
+      "position": { "x": 820, "y": 200 }
+    },
+
+    {
+      "id": "n_verbal_cuks",
+      "type": "output",
+      "label": "Устный доклад в ЦУКС",
+      "action": "verbal_report_cuks",
+      "text": "Старший оперативный дежурный ЕДДС в течение 3 ± 1 минут с момента классификации события как ЧС выше локального — устный доклад оперативному дежурному ЦУКС ГУ МЧС России по НСО по прямой линии. Параллельно: Глава р.п. Кольцово, первый зам. председателя КЧС и ОПБ.",
+      "priority": 1,
+      "position": { "x": 1080, "y": 60 }
+    },
+    {
+      "id": "n_formal_report",
+      "type": "output",
+      "label": "Донесение 1ЧС / 2ЧС / 4ЧС",
+      "action": "formal_report_cuks",
+      "text": "За 20 ± 5 минут подготовить и направить в ЦУКС формализованное донесение МЧС (1ЧС — угроза, 2ЧС — факт, 4ЧС — ход ликвидации). В составе: координаты зоны ЧС, обстановка, привлекаемые силы и средства, прогноз развития, потери и пострадавшие.",
+      "priority": 2,
+      "position": { "x": 1080, "y": 200 }
+    },
+    {
+      "id": "n_refresh_loop",
+      "type": "output",
+      "label": "Повторные доклады каждый 1 ± 0.5 ч",
+      "action": "refresh_report_loop",
+      "text": "До окончания ликвидации ЧС — повторные доклады в ЦУКС каждый 1 ± 0.5 ч с обновлёнными данными: изменение обстановки, потери, привлечённые/высвобожденные силы, прогноз окончания работ. При развёртывании Оперативного штаба ЛЧС ГУ МЧС — ЕДДС выполняет указания ОШ ЛЧС.",
+      "priority": 2,
+      "position": { "x": 1080, "y": 340 }
+    },
+
+    {
+      "id": "n_shacl_verbal",
+      "type": "shacl_constraint",
+      "label": "SHACL: verbalReportMinutes",
+      "constraintRef": "Regulation_verbalReportMinutes",
+      "position": { "x": 820, "y": 340 }
+    }
+  ],
+  "edges": [
+    { "source": "n_affected_in",   "target": "n_affected_thr" },
+    { "source": "n_affected_thr",  "target": "n_affected_cmp" },
+    { "source": "n_affected_cmp",  "target": "n_severity", "condition": "people_above_threshold" },
+
+    { "source": "n_damage_in",  "target": "n_damage_thr" },
+    { "source": "n_damage_thr", "target": "n_damage_cmp" },
+    { "source": "n_damage_cmp", "target": "n_severity", "condition": "damage_above_threshold" },
+
+    { "source": "n_verbal_in",  "target": "n_verbal_thr" },
+    { "source": "n_verbal_thr", "target": "n_verbal_cmp" },
+    { "source": "n_verbal_cmp", "target": "n_verbal_cuks", "condition": "in_time" },
+
+    { "source": "n_severity", "target": "n_verbal_cuks",   "condition": "municipal" },
+    { "source": "n_severity", "target": "n_formal_report", "condition": "municipal" },
+    { "source": "n_severity", "target": "n_formal_report", "condition": "intermunicipal" },
+    { "source": "n_severity", "target": "n_formal_report", "condition": "regional" },
+    { "source": "n_severity", "target": "n_refresh_loop",  "condition": "ongoing" },
+
+    { "source": "n_verbal_cmp", "target": "n_shacl_verbal" }
+  ]
+}

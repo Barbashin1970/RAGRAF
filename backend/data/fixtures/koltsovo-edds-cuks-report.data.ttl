@@ -1,0 +1,64 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент: доклад в ЦУКС ГУ МЧС России по НСО при ЧС выше локального характера.
+# Источник: «Положение о ЕДДС МКУ "СВЕТОЧ"», Приложение 1 к приказу № 15 от 04.12.2020,
+# §6.4 (классификация ЧС выше локального), §5.4.1 (передача в ЦУКС в первоочередном
+# порядке), §5.4.2, §5.6.4.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+# Время от классификации происшествия как «выше локального» до устного доклада
+# в ЦУКС ГУ МЧС НСО, минуты. Норма 3 ± 1 мин — экстренный канал по прямой линии.
+:verbalReportMinutes          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:verbalReportMinutesDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Время до формализованного донесения (форма 1ЧС / 2ЧС / 4ЧС МЧС) с момента
+# обнаружения, минуты. Норма 20 ± 5 мин.
+:formalReportMinutes          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:formalReportMinutesDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Уровень критичности — это «выше локального» означает muni / межмуни / regional / fed.
+# Параметр-ориентир: число пострадавших (порог локальной — до 10 чел., муниципальной —
+# до 50, межмуни — до 500). Берём пороговое значение 10 ± 5 как «триггер выше локального».
+:affectedPeopleThreshold          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:affectedPeopleThresholdDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Сумма материального ущерба, при которой ЧС считается выше локального, млн ₽.
+# Согласно ПП РФ № 304-2007 порог локальной ЧС — 100 тыс.; муниципальной — 5 млн.
+# Здесь триггер «выше локального» = 5 ± 1 млн ₽.
+:damageThresholdMillionRub          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:damageThresholdMillionRubDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Частота повторных докладов в ЦУКС при развитии ЧС, часы. Норма 1 ± 0.5 ч.
+:reportRefreshHours          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:reportRefreshHoursDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:KoltsovoEddsCuksReportRegulation
+    a                                  :Regulation ;
+    :name                              "Регламент доклада в ЦУКС ГУ МЧС России по НСО при ЧС выше локального характера" ;
+    :date                              "2020-12-04"^^xsd:date ;
+
+    :verbalReportMinutes                3.0 ;
+    :verbalReportMinutesDeviation       1.0 ;
+
+    :formalReportMinutes               20.0 ;
+    :formalReportMinutesDeviation       5.0 ;
+
+    :affectedPeopleThreshold           10.0 ;
+    :affectedPeopleThresholdDeviation   5.0 ;
+
+    :damageThresholdMillionRub          5.0 ;
+    :damageThresholdMillionRubDeviation 1.0 ;
+
+    :reportRefreshHours                 1.0 ;
+    :reportRefreshHoursDeviation        0.5 ;
+
+    :recommendation                    "Доклад в ЦУКС ГУ МЧС России по НСО при ЧС выше локального (на основе § 5.4.1, § 5.6.4, § 6.4 Положения о ЕДДС МКУ «СВЕТОЧ» №15 от 04.12.2020 и ПП РФ № 304-2007 о классификации ЧС): \n\n1. КЛАССИФИКАЦИЯ — старший оперативный дежурный (СОД) ЕДДС оценивает событие как ЧС выше локального характера, если: \n   - количество пострадавших превышает 10 ± 5 чел., либо \n   - материальный ущерб превышает 5 ± 1 млн ₽, либо \n   - зона ЧС выходит за пределы одного объекта, либо \n   - есть угроза распространения. \n\n2. УСТНЫЙ ДОКЛАД — в течение 3 ± 1 минут по прямой линии связи: оперативному дежурному ЦУКС ГУ МЧС России по НСО. Параллельно — Главе р.п. Кольцово и первому заместителю председателя КЧС и ОПБ. \n\n3. ФОРМАЛИЗОВАННОЕ ДОНЕСЕНИЕ — за 20 ± 5 минут подготовить и направить в ЦУКС форму донесения (1ЧС — об угрозе, 2ЧС — о факте, 4ЧС — о ходе ликвидации) с точными координатами зоны ЧС, описанием обстановки, привлекаемыми силами. \n\n4. ПОВТОРНЫЕ ДОКЛАДЫ — каждый 1 ± 0.5 ч до окончания ликвидации: изменение обстановки, потери, привлечённые силы, прогноз. \n\n5. ВЗАИМОДЕЙСТВИЕ С ОШ ЛЧС — при развёртывании Оперативного штаба ликвидации ЧС ГУ МЧС, ЕДДС в части действий по данной ЧС выполняет указания ОШ ЛЧС (§ 5.5.3, § 5.6.5). \n\n6. ИНФОРМАЦИОННЫЙ ПОТОК — поступающие данные о силах/средствах, доводятся ЕДДС всем взаимодействующим ДДС, органам управления и в ЦУКС (§ 5.6.4). \n\nКонтакт ЦУКС ГУ МЧС по НСО — линия 112 регионального уровня; круглосуточный СОД ЕДДС р.п. Кольцово: 336-56-47." .

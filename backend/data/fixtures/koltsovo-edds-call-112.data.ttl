@@ -1,0 +1,64 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент: приём вызова 112 в ЕДДС р.п. Кольцово (МКУ «СВЕТОЧ»).
+# Источник: «Положение о ЕДДС МКУ "СВЕТОЧ"», Приложение 1 к приказу № 15
+# от 04.12.2020, §4.1, §5.4.1-5.4.2, §6.1-6.5; алгоритм оператора 112 § 8.6.2.
+# Триггер — входящий вызов на единый номер «112» либо «01/02/03/04».
+# Эскалация: оператор 112 → старший оперативный дежурный → ДДС по подведомственности.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+# Время ответа оператора на входящий вызов (с момента звонка до hello). Норма ≤ 8 с по приказу
+# МЧС для систем-112; локально в Кольцово держим 6 ± 2 с.
+:answerTimeSeconds          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:answerTimeSecondsDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Длительность приёма и обработки вызова оператором 112 (от hello до передачи в ДДС),
+# секунды. Норма 90 ± 30 — типовое окно для опроса по алгоритму системы «112».
+:handlingTimeSeconds          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:handlingTimeSecondsDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Время передачи карточки происшествия в профильную ДДС («01», «02», «03», «04» или
+# отраслевую ДДС предприятия), минуты. Норма 2 ± 1 мин.
+:dispatchTimeMinutes          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:dispatchTimeMinutesDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Длительность хранения голосовой записи переговоров оператора, сутки. § 10.2 требует
+# систему записи всех видов переговоров — минимум 30 ± 5 суток на дисковом массиве.
+:recordRetentionDays          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:recordRetentionDaysDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Норматив количества одновременно работающих операторов 112 в смене. По § 10.2 в составе
+# оборудования заложено 2 АРМ оператора → минимум 2 одновременно, при пике до 3 ± 1.
+:operatorsOnDuty          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:operatorsOnDutyDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:KoltsovoEddsCall112Regulation
+    a                                  :Regulation ;
+    :name                              "Регламент приёма вызова на единый номер 112 (ЕДДС р.п. Кольцово, МКУ «СВЕТОЧ»)" ;
+    :date                              "2020-12-04"^^xsd:date ;
+
+    :answerTimeSeconds                  6.0 ;
+    :answerTimeSecondsDeviation         2.0 ;
+
+    :handlingTimeSeconds               90.0 ;
+    :handlingTimeSecondsDeviation      30.0 ;
+
+    :dispatchTimeMinutes                2.0 ;
+    :dispatchTimeMinutesDeviation       1.0 ;
+
+    :recordRetentionDays               30.0 ;
+    :recordRetentionDaysDeviation       5.0 ;
+
+    :operatorsOnDuty                    2.0 ;
+    :operatorsOnDutyDeviation           1.0 ;
+
+    :recommendation                    "Алгоритм приёма вызова на 112 в ЕДДС р.п. Кольцово (на основе § 5.4.1, § 6.1-6.5, § 8.6.2 Положения о ЕДДС МКУ «СВЕТОЧ» №15 от 04.12.2020): 1) Ответить на вызов в течение 6 ± 2 секунд, использовать гарнитуру (§ 8.6.2). 2) Опросить заявителя по алгоритму системы-112: тип ЧС/происшествия, адрес, угроза жизни и здоровью, количество пострадавших, текущая обстановка. Окно опроса 90 ± 30 секунд. 3) Зарегистрировать вызов в КСА ЕДДС, привязать к зоне ответственности соответствующей ДДС. 4) Передать карточку происшествия в профильную ДДС («01», «02», «03», «04», отраслевая ДДС предприятия) в течение 2 ± 1 минут; при угрозе жизни — параллельно вызвать профильную службу сразу. 5) При классификации ситуации как ЧС выше локального характера — немедленно доложить старшему оперативному дежурному ЕДДС и в ЦУКС ГУ МЧС России по НСО (см. отдельный регламент koltsovo-edds-cuks-report). 6) Все переговоры записываются и хранятся 30 ± 5 суток. 7) Контактный круглосуточный номер СОД ЕДДС р.п. Кольцово: 336-56-47; тел/факс «112»: 306-67-93; почта: mku_svetoch@mail.ru." .

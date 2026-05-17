@@ -2,6 +2,7 @@ import {
   Building2,
   Flame,
   Leaf,
+  LifeBuoy,
   type LucideIcon,
   Settings2,
   ShieldAlert,
@@ -63,6 +64,19 @@ export const DOMAIN_VISUALS: Record<string, DomainVisual> = {
     chipFg: 'text-emerald-700',
     cardBorder: 'border-emerald-100 hover:border-emerald-300',
     sectionBg: 'bg-gradient-to-r from-emerald-50/80 to-transparent',
+  },
+  // Ситуационный центр / ЕДДС. Тон — amber (янтарный, как сигнальный круг
+  // оперативного дежурного). Это аварийно-диспетчерская тематика, контрастирует
+  // с rose (safety = «уже горит»: серверная, охрана) и blue (housing).
+  emergency_response: {
+    icon: LifeBuoy,
+    iconBg: 'bg-amber-100',
+    iconFg: 'text-amber-700',
+    accent: 'bg-amber-500',
+    chipBg: 'bg-amber-50',
+    chipFg: 'text-amber-700',
+    cardBorder: 'border-amber-100 hover:border-amber-300',
+    sectionBg: 'bg-gradient-to-r from-amber-50/80 to-transparent',
   },
 }
 

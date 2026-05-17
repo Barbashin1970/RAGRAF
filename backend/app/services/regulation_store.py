@@ -564,18 +564,24 @@ def delete(source_id: str) -> bool:
 def _seed_from_fixtures_if_empty() -> None:
     """При первом запуске: парсим все фикстуры и кладём в DB.
 
-    После сида DB — authoritative; правки идут только в DB, фикстуры не меняем.
+    Раньше логика была all-or-nothing: если в БД уже есть хоть один регламент,
+    подсев не выполнялся. После добавления нового домена (например, новых
+    фикстур ЕДДС Кольцово) это означало, что они никогда не появятся у тех
+    пользователей, у кого DB уже существовала. Теперь подсев — per-id:
+    каждый отсутствующий регламент из REGISTRY добавляется, существующие
+    (отредактированные пользователем) не трогаются.
     """
     from app.services import fixtures  # local import to avoid cycle at module-load time
     from app.services.turtle_bridge import parse_regulation_turtle
 
     c = _connection()
-    row = c.execute("SELECT COUNT(*) FROM regulations").fetchone()
-    count = int(row[0]) if row else 0
-    if count > 0:
-        return  # already seeded
+    existing_rows = c.execute("SELECT source_id FROM regulations").fetchall()
+    existing_ids = {r[0] for r in existing_rows} if existing_rows else set()
 
+    seeded = 0
     for sid, meta in fixtures.REGISTRY.items():
+        if sid in existing_ids:
+            continue
         try:
             data = fixtures.read_data(sid)
             shapes = fixtures.read_shapes(sid)
@@ -584,6 +590,10 @@ def _seed_from_fixtures_if_empty() -> None:
             # Имя из реестра приоритетнее имени в Turtle — оно длиннее и описательнее.
             reg.name = meta.get("name") or reg.name
             save(reg, author="system-seed", comment=f"Сидинг из фикстуры {sid}")
+            seeded += 1
         except Exception as e:
             # Не валим старт приложения если одна фикстура битая.
             print(f"[regulation_store] seed warning for {sid}: {e}")
+
+    if seeded:
+        print(f"[regulation_store] seeded {seeded} new regulation(s) from fixtures")

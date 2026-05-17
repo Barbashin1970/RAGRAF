@@ -1,0 +1,67 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент: перевод ЕДДС р.п. Кольцово в режимы повышенной готовности и ЧС.
+# Источник: «Положение о ЕДДС МКУ "СВЕТОЧ"», Приложение 1 к приказу № 15
+# от 04.12.2020, §5.1-5.7 — режимы функционирования ЕДДС.
+# Триггер — обстановка, требующая совместных действий ДДС и сил РСЧС, либо
+# уже возникшее ЧС. Решение о переводе принимает Глава р.п. Кольцово.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+# Время от принятия Главой решения до фактического перевода ЕДДС в режим
+# повышенной готовности (оповещение КЧС, ДДС, постановка задач), минуты.
+# Норма 15 ± 5 мин — типовое окно для муниципального ЕДДС.
+:activationTimeMinutes          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:activationTimeMinutesDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Периодичность сбора и обобщения данных обстановки в режиме повышенной готовности,
+# минуты. Норма 30 ± 10 мин (вместо «по факту изменений» в повседневном режиме).
+:monitoringIntervalMinutes          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:monitoringIntervalMinutesDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Периодичность доклада обстановки от ЕДДС в ЦУКС ГУ МЧС в режиме ЧС, часы.
+# Норма 1 ± 0.5 ч (донесения о ходе ликвидации, привлечённых силах, потерях).
+:reportIntervalHours          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:reportIntervalHoursDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Время до подключения резервного электропитания (ИБП → дизель-генератор),
+# секунды. Норма 30 ± 10 с — стандарт для пультов управления критической
+# инфраструктурой; § 10.2 требует «источники гарантированного и резервного
+# электропитания».
+:powerSwitchoverSeconds          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:powerSwitchoverSecondsDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+# Количество людей в смене ОДС при ЧС-режиме (повседневный 2-3, ЧС — все смены).
+# Норма 5 ± 2 — старший оперативный дежурный + 2 оператора 112 + помощники.
+:dutyShiftSize          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:dutyShiftSizeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:KoltsovoEddsModeEscalationRegulation
+    a                                  :Regulation ;
+    :name                              "Регламент перевода ЕДДС р.п. Кольцово в режимы повышенной готовности и чрезвычайной ситуации" ;
+    :date                              "2020-12-04"^^xsd:date ;
+
+    :activationTimeMinutes              15.0 ;
+    :activationTimeMinutesDeviation      5.0 ;
+
+    :monitoringIntervalMinutes          30.0 ;
+    :monitoringIntervalMinutesDeviation 10.0 ;
+
+    :reportIntervalHours                 1.0 ;
+    :reportIntervalHoursDeviation        0.5 ;
+
+    :powerSwitchoverSeconds             30.0 ;
+    :powerSwitchoverSecondsDeviation    10.0 ;
+
+    :dutyShiftSize                       5.0 ;
+    :dutyShiftSizeDeviation              2.0 ;
+
+    :recommendation                    "Переход ЕДДС р.п. Кольцово между режимами функционирования (на основе § 5.1-5.7 Положения о ЕДДС МКУ «СВЕТОЧ» №15 от 04.12.2020): \n\n1. РЕЖИМ ПОВСЕДНЕВНОЙ ДЕЯТЕЛЬНОСТИ — круглосуточное дежурство, приём 112, мониторинг АДПИ GSM и видеонаблюдения, контроль готовности подведомственных ДДС, ежедневные тренировки с ЦУКС. \n\n2. ПЕРЕХОД В РЕЖИМ ПОВЫШЕННОЙ ГОТОВНОСТИ (решение принимает Глава р.п. Кольцово): \n   - оповещение должностных лиц КЧС и ОПБ, администрации, ДДС предприятий — за 15 ± 5 минут; \n   - сбор и обобщение данных обстановки по ПОО и окружающей среде с периодичностью 30 ± 10 минут; \n   - прогнозирование развития обстановки, подготовка предложений по силам/средствам; \n   - координация экстренных мер ДДС предприятий и сил РСЧС. \n\n3. ПЕРЕХОД В РЕЖИМ ЧРЕЗВЫЧАЙНОЙ СИТУАЦИИ (решение Главы): \n   - все информационные потоки между ДДС и силами РСЧС идут через ЕДДС; \n   - доклад обстановки в ЦУКС ГУ МЧС России по НСО — каждый 1 ± 0.5 ч; \n   - контроль за установлением границ зоны ЧС, оповещение населения; \n   - непрерывный контроль окружающей среды на аварийных объектах; \n   - размер ОДС наращивается до 5 ± 2 человек. \n\n4. ИНФРАСТРУКТУРА: при потере основного питания ИБП удерживает работу пульта; переключение на резервный дизель — 30 ± 10 секунд (§ 10.2). \n\n5. ВЫПОЛНЕНИЕ УКАЗАНИЙ КЧС и ОПБ или Оперативного штаба ЛЧС ГУ МЧС: в части действий по конкретной ЧС ЕДДС подчиняется указаниям ОШ ЛЧС (§ 5.5.3, 5.6.5)." .
