@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import {
   ChevronRight,
   ListTree,
@@ -12,7 +12,6 @@ import { useQuery } from '@tanstack/react-query'
 import { api, type Domain, type Regulation } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { getDomainVisual } from '@/lib/domains'
-import { Tabs, type TabDef } from '@/components/ui'
 
 interface Stat {
   icon: LucideIcon
@@ -168,30 +167,75 @@ export function RegulationHeader({
 }
 
 /**
- * Локальная навигация между экранами регламента — поверх ui `<Tabs>` с
- * react-router'ом. Используем `tone='primary'` (Model Layer, teal акцент);
- * domain-specific цвет уже передан через accent-stripe и domain icon выше —
- * двойной акцент в табах перегрузил бы UI.
+ * Локальная навигация между экранами регламента — цветные кнопки
+ * (violet / blue / amber / emerald) с активным состоянием.
+ *
+ * Цвета синхронизированы с `ActionButton` из `RegulationList` — единое
+ * визуальное соглашение «Редактор=фиолетовый, Поток=синий, Ограничения=
+ * янтарный, Граф=изумрудный» работает и в карточке списка, и в шапке
+ * детальной страницы. Юзер не путается переключаясь между экранами.
+ *
+ * Активная вкладка отличается насыщенным фоном, более тёмным текстом и
+ * inset-ring'ом — это сохраняет цветовую идентичность таба и одновременно
+ * однозначно сигнализирует «вы здесь».
  */
+type TabId = 'edit' | 'flow' | 'constraints' | 'graph'
+
+interface TabSpec {
+  id: TabId
+  label: string
+  icon: LucideIcon
+  // Inactive — тон карточки на главной (bg-X-50 + border-X-200 + text-X-700).
+  inactive: string
+  // Active — заметнее: bg-X-100, рамка тоньше но темнее, ring для «нажатости».
+  active: string
+  iconColor: string
+}
+
+const TAB_SPECS: TabSpec[] = [
+  {
+    id: 'edit',
+    label: 'Редактировать',
+    icon: Pencil,
+    inactive: 'border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-300 hover:bg-violet-100',
+    active:   'border-violet-400 bg-violet-100 text-violet-800 ring-2 ring-violet-200/70 font-semibold',
+    iconColor: 'text-violet-500',
+  },
+  {
+    id: 'flow',
+    label: 'Поток',
+    icon: Workflow,
+    inactive: 'border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300 hover:bg-blue-100',
+    active:   'border-blue-400 bg-blue-100 text-blue-800 ring-2 ring-blue-200/70 font-semibold',
+    iconColor: 'text-blue-500',
+  },
+  {
+    id: 'constraints',
+    label: 'Ограничения',
+    icon: Shield,
+    inactive: 'border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300 hover:bg-amber-100',
+    active:   'border-amber-400 bg-amber-100 text-amber-900 ring-2 ring-amber-200/70 font-semibold',
+    iconColor: 'text-amber-500',
+  },
+  {
+    id: 'graph',
+    label: 'Граф',
+    icon: Network,
+    inactive: 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100',
+    active:   'border-emerald-400 bg-emerald-100 text-emerald-800 ring-2 ring-emerald-200/70 font-semibold',
+    iconColor: 'text-emerald-500',
+  },
+]
+
 function TabSwitcher({
   sourceId,
   active,
   domain,
 }: {
   sourceId: string
-  active: 'edit' | 'flow' | 'constraints' | 'graph'
+  active: TabId
   domain: string | null | undefined
 }) {
-  type TabId = 'edit' | 'flow' | 'constraints' | 'graph'
-  const navigate = useNavigate()
-
-  const tabs: TabDef<TabId>[] = [
-    { id: 'edit',        label: 'Редактировать', icon: Pencil   },
-    { id: 'flow',        label: 'Поток',         icon: Workflow },
-    { id: 'constraints', label: 'Ограничения',   icon: Shield   },
-    { id: 'graph',       label: 'Граф',          icon: Network  },
-  ]
-
   const routes: Record<TabId, string> = {
     edit:        `/regulations/${sourceId}/edit`,
     flow:        `/regulations/${sourceId}/flow`,
@@ -200,11 +244,25 @@ function TabSwitcher({
   }
 
   return (
-    <Tabs
-      tabs={tabs}
-      active={active}
-      onChange={(id) => navigate(routes[id])}
-      tone="primary"
-    />
+    <div className="flex flex-wrap items-center gap-1.5">
+      {TAB_SPECS.map((t) => {
+        const isActive = t.id === active
+        const Icon = t.icon
+        return (
+          <Link
+            key={t.id}
+            to={routes[t.id]}
+            aria-current={isActive ? 'page' : undefined}
+            className={cn(
+              'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium transition',
+              isActive ? t.active : t.inactive,
+            )}
+          >
+            <Icon size={13} className={t.iconColor} />
+            {t.label}
+          </Link>
+        )
+      })}
+    </div>
   )
 }
