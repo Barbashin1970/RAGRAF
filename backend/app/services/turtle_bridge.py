@@ -209,13 +209,21 @@ def regulation_to_turtle(reg: Regulation) -> str:
         g.add((pred, RDFS.domain, REG_CLASS))
         g.add((pred, RDFS.range, rng))
 
-    # Параметры и их *Deviation — оба decimal
+    # Параметры и их *Deviation — оба decimal.
+    # ВАЖНО: предикат строим из `p.id` (стабильный schema-идентификатор —
+    # `inletPressure`), НЕ из `p.name` (отображаемое имя, может быть
+    # переименовано в «Давление узла» с пробелом и кириллицей —
+    # сериализатор rdflib падает на построении URI). Имя — отдельная
+    # `rdfs:label` к свойству (если отличается от id, для traceability).
     for p in reg.parameters:
-        for nm in (p.name, f"{p.name}Deviation"):
+        local = _safe_local_name(p.id or p.name)
+        for nm in (local, f"{local}Deviation"):
             pred = REG_NS[nm]
             g.add((pred, RDF.type, OWL.DatatypeProperty))
             g.add((pred, RDFS.domain, REG_CLASS))
             g.add((pred, RDFS.range, XSD.decimal))
+        if p.name and p.name != p.id:
+            g.add((REG_NS[local], RDFS.label, Literal(p.name, lang="ru")))
 
     instance = REG_NS[_instance_local_name(reg.id)]
     g.add((instance, RDF.type, REG_CLASS))
@@ -224,13 +232,14 @@ def regulation_to_turtle(reg: Regulation) -> str:
     if reg.date:
         g.add((instance, REG_NS["date"], Literal(reg.date, datatype=XSD.date)))
     for p in reg.parameters:
+        local = _safe_local_name(p.id or p.name)
         if p.referenceValue is not None:
-            g.add((instance, REG_NS[p.name], Literal(float(p.referenceValue), datatype=XSD.decimal)))
+            g.add((instance, REG_NS[local], Literal(float(p.referenceValue), datatype=XSD.decimal)))
         if p.deviationAllowed is not None:
             g.add(
                 (
                     instance,
-                    REG_NS[f"{p.name}Deviation"],
+                    REG_NS[f"{local}Deviation"],
                     Literal(float(p.deviationAllowed), datatype=XSD.decimal),
                 )
             )
@@ -303,7 +312,9 @@ def regulation_to_turtle(reg: Regulation) -> str:
         g.add((REG_NS["hasTrigger"], RDF.type, OWL.ObjectProperty))
         g.add((REG_NS["Trigger"], RDF.type, OWL.Class))
         for t in reg.triggers:
-            trig_uri = REG_NS[f"{_instance_local_name(reg.id).removesuffix('Regulation')}_Trigger_{t.id}"]
+            # Trigger URI tolerates legacy t.id с кириллицей через _safe_local_name
+            trig_local = _safe_local_name(t.id)
+            trig_uri = REG_NS[f"{_instance_local_name(reg.id).removesuffix('Regulation')}_Trigger_{trig_local}"]
             g.add((instance, REG_NS["hasTrigger"], trig_uri))
             g.add((trig_uri, RDF.type, REG_NS["Trigger"]))
             if t.label:
@@ -389,8 +400,9 @@ def regulation_to_shacl_shapes(reg: Regulation) -> str:
     # Параметры: каждый — decimal с min_inclusive=0 (нет отрицательных давлений),
     # парный *Deviation тоже decimal ≥ 0. Reusing Rules-Management.pdf convention.
     for p in reg.parameters:
-        add_property(p.name, XSD.decimal, min_inclusive=0.0)
-        add_property(f"{p.name}Deviation", XSD.decimal, min_inclusive=0.0)
+        local = _safe_local_name(p.id or p.name)
+        add_property(local, XSD.decimal, min_inclusive=0.0)
+        add_property(f"{local}Deviation", XSD.decimal, min_inclusive=0.0)
 
     return g.serialize(format="turtle")
 
@@ -402,6 +414,35 @@ def _instance_local_name(source_id: str) -> str:
     if not pascal.endswith("Regulation"):
         pascal += "Regulation"
     return pascal
+
+
+def _safe_local_name(s: str) -> str:
+    """Привести строку к валидному XML/RDF localname.
+
+    Цель: пользователь переименовал параметр в «Давление узла» (кириллица +
+    пробел) — это допустимо как display name, но недопустимо как RDF
+    localname в Turtle. Сериализатор rdflib бросает ValueError при попытке
+    построить URI, GET /raw возвращает 500.
+
+    Стратегия: убрать пробелы (camelCase), оставить только ASCII буквы/
+    цифры/подчёркивание. Для непустых fallback'ов кириллицы — slug через
+    md5 (стабильно при повторных save'ах, не зависит от регистра).
+    Пустой результат запрещён (RDF requirement) — возвращаем 'param'.
+    """
+    if not s:
+        return "param"
+    # camelCase из «Давление узла» → «ДавлениеУзла», затем фильтр.
+    parts = [p for p in s.split() if p]
+    camel = "".join(p[:1].upper() + p[1:] for p in parts) if len(parts) > 1 else s
+    ascii_filtered = "".join(ch for ch in camel if ch.isascii() and (ch.isalnum() or ch == "_"))
+    if ascii_filtered and (ascii_filtered[0].isalpha() or ascii_filtered[0] == "_"):
+        return ascii_filtered
+    # Fallback: всё ушло (чистая кириллица/пунктуация) — стабильный slug
+    # через md5 чтобы repeat-save давал тот же URI. Префикс 'p_' гарантирует
+    # валидный leading-char.
+    import hashlib
+    h = hashlib.md5(s.encode("utf-8")).hexdigest()[:12]
+    return f"p_{h}"
 
 
 # ---- Parsers ----------------------------------------------------------

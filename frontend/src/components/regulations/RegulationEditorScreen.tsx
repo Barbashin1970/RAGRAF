@@ -334,12 +334,14 @@ function FormView({
   const removeParam = (idx: number) => {
     // Удаляем параметр + его триггер (если был). Без этого триггер становится
     // orphan'ом и подсвечивается красной рамкой; пользователь сам бы потом
-    // его удалял — лишний шаг.
+    // его удалял — лишний шаг. param_ref — это p.id (стабильный идентификатор),
+    // не p.name (отображаемое имя). Иначе после переименования параметра
+    // триггер становился сиротой даже если связь логически сохранена.
     const removedParam = draft.parameters[idx]
     setDraft({
       ...draft,
       parameters: draft.parameters.filter((_, i) => i !== idx),
-      triggers: (draft.triggers ?? []).filter((t) => t.param_ref !== removedParam?.name),
+      triggers: (draft.triggers ?? []).filter((t) => t.param_ref !== removedParam?.id),
     })
   }
   const recText = draft.recommendations[0]?.text ?? ''
@@ -360,28 +362,32 @@ function FormView({
   // секцию «Триггеры» — это устраняет orphan-триггеры и делает UX логичным
   // («параметр + откуда он наполняется» — одно понятие).
   //
-  // Backend модель не меняется: триггер остаётся отдельной сущностью в
-  // DuckDB + Turtle (`:hasTrigger`) для онтологической чистоты и
-  // O(1) reverse-lookup. Меняется только UI-метафора.
+  // КОНТРАКТ param_ref: всегда p.id (стабильный schema-идентификатор —
+  // напр. `inletPressure`), НЕ p.name (отображаемое имя, может быть
+  // переименовано в «Давление узла»). flow.json input.paramRef и
+  // регламент Turtle :paramRef хранят тот же p.id. Без этого после
+  // переименования параметра триггер не находил input в reconcile,
+  // sensor-нода не появлялась в Flow.
   const triggers = draft.triggers ?? []
-  const triggerForParam = (paramName: string): RegulationTrigger | undefined =>
-    triggers.find((t) => t.param_ref === paramName)
+  const triggerForParam = (paramId: string): RegulationTrigger | undefined =>
+    triggers.find((t) => t.param_ref === paramId)
   const upsertTriggerForParam = (
+    paramId: string,
     paramName: string,
     patch: Partial<RegulationTrigger>,
   ) => {
-    const idx = triggers.findIndex((t) => t.param_ref === paramName)
+    const idx = triggers.findIndex((t) => t.param_ref === paramId)
     if (idx >= 0) {
       const next = triggers.map((t, i) => (i === idx ? { ...t, ...patch } : t))
       setDraft({ ...draft, triggers: next })
     } else {
-      // Новый триггер для параметра. id выводим из имени параметра —
-      // стабильный slug, по которому Turtle-сериализация делает URI вида
-      // `:HeatInletBreach_Trigger_trig-inletPressure`.
+      // Новый триггер. id триггера — стабильный slug от p.id (не от p.name —
+      // иначе при ренейме параметра менялся бы trigger.id, что нарушает
+      // append-only историю и SHACL-валидацию URI).
       const nt: RegulationTrigger = {
-        id: `trig-${paramName}`,
+        id: `trig-${paramId}`,
         label: paramName,
-        param_ref: paramName,
+        param_ref: paramId,
         sensor_subtype: null,
         event_type: null,
         source_regulation: null,
@@ -392,8 +398,8 @@ function FormView({
       setDraft({ ...draft, triggers: [...triggers, nt] })
     }
   }
-  const removeTriggerForParam = (paramName: string) => {
-    setDraft({ ...draft, triggers: triggers.filter((t) => t.param_ref !== paramName) })
+  const removeTriggerForParam = (paramId: string) => {
+    setDraft({ ...draft, triggers: triggers.filter((t) => t.param_ref !== paramId) })
   }
 
   return (
@@ -578,11 +584,12 @@ function FormView({
                   </FormRow>
                 </div>
                 <ParamTriggerInline
+                  paramId={p.id}
                   paramName={p.name}
-                  trigger={triggerForParam(p.name)}
+                  trigger={triggerForParam(p.id)}
                   currentRegulationId={draft.id}
-                  onUpsert={(patch) => upsertTriggerForParam(p.name, patch)}
-                  onRemove={() => removeTriggerForParam(p.name)}
+                  onUpsert={(patch) => upsertTriggerForParam(p.id, p.name, patch)}
+                  onRemove={() => removeTriggerForParam(p.id)}
                 />
                 <div className="mt-3 grid grid-cols-2 gap-2.5 rounded-md border border-emerald-100 bg-emerald-50/40 p-2">
                   <FormRow label="SHACL min ≥" icon={ShieldCheck} compact>
@@ -776,12 +783,14 @@ function TriggeredByBanner({ regulationId }: { regulationId: string }) {
 // ──────────────────────────────────────────────────────────
 
 function ParamTriggerInline({
+  paramId: _paramId,  // используется родителем для трекинга; здесь только props passthrough
   paramName,
   trigger,
   currentRegulationId,
   onUpsert,
   onRemove,
 }: {
+  paramId: string
   paramName: string
   trigger: RegulationTrigger | undefined
   currentRegulationId: string

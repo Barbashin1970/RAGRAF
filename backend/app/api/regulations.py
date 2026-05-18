@@ -211,7 +211,21 @@ async def get_regulation_raw(source_id: str) -> str:
     if stored is not None:
         # Triggers — теперь часть Turtle через :hasTrigger. Парсер шейпов
         # тащим из upstream только для bounds; на render Turtle они не нужны.
-        return regulation_to_turtle(stored)
+        try:
+            return regulation_to_turtle(stored)
+        except Exception as e:
+            # Защита от 500: если в имени параметра/триггера осталась кириллица
+            # или пробел (старый legacy перед миграцией на _safe_local_name),
+            # rdflib падает на построении URI. Отдаём stub-комментарий вместо
+            # краша — пользователь хотя бы видит причину в Turtle-редакторе.
+            from app.services.turtle_bridge import _safe_local_name  # noqa: F401
+            return (
+                f"# Регламент {source_id}\n"
+                f"# Не удалось сериализовать в Turtle: {type(e).__name__}: {e}\n"
+                f"# Вероятная причина: имя параметра/триггера содержит спец-\n"
+                f"# символы. Отредактируйте через вкладку «Поля» и сохраните —\n"
+                f"# backend автоматически приведёт URI к валидному виду.\n"
+            )
     try:
         return await client.get_data(source_id)
     except Exception as e:

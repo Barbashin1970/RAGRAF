@@ -320,6 +320,75 @@ def _run_data_migrations() -> None:
         except Exception as e:
             print(f"[regulation_store] migration strip_auto_triggers_v1 failed: {e}")
 
+    # ── fix_trigger_param_ref_to_id_v1 ───────────────────────────────────
+    # 2026-05-18. Контракт param_ref: стабильный schema-id (`inletPressure`),
+    # НЕ display name (`Давление узла`). Раньше фронт сохранял
+    # `trigger.param_ref = p.name`, что после ренейма параметра ломало
+    # синк с flow (input.paramRef = p.id) — sensor-нода не появлялась,
+    # GET /raw 500 при rdflib URI build на «Давление узла».
+    #
+    # Миграция: для каждого trigger.param_ref, если он совпадает с
+    # parameter.name (но не с parameter.id), заменяем на parameter.id.
+    # Триггеры с param_ref совпадающим с parameter.id не трогаем.
+    if "fix_trigger_param_ref_to_id_v1" not in applied:
+        try:
+            # Сначала собираем пары (source_id, current_param_ref, target_id)
+            # — DuckDB UPDATE с JOIN ограничен, выгоднее построить план в Python.
+            mismatches = c.execute(
+                """
+                SELECT t.source_id, t.trigger_id, t.param_ref, p.id, p.name
+                FROM regulation_triggers t
+                JOIN parameters p
+                  ON p.source_id = t.source_id
+                 AND p.name = t.param_ref
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM parameters p2
+                    WHERE p2.source_id = t.source_id AND p2.id = t.param_ref
+                )
+                """
+            ).fetchall()
+            updated = 0
+            for sid, tid, old_ref, new_ref, _name in mismatches:
+                # Также пере-канонизируем trigger_id если он был
+                # `trig-<old_ref>` — иначе после фикса URI триггер всё ещё
+                # имеет «грязный» trigger_id, который ломает Turtle URI.
+                new_tid = f"trig-{new_ref}" if tid == f"trig-{old_ref}" else tid
+                if new_tid != tid:
+                    # Сначала проверим что нет коллизии — иначе UPSERT
+                    # с новым id наложился бы на существующий триггер.
+                    coll = c.execute(
+                        "SELECT 1 FROM regulation_triggers WHERE source_id = ? AND trigger_id = ?",
+                        [sid, new_tid],
+                    ).fetchone()
+                    if coll is None:
+                        c.execute(
+                            "UPDATE regulation_triggers SET trigger_id = ?, param_ref = ? WHERE source_id = ? AND trigger_id = ?",
+                            [new_tid, new_ref, sid, tid],
+                        )
+                    else:
+                        # Коллизия — удаляем legacy запись (новая уже есть).
+                        c.execute(
+                            "DELETE FROM regulation_triggers WHERE source_id = ? AND trigger_id = ?",
+                            [sid, tid],
+                        )
+                else:
+                    c.execute(
+                        "UPDATE regulation_triggers SET param_ref = ? WHERE source_id = ? AND trigger_id = ?",
+                        [new_ref, sid, tid],
+                    )
+                updated += 1
+            c.execute(
+                "INSERT INTO _migrations (name) VALUES (?)",
+                ["fix_trigger_param_ref_to_id_v1"],
+            )
+            print(
+                f"[regulation_store] migration fix_trigger_param_ref_to_id_v1 applied — fixed {updated} trigger(s)"
+            )
+        except Exception as e:
+            print(
+                f"[regulation_store] migration fix_trigger_param_ref_to_id_v1 failed: {e}"
+            )
+
 
 def has(source_id: str) -> bool:
     with _LOCK:
