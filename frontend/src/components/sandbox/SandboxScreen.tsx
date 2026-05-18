@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  ArrowUp,
   Beaker,
   Bot,
   Check,
@@ -15,9 +16,10 @@ import {
   Loader2,
   MessageSquare,
   PackagePlus,
+  Paperclip,
   Pencil,
+  Plus,
   RotateCcw,
-  Send,
   Settings2,
   Sliders,
   Square,
@@ -493,6 +495,14 @@ function SearchDemo() {
     queryKey: ['datasets'],
     queryFn: () => api.datasets.list(),
   })
+  // Счётчики документов для scope-чипа в инпуте чата. Кэш шерится с
+  // DocumentsPanel/ContextPanel, лишних запросов нет.
+  const { data: docsList } = useQuery({
+    queryKey: ['sandbox-documents'],
+    queryFn: () => api.sandbox.listDocuments(),
+  })
+  const docsEnabledCount = docsList?.limits.enabled_count ?? 0
+  const docsTotalCount = docsList?.limits.current_count ?? 0
   const allRegulationIds = useMemo<string[]>(() => {
     if (!regsRaw) return []
     const arr: unknown[] = Array.isArray(regsRaw)
@@ -710,9 +720,19 @@ function SearchDemo() {
           {chat.isPending && <TypingIndicator />}
         </div>
 
-        {/* Input bar — прижат к низу центральной колонки */}
-        <div className="border-t border-stone-200 bg-white px-4 py-3">
-          <div className="flex items-end gap-2">
+        {/* Input bar — pill-shaped, перерисован в стиле Perplexity / Claude /
+            ChatGPT-2025: rounded-2xl контейнер, кнопки внутри (не сбоку),
+            круглый send/stop справа.
+            Левая «+» открывает левую панель Контекст (документы/регламенты)
+            если был свёрнут или прокручивает к ней; рядом — scope-chip со
+            счётчиками подключённых источников. */}
+        <div className="bg-stone-50/30 px-4 pb-4 pt-2">
+          <div
+            className={cn(
+              'mx-auto flex max-w-3xl flex-col gap-2 rounded-2xl border bg-white px-3 py-2.5 shadow-sm transition focus-within:border-violet-400 focus-within:ring-1 focus-within:ring-violet-300',
+              chat.isPending ? 'border-violet-200' : 'border-stone-200',
+            )}
+          >
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -730,38 +750,104 @@ function SearchDemo() {
                   : 'Задай вопрос про регламенты (Enter — отправить, Shift+Enter — перенос строки)'
               }
               disabled={chat.isPending}
-              className="min-h-[42px] max-h-32 flex-1 resize-none rounded-md border border-stone-200 bg-white px-3 py-2 text-sm focus:border-violet-400 focus:outline-none focus:ring-1 focus:ring-violet-300 disabled:opacity-60"
+              className="min-h-[24px] max-h-40 w-full resize-none border-0 bg-transparent px-1 py-0.5 text-sm leading-relaxed placeholder:text-stone-400 focus:outline-none focus:ring-0 disabled:opacity-60"
             />
-            {chat.isPending ? (
-              <Button
-                variant="danger"
-                icon={<Square size={14} className="fill-current" />}
-                onClick={stop}
-                title="Остановить генерацию принудительно"
-              >
-                Стоп
-              </Button>
-            ) : (
-              <Button
-                variant="author"
-                icon={<Send size={14} />}
-                onClick={() => send()}
-                disabled={!input.trim()}
-              >
-                Отправить
-              </Button>
-            )}
-            {turns.length > 0 && (
-              <Button
-                variant="ghost"
-                icon={<RotateCcw size={14} />}
-                onClick={reset}
+            <div className="flex items-center gap-2">
+              {/* «+» — быстрая ссылка к левой панели «Документы». Скроллит
+                  фокус к левой колонке (она всегда видима в Студии). */}
+              <button
+                type="button"
+                onClick={() => {
+                  document
+                    .querySelector('[data-context-panel]')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                }}
                 disabled={chat.isPending}
-                title="Очистить разговор"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-stone-200 text-stone-500 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50"
+                title="Добавить контекст — открой левую панель, чтобы выбрать документы или регламенты"
               >
-                <span className="sr-only">Очистить</span>
-              </Button>
-            )}
+                <Plus size={16} />
+              </button>
+              {/* Scope-chip: «🔍 Поиск» с подсчётом включённых источников.
+                  Кликом тоже скроллит к левой панели. Дизайн повторяет
+                  Perplexity / Claude — компактно, без занимания всей строки. */}
+              <button
+                type="button"
+                onClick={() => {
+                  document
+                    .querySelector('[data-context-panel]')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+                }}
+                className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 px-3 py-1 text-xs text-stone-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+                title="Что сейчас в контексте чата: галки в левой панели"
+              >
+                <FileSearch size={12} />
+                <span className="font-medium">Поиск</span>
+                <span className="text-stone-400">·</span>
+                <span
+                  className={cn(
+                    allRegulationIds.length - disabledRegulationIds.size > 0
+                      ? 'text-stone-700'
+                      : 'text-stone-400',
+                  )}
+                >
+                  {Math.max(0, allRegulationIds.length - disabledRegulationIds.size)} регл.
+                </span>
+                {docsTotalCount > 0 && (
+                  <>
+                    <span className="text-stone-400">·</span>
+                    <span
+                      className={cn(
+                        docsEnabledCount > 0 ? 'text-stone-700' : 'text-stone-400',
+                      )}
+                    >
+                      <Paperclip size={10} className="mr-0.5 inline-block" />
+                      {docsEnabledCount} док.
+                    </span>
+                  </>
+                )}
+              </button>
+
+              <div className="ml-auto flex items-center gap-1.5">
+                {turns.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={reset}
+                    disabled={chat.isPending}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-stone-400 transition hover:bg-stone-100 hover:text-stone-700 disabled:opacity-40"
+                    title="Очистить разговор"
+                    aria-label="Очистить разговор"
+                  >
+                    <RotateCcw size={14} />
+                  </button>
+                )}
+                {/* Круглая send/stop кнопка — классика всех чат-инпутов.
+                    Pending → красный круг с квадратом stop (как у GPT/Claude).
+                    Idle  → виолетовый круг со стрелкой ↑. */}
+                {chat.isPending ? (
+                  <button
+                    type="button"
+                    onClick={stop}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-rose-600 text-white shadow-sm transition hover:bg-rose-700"
+                    title="Остановить генерацию"
+                    aria-label="Остановить генерацию"
+                  >
+                    <Square size={14} className="fill-current" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => send()}
+                    disabled={!input.trim()}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-violet-600 text-white shadow-sm transition hover:bg-violet-700 disabled:bg-stone-200 disabled:text-stone-400 disabled:shadow-none"
+                    title="Отправить (Enter)"
+                    aria-label="Отправить сообщение"
+                  >
+                    <ArrowUp size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

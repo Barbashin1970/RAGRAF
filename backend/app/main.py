@@ -29,6 +29,14 @@ async def lifespan(_: FastAPI):
         extraction_term_store.init_db()
     except Exception as e:
         print(f"[lifespan] extraction_term_store.init_db failed: {e}")
+    # Демо-документы (ТЗ, ARC, ARC-SIGMA) — для онбординга в Студии аналитика.
+    # Работает и без эмбеддингов: keyword-fallback в retrieve_relevant_chunks
+    # обеспечивает осмысленный retrieval по словам из вопроса.
+    try:
+        from app.services import document_store
+        await document_store.seed_demo_documents_if_empty()
+    except Exception as e:
+        print(f"[lifespan] demo documents seed failed: {e}")
     yield
 
 

@@ -23,9 +23,12 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from io import BytesIO
+from pathlib import Path
 from typing import Any
 
 from app.services import regulation_store
+
+DEMO_DOCS_DIR = Path(__file__).resolve().parents[2] / "data" / "demo_documents"
 
 _LOCK = threading.RLock()
 
@@ -72,7 +75,16 @@ def parse_document(filename: str, mime_type: str, data: bytes) -> str:
         or lower.endswith(".docx")
     ):
         return parse_docx(data)
-    raise ValueError(f"Неподдерживаемый формат: {mime_type or filename}. Только PDF/DOCX.")
+    # Markdown / plain text — нужно для demo-seed (TZ_RAGRAF.md, ARC.md и т.п.).
+    # MD-разметка не рендерим: символы #/* в keyword-fallback retrieval'е не мешают,
+    # а для семантического поиска bge-m3 сам нормализует.
+    if (
+        mime_type in ("text/markdown", "text/plain")
+        or lower.endswith(".md")
+        or lower.endswith(".txt")
+    ):
+        return data.decode("utf-8", errors="replace")
+    raise ValueError(f"Неподдерживаемый формат: {mime_type or filename}. Поддерживаются PDF/DOCX/MD/TXT.")
 
 
 # ── Chunking ──────────────────────────────────────────────────────────
@@ -391,3 +403,55 @@ async def retrieve_relevant_chunks(query: str, top_k: int = 5) -> list[dict[str,
         {"doc_id": d, "filename": f, "text": t, "score": float(s)}
         for s, d, f, t in scored2[:top_k]
     ]
+
+
+# ── Demo seeding ──────────────────────────────────────────────────────
+
+
+async def seed_demo_documents_if_empty() -> int:
+    """Засеять `backend/data/demo_documents/*.md` в DuckDB при первом старте.
+
+    Цель — на свежем инстансе (Railway, локальный first-run) у новичка сразу
+    есть 3 документа в Студии аналитика (ТЗ, ARC, ARC-SIGMA) с включёнными
+    галками. Можно тут же задавать вопросы и видеть «привязку к источникам»
+    в чате.
+
+    Идемпотентно: пропускаем если документ с таким filename уже есть в DB
+    (например, юзер сам загружал ту же ТЗ). Возвращает число фактически
+    добавленных документов.
+
+    Без эмбеддингов работает: keyword-fallback в retrieve_relevant_chunks
+    делает substring-match по chunks. Этого достаточно для буквальных вопросов
+    про термины — «что такое RAGU», «зачем DuckDB», «какие порты у Rule DSL».
+    """
+    if not DEMO_DOCS_DIR.is_dir():
+        return 0
+
+    # Существующие filename'ы — чтобы не дублировать при перезапуске.
+    existing = set()
+    with _LOCK:
+        c = regulation_store._connection()
+        rows = c.execute("SELECT filename FROM user_documents").fetchall()
+        existing = {r[0] for r in rows} if rows else set()
+
+    seeded = 0
+    # Стабильный порядок: сначала ТЗ, потом ARC, потом ARC-SIGMA. Берём через
+    # sorted(), что для русских названий с префиксом «Архитектура / ТЗ» даёт
+    # порядок: «Архитектура RAGRAF» < «Архитектура Сигма» < «ТЗ RAGRAF».
+    for path in sorted(DEMO_DOCS_DIR.glob("*.md")):
+        filename = path.name
+        if filename in existing:
+            continue
+        try:
+            data = path.read_bytes()
+            meta = await add_document(filename, "text/markdown", data)
+            # add_document по дефолту ставит enabled=False (opt-in). Для demo
+            # переключаем на True — новичок должен сразу видеть «3/3 включено».
+            toggle_document(meta["doc_id"], True)
+            seeded += 1
+        except Exception as e:
+            print(f"[document_store] demo-seed warning for {filename}: {e}")
+
+    if seeded:
+        print(f"[document_store] seeded {seeded} demo document(s)")
+    return seeded

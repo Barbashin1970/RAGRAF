@@ -52,7 +52,10 @@ export function ContextPanel({
   const regsEnabled = regsTotal - disabledRegulationIds.size
 
   return (
-    <aside className="flex h-full w-72 shrink-0 flex-col border-r border-stone-200 bg-stone-50/60">
+    <aside
+      data-context-panel
+      className="flex h-full w-72 shrink-0 flex-col border-r border-stone-200 bg-stone-50/60"
+    >
       {/* Tab strip — компактный, мини-бэйджи с числом enabled */}
       <nav className="grid grid-cols-2 border-b border-stone-200 bg-white">
         <TabButton

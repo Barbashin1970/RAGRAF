@@ -56,6 +56,12 @@ COPY backend/app /srv/backend/app
 #   • turtle bridge не отдаёт shapes/data для seed-регламентов.
 COPY backend/data/fixtures /srv/backend/data/fixtures
 
+# Демо-документы для онбординга (ТЗ RAGRAF, ARC, ARC-SIGMA). Путь хардкожен в
+# document_store.py через `Path(__file__).parents[2] / "data" / "demo_documents"`.
+# При первом старте `seed_demo_documents_if_empty()` парсит их в DuckDB и
+# выставляет enabled=True — новичок сразу видит «3/3 документов включено».
+COPY backend/data/demo_documents /srv/backend/data/demo_documents
+
 # Seed-данные DuckDB + начальное содержимое flows/ / versions/. ВАЖНО:
 # это копируется в `_seed_data/`, а runtime-каталог `/data` будет Volume
 # на Railway (см. start.sh — при первом запуске, если /data пустой,
