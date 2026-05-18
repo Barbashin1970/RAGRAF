@@ -242,16 +242,12 @@ async def update_regulation_raw(source_id: str, request: Request) -> dict[str, A
     if existing is None:
         raise HTTPException(status_code=404, detail=f"Регламент '{source_id}' не найден")
 
-    # SHACL shapes для bounds — берём текущие из upstream/фикстуры; если
-    # недоступны, парсим без них.
-    shapes_turtle = ""
+    # Парсим Turtle БЕЗ внешнего call'а за shapes — это был узкое место,
+    # делало save Turtle медленным (15с таймаут httpx на upstream) и
+    # маскировало success как зависание. SHACL-bounds для параметров
+    # восстанавливаем ниже из существующего regulation в store.
     try:
-        shapes_turtle = await client.get_shapes(source_id)
-    except Exception:
-        pass
-
-    try:
-        reg = parse_regulation_turtle(turtle, source_id, shapes_turtle=shapes_turtle)
+        reg = parse_regulation_turtle(turtle, source_id, shapes_turtle="")
     except Exception as e:
         raise HTTPException(
             status_code=400,
@@ -266,15 +262,26 @@ async def update_regulation_raw(source_id: str, request: Request) -> dict[str, A
             detail="В Turtle не найдены параметры, имя или рекомендация — отклонено как недействительный документ. Проверьте синтаксис.",
         )
 
-    # Восстанавливаем поля, которые в Turtle не выгружаются (domain, PROV-O
-    # локальный файл, mime/checksum). Это сохраняет привязки регламента
-    # после правки в редакторе.
+    # Восстанавливаем поля, которые в Turtle не выгружаются (domain, status,
+    # PROV-O локальный файл, mime/checksum) и SHACL-bounds параметров (они
+    # хранятся в shapes.ttl, не в data.ttl, и теряются при чистом парсинге).
     reg.domain = existing.domain or reg.domain
     reg.status = existing.status
     if not reg.source_file_path:
         reg.source_file_path = existing.source_file_path
     if not reg.source_mime_type:
         reg.source_mime_type = existing.source_mime_type
+    # Перенос bounds — параметры в Turtle не несут sh:minInclusive/maxInclusive,
+    # это поле shapes.ttl. Сохраняем их из существующего store, чтобы
+    # редактирование Turtle не сбрасывало валидацию.
+    existing_bounds = {p.name: (p.minInclusive, p.maxInclusive) for p in existing.parameters}
+    for p in reg.parameters:
+        if p.name in existing_bounds:
+            mn, mx = existing_bounds[p.name]
+            if p.minInclusive is None:
+                p.minInclusive = mn
+            if p.maxInclusive is None:
+                p.maxInclusive = mx
     # Триггеры: parse_regulation_turtle уже их распарсит, но если в Turtle
     # их нет (например пользователь стёр), не теряем — оставляем из store.
     if not reg.triggers and existing.triggers:

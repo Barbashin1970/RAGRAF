@@ -80,29 +80,23 @@ export function RegulationEditorScreen() {
   const [draft, setDraft] = useState<Regulation | null>(null)
   const [tab, setTab] = useState<Tab>('form')
   const [showHistory, setShowHistory] = useState(false)
-  // Флаг «после save ожидаем свежие данные с сервера» — единственная
-  // причина для перезаливки draft из regulation. По умолчанию (фоновый
-  // refetch react-query: window focus, инвалидация соседних query) draft
-  // НЕ затирается, иначе любая правка пропадает при переключении окна.
-  const [pendingServerSync, setPendingServerSync] = useState(false)
 
+  // Инициализация draft. Срабатывает только когда:
+  //   - draft ещё пуст (первичный mount); или
+  //   - в URL открыт другой регламент (regulation.id поменялся).
+  // Фоновые refetch (window focus, invalidate соседних query) НЕ затирают
+  // local edits — иначе любая правка пропадает. После save mutations
+  // явно обновляют draft через setDraft(fresh) в onSuccess, не через
+  // этот useEffect.
   useEffect(() => {
     if (!regulation) return
     setDraft((current) => {
-      // Первичная загрузка / переход на другой регламент → инициализируем.
       if (current === null || current.id !== regulation.id) {
         return structuredClone(regulation) as Regulation
       }
-      // Свежие данные с сервера после save / publish / archive / restore →
-      // обновляем, флаг снимаем ниже в useEffect-cleanup.
-      if (pendingServerSync) {
-        return structuredClone(regulation) as Regulation
-      }
-      // Фоновый refetch (focus / mutate соседних) — не трогаем local edits.
       return current
     })
-    if (pendingServerSync) setPendingServerSync(false)
-  }, [regulation, pendingServerSync])
+  }, [regulation])
 
   const dirty = useMemo(() => {
     if (!regulation || !draft) return false
@@ -128,49 +122,39 @@ export function RegulationEditorScreen() {
     return norm(regulation) !== norm(draft)
   }, [regulation, draft])
 
-  const invalidateAll = () => {
-    // Regulation — force refetch (а не invalidate). Без этого после save
-    // remote-данные приходят с задержкой и dirty не успевает сброситься —
-    // пользователь видит «несохранённую» зелёную кнопку, хотя сервер
-    // принял изменения. refetchQueries дёрнет GET сразу и синхронно
-    // прокинет свежий regulation в react-query → useEffect перезаполнит
-    // draft → dirty станет false.
-    qc.refetchQueries({ queryKey: ['regulation', id] })
+  // После save/publish/archive — явно тянем свежий regulation с сервера
+  // (await fetchQuery → детерминированный single-source-of-truth) и
+  // переписываем draft. Это решает две проблемы одновременно:
+  //   1) dirty корректно становится false (draft === regulation);
+  //   2) если backend нормализовал данные (например пересобрал триггеры
+  //      через reconcile_triggers_with_flow), пользователь видит результат.
+  // invalidate соседних query — для list/history/flow вью.
+  const syncFromServer = async () => {
+    const fresh = await qc.fetchQuery({
+      queryKey: ['regulation', id],
+      queryFn: () => api.regulations.get(id),
+    })
+    if (fresh) setDraft(structuredClone(fresh) as Regulation)
     qc.invalidateQueries({ queryKey: ['datasets'] })
     qc.invalidateQueries({ queryKey: ['regulation-history', id] })
     qc.invalidateQueries({ queryKey: ['regulation-triggered-by', id] })
-    // Flow refetch — форсим, чтобы при переходе на Flow Editor пилюли
-    // датчиков, добавленные backend'ом через reconcile_flow_with_triggers,
-    // были видны сразу, без зависимости от mount lifecycle.
+    // Flow — refetch (а не invalidate): пользователь скоро откроет страницу
+    // Поток и должен сразу видеть только что добавленный sensor из триггера.
     qc.refetchQueries({ queryKey: ['flow', id] })
   }
 
-  // Все мутации ставят `pendingServerSync` — это сигнал useEffect выше
-  // ОДНОКРАТНО перезалить draft из свежего regulation после refetch.
-  // Без этого фонового refetch'а от react-query (window focus, инвалидация
-  // соседних query) затирал бы local edits, и кнопка «Сохранить» казалась
-  // неактивной потому что dirty=false на свежезаписанных данных.
   const save = useMutation({
     mutationFn: (next: Regulation) => api.regulations.save(id, next),
-    onSuccess: () => {
-      setPendingServerSync(true)
-      invalidateAll()
-    },
+    onSuccess: syncFromServer,
   })
 
   const publish = useMutation({
     mutationFn: () => api.regulations.publish(id),
-    onSuccess: () => {
-      setPendingServerSync(true)
-      invalidateAll()
-    },
+    onSuccess: syncFromServer,
   })
   const archive = useMutation({
     mutationFn: () => api.regulations.archive(id),
-    onSuccess: () => {
-      setPendingServerSync(true)
-      invalidateAll()
-    },
+    onSuccess: syncFromServer,
   })
 
   const stats = [
@@ -302,13 +286,7 @@ export function RegulationEditorScreen() {
           )}
         </div>
         {showHistory && (
-          <HistoryPanel
-            id={id}
-            onRestore={() => {
-              setPendingServerSync(true)
-              invalidateAll()
-            }}
-          />
+          <HistoryPanel id={id} onRestore={syncFromServer} />
         )}
       </div>
     </div>
@@ -1367,28 +1345,37 @@ function SourceView({ sourceId }: { sourceId: string; draft: Regulation }) {
     queryFn: () => api.regulations.raw(sourceId),
   })
 
-  // Локальный буфер для редактирования. Заполняется из server-data при первой
-  // загрузке (и при «Сбросить»), не затирается фоновыми refetch'ами react-query.
+  // Локальный буфер. Инициализируется один раз когда придёт data; после
+  // этого фоновые refetch react-query НЕ затирают (как в RegulationEditor
+  // pendingServerSync паттерн). После save мы явно перезаписываем буфер
+  // тем, что вернул refetch — не полагаемся на useEffect chain.
   const [buffer, setBuffer] = useState<string | null>(null)
   useEffect(() => {
-    if (data && buffer === null) setBuffer(data)
-  }, [data, buffer])
+    if (data !== undefined && buffer === null) setBuffer(data)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data])
 
   const dirty = buffer !== null && data !== undefined && buffer !== data
 
   const save = useMutation({
     mutationFn: (turtle: string) => api.regulations.updateRaw(sourceId, turtle),
-    onSuccess: () => {
-      // Инвалидируем и сам regulation (структурированное представление
-      // обновится — Поля/Слайдеры покажут свежее), и raw — чтобы сразу
-      // отобразилось как backend нормализовал Turtle (отступы, порядок
-      // префиксов и т.п.).
+    onSuccess: async () => {
+      // Инвалидируем структурированные представления (Поля/Слайдеры/История)
+      // и поток (могла поменяться привязка sensor через триггеры).
       qc.invalidateQueries({ queryKey: ['regulation', sourceId] })
       qc.invalidateQueries({ queryKey: ['flow', sourceId] })
       qc.invalidateQueries({ queryKey: ['regulation-history', sourceId] })
-      qc.refetchQueries({ queryKey: ['regulation-raw', sourceId] })
-      // После refetch локальный буфер должен подтянуть свежее (см. useEffect ниже).
-      setBuffer(null)
+      // Phase 1: ждём пока вернётся свежий Turtle с сервера. Без await
+      // следующая строка setBuffer записала бы локально OLD data, потому
+      // что react-query refetch — асинхронный.
+      const fresh = await qc.fetchQuery({
+        queryKey: ['regulation-raw', sourceId],
+        queryFn: () => api.regulations.raw(sourceId),
+      })
+      // Phase 2: буфер = свежий Turtle с сервера → dirty=false → кнопка
+      // «Сохранить» гасится. Если backend нормализовал отступы/префиксы,
+      // пользователь сразу видит результат.
+      setBuffer(fresh ?? '')
     },
   })
 

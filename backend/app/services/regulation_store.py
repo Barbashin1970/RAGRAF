@@ -578,10 +578,30 @@ def save(
     # синка не должен откатывать запись регламента.
     if sync_flow:
         try:
+            from app.schemas.domain import RuleDSL
             from app.services.flow_storage import (
+                load_flow,
                 reconcile_flow_with_params,
                 reconcile_flow_with_triggers,
+                save_flow,
             )
+
+            # Если flow.json для регламента ещё не существует — создаём
+            # минимальный пустой RuleDSL. Без этого reconcile_flow_with_params
+            # сразу выходит (его контракт: «flow есть → синкаем; нет flow →
+            # ничего не делаем»), и sensor-нодa, ожидаемая пользователем
+            # после правки триггера, не появляется на канвасе. С пустым flow
+            # reconcile_flow_with_params сама добавит input-цепочки для всех
+            # параметров, reconcile_flow_with_triggers навесит sensor-узлы.
+            if load_flow(reg.id) is None:
+                empty_dsl = RuleDSL(
+                    rule_id=f"rule_{reg.id}",
+                    regulation_id=reg.id,
+                    nodes=[],
+                    edges=[],
+                )
+                save_flow(reg.id, empty_dsl, author="system",
+                          comment="Авто-создан при save регламента")
 
             # Порядок важен: сначала параметры (создаёт input-ноды для новых
             # параметров), потом триггеры (привязывает sensor-узлы к этим
