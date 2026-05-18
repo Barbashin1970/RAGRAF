@@ -507,32 +507,73 @@ def save(
                     reg.source_checksum, reg.source_mime_type,
                 ],
             )
-            # Полная замена параметров (упрощённая стратегия — drop+insert).
-            c.execute("DELETE FROM parameters WHERE source_id = ?", [reg.id])
-            for pos, p in enumerate(reg.parameters):
+            # ── Parameters: UPSERT + точечный DELETE удалённых ──────────────
+            # Раньше делали DELETE-всех + INSERT-новых. Это дёргает
+            # PRIMARY_parameters_5 index на ВСЕ ключи дважды (удаление + вставка
+            # обратно с тем же id). При abrupt-shutdown между этими шагами на
+            # volume оставался битый index → последующий COMMIT падал с
+            # FatalException `duplicate key "src, id"` → SIGABRT → краш контейнера.
+            # Корень из логов Railway 2026-05-18.
+            #
+            # UPSERT через ON CONFLICT DO UPDATE — НЕ удаляет существующую строку,
+            # только меняет non-PK поля. Индекс PK остаётся стабильным, не
+            # ребилдится. Удаление параметров теперь точечное — только тех,
+            # которых нет в новом списке.
+            #
+            # Защита от дубликатов в входном reg.parameters: dedupe по id
+            # с сохранением первого вхождения.
+            seen_param_ids: set[str] = set()
+            unique_params = []
+            for p in reg.parameters:
+                if p.id in seen_param_ids:
+                    continue
+                seen_param_ids.add(p.id)
+                unique_params.append(p)
+            for pos, p in enumerate(unique_params):
                 c.execute(
                     """
                     INSERT INTO parameters (source_id, id, name, datatype, ref_value, deviation, unit, min_inclusive, max_inclusive, position)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (source_id, id) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        datatype = EXCLUDED.datatype,
+                        ref_value = EXCLUDED.ref_value,
+                        deviation = EXCLUDED.deviation,
+                        unit = EXCLUDED.unit,
+                        min_inclusive = EXCLUDED.min_inclusive,
+                        max_inclusive = EXCLUDED.max_inclusive,
+                        position = EXCLUDED.position
                     """,
                     [
-                        reg.id,
-                        p.id,
-                        p.name,
-                        p.datatype,
-                        p.referenceValue,
-                        p.deviationAllowed,
-                        p.unit,
-                        p.minInclusive,
-                        p.maxInclusive,
-                        pos,
+                        reg.id, p.id, p.name, p.datatype,
+                        p.referenceValue, p.deviationAllowed, p.unit,
+                        p.minInclusive, p.maxInclusive, pos,
                     ],
                 )
-            # Триггеры — drop+insert той же стратегией. trigger_id уникален
-            # в рамках регламента; полная замена позволяет переименовывать
-            # триггеры без отдельной миграционной логики.
-            c.execute("DELETE FROM regulation_triggers WHERE source_id = ?", [reg.id])
-            for pos, t in enumerate(reg.triggers):
+            # Удаление параметров, которых больше нет в reg.parameters.
+            # NOT IN-список безопасен по размеру — типичный регламент <20 params.
+            if seen_param_ids:
+                placeholders = ",".join("?" for _ in seen_param_ids)
+                c.execute(
+                    f"DELETE FROM parameters WHERE source_id = ? AND id NOT IN ({placeholders})",
+                    [reg.id, *seen_param_ids],
+                )
+            else:
+                # Пустой набор — удаляем всё
+                c.execute("DELETE FROM parameters WHERE source_id = ?", [reg.id])
+
+            # ── Triggers: UPSERT + точечный DELETE удалённых ─────────────────
+            # Та же история, что и с parameters: DELETE-all + INSERT-all
+            # дёргал idx_trig_subtype/event/source_reg + PK index, что давало
+            # риск повреждения на abrupt-shutdown.
+            seen_trig_ids: set[str] = set()
+            unique_triggers = []
+            for t in reg.triggers:
+                if t.id in seen_trig_ids:
+                    continue
+                seen_trig_ids.add(t.id)
+                unique_triggers.append(t)
+            for pos, t in enumerate(unique_triggers):
                 c.execute(
                     """
                     INSERT INTO regulation_triggers (
@@ -542,20 +583,31 @@ def save(
                         description, position
                     )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (source_id, trigger_id) DO UPDATE SET
+                        label = EXCLUDED.label,
+                        param_ref = EXCLUDED.param_ref,
+                        sensor_subtype = EXCLUDED.sensor_subtype,
+                        event_type = EXCLUDED.event_type,
+                        source_regulation = EXCLUDED.source_regulation,
+                        source_output = EXCLUDED.source_output,
+                        description = EXCLUDED.description,
+                        position = EXCLUDED.position
                     """,
                     [
-                        reg.id,
-                        t.id,
-                        t.label,
-                        t.param_ref,
-                        t.sensor_subtype,
-                        t.event_type,
-                        t.source_regulation,
-                        t.source_output,
-                        t.description,
-                        pos,
+                        reg.id, t.id, t.label, t.param_ref,
+                        t.sensor_subtype, t.event_type,
+                        t.source_regulation, t.source_output,
+                        t.description, pos,
                     ],
                 )
+            if seen_trig_ids:
+                placeholders = ",".join("?" for _ in seen_trig_ids)
+                c.execute(
+                    f"DELETE FROM regulation_triggers WHERE source_id = ? AND trigger_id NOT IN ({placeholders})",
+                    [reg.id, *seen_trig_ids],
+                )
+            else:
+                c.execute("DELETE FROM regulation_triggers WHERE source_id = ?", [reg.id])
             # History snapshot
             c.execute(
                 """

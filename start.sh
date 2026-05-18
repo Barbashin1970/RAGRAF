@@ -52,21 +52,53 @@ echo "==> EMBEDDINGS:    ${EMBEDDINGS_ENABLED:-false}"
 DUCKDB_FILE="${DATA_DIR_PATH}/regulations.duckdb"
 if [ -f "$DUCKDB_FILE" ]; then
     echo "==> DuckDB integrity check: ${DUCKDB_FILE}"
+    # Probe — 3 уровня. Слабый probe (только SELECT) пропускает
+    # повреждённые ИНДЕКСЫ: файл читается, но при первом же COMMIT
+    # `RemoveFromIndexes` бросает FatalException → SIGABRT → крашится
+    # контейнер. Сейчас имитируем тот же путь, что делает uvicorn-процесс:
+    #   1) open + SELECT (читаемость);
+    #   2) CHECKPOINT (force-flush WAL — лечит часть transient bugs);
+    #   3) write-roundtrip на `parameters`: UPDATE/COMMIT/UPDATE-обратно/COMMIT
+    #      — это поднимет тот же crash что и при работе приложения,
+    #      и мы успеем ротировать файл вместо вечного цикла рестартов.
+    # SIGABRT (exit 134) и SIGSEGV (139) bash ловит через `if !`.
     if python -c "
 import duckdb, sys
 try:
     c = duckdb.connect('${DUCKDB_FILE}')
+    # 1) базовая читаемость
     c.execute('SELECT 1').fetchone()
+    # 2) CHECKPOINT — flush WAL → может исправить transient несоответствия
+    try:
+        c.execute('CHECKPOINT')
+    except Exception as e:
+        print(f'CHECKPOINT skipped: {type(e).__name__}: {e}', file=sys.stderr)
+    # 3) Write-roundtrip на parameters — самый частый источник crash:
+    #    повреждённый PRIMARY KEY index 'PRIMARY_parameters_*'.
+    #    Если таблица пуста или нет — пропускаем (нечего тестировать).
+    try:
+        row = c.execute('SELECT source_id, id FROM parameters LIMIT 1').fetchone()
+    except Exception:
+        row = None
+    if row:
+        sid, pid = row
+        # Идемпотентный UPDATE на то же значение — не меняет данные,
+        # но дёргает index pipeline ровно так же как save().
+        c.execute('BEGIN')
+        c.execute('UPDATE parameters SET position = position WHERE source_id = ? AND id = ?', [sid, pid])
+        c.execute('COMMIT')
+        # Если COMMIT прошёл — индекс жив.
     c.close()
     sys.exit(0)
 except Exception as e:
     print(f'duckdb probe failed: {type(e).__name__}: {e}', file=sys.stderr)
     sys.exit(1)
 " 2>&1; then
-        echo "==> DuckDB OK — продолжаем"
+        echo "==> DuckDB OK (включая write-roundtrip)"
     else
+        EXIT_CODE=$?
         TS=$(date +%s)
-        echo "==> WARN: DuckDB-файл повреждён (exit $? включая SIGSEGV) — ротируем в .broken-${TS}"
+        echo "==> WARN: DuckDB-файл повреждён (exit ${EXIT_CODE} — SIGABRT=134/SIGSEGV=139/Python=1) — ротируем в .broken-${TS}"
         mv "${DUCKDB_FILE}" "${DUCKDB_FILE}.broken-${TS}" 2>/dev/null || true
         # WAL без главного файла бесполезен и может вызвать тот же crash при
         # реоткрытии — тоже ротируем. -f чтобы не падать если WAL нет.
