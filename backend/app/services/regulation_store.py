@@ -483,6 +483,12 @@ def get(source_id: str) -> Regulation | None:
     ]
     recommendations: list[Recommendation] = []
     if head[6]:  # recommendation text
+        # linkedParameters — auto-derived = все p.id. Поле в модели сохранено
+        # для backward compat (graph_builder использует его как «к каким
+        # параметрам относится эта рекомендация» — пока всегда «ко всем»).
+        # Клиентские правки этого поля игнорируются: оно всегда
+        # перевычисляется на read. Если в будущем будет нужно линковать
+        # подмножество параметров — добавить DB-колонку + UI-чекбоксы.
         recommendations.append(
             Recommendation(
                 id=f"rec_{source_id}",
