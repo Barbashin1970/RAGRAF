@@ -230,6 +230,87 @@ def test_bug_6_output_recommendation_sync() -> bool:
     return ok
 
 
+def test_flow_sensor_propagates_to_edit_and_turtle() -> bool:
+    """Flow add sensor → trigger в Edit + Turtle (UX-баг из юзер-отчёта 034).
+
+    Сценарий: пользователь рисует sensor в Flow Editor (drop pill + выбор
+    sensorSubtype) БЕЗ ручного указания bindsTo. Ожидание: после save Flow
+    sensor виден в Edit/«Поля» (как триггер) и в Turtle/«Turtle» (как
+    `:hasTrigger` блок).
+    """
+    print("\n=== Flow→Edit→Turtle: sensor через Flow Editor ===")
+    # Get current flow
+    flow = http_get("/api/regulations/pressure-diameter/flow")
+    assert isinstance(flow, dict)
+    nodes = flow["nodes"]
+    edges = flow["edges"]
+
+    # Find input ноду для pressure
+    input_node = next((n for n in nodes if n.get("type") == "input"), None)
+    if input_node is None:
+        print("  ⚠ no input nodes — skipping")
+        return True
+    input_y = (input_node.get("position") or {}).get("y", 0)
+
+    # Удалить существующие sensor-ноды (для чистоты теста)
+    nodes = [n for n in nodes if n.get("type") != "sensor"]
+    edges = [
+        e for e in edges
+        if not any(n.get("id") == e["source"] and n.get("type") == "sensor"
+                   for n in flow["nodes"])
+    ]
+
+    # Drop sensor pill: nodeId, type='sensor', sensorSubtype='p' (Манометр),
+    # без bindsTo (имитирует пользовательский drag-drop без edge).
+    sensor_id = "test-sensor-flow"
+    nodes.append({
+        "id": sensor_id,
+        "type": "sensor",
+        "label": "",
+        "sensorType": "p",
+        "sensorSubtype": "p",
+        "bindsTo": None,
+        "position": {"x": -200, "y": input_y},
+    })
+
+    # PUT flow
+    body = {
+        "rule_id": flow.get("rule_id", "rule_pressure-diameter"),
+        "regulation_id": "pressure-diameter",
+        "nodes": nodes,
+        "edges": edges,
+    }
+    http_put_json("/api/regulations/pressure-diameter/flow", body)
+
+    # Verify: Edit видит триггер
+    reg = http_get("/api/regulations/pressure-diameter")
+    assert isinstance(reg, dict)
+    triggers = reg["triggers"]
+    pressure_triggers = [t for t in triggers if t["param_ref"] == "pressure"]
+    ok = True
+    ok &= assert_eq("trigger exists in regulation", len(pressure_triggers), 1)
+    if pressure_triggers:
+        ok &= assert_eq("sensor_subtype synced", pressure_triggers[0]["sensor_subtype"], "p")
+
+    # Verify: Turtle содержит :hasTrigger
+    raw = http_get("/api/regulations/pressure-diameter/raw")
+    assert isinstance(raw, str)
+    ok &= assert_eq(":hasTrigger в Turtle", ":hasTrigger" in raw, True)
+    ok &= assert_eq(":sensorSubtype в Turtle", ":sensorSubtype" in raw, True)
+
+    # Verify: flow получил bindsTo на input + edge
+    flow2 = http_get("/api/regulations/pressure-diameter/flow")
+    assert isinstance(flow2, dict)
+    sensor_after = next(n for n in flow2["nodes"] if n["id"] == sensor_id)
+    ok &= assert_eq("bindsTo auto-set", sensor_after.get("bindsTo"), input_node["id"])
+    edge_exists = any(
+        e["source"] == sensor_id and e["target"] == input_node["id"]
+        for e in flow2["edges"]
+    )
+    ok &= assert_eq("edge sensor→input создан", edge_exists, True)
+    return ok
+
+
 def test_bug_9_custom_unit_preserved() -> bool:
     """BUG-9: кастомный unit сохраняется при Turtle save."""
     print("\n=== BUG-9: кастомный unit через Turtle save ===")
@@ -269,6 +350,7 @@ def main() -> int:
         test_bug_5_dedupe_triggers,
         test_bug_6_output_recommendation_sync,
         test_bug_9_custom_unit_preserved,
+        test_flow_sensor_propagates_to_edit_and_turtle,
     ]
     results = [t() for t in tests]
     passed = sum(results)

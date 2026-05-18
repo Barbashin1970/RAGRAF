@@ -265,6 +265,7 @@ export function FlowEditorScreen() {
           <PropertyPanel
             node={selected}
             parameters={regulation?.parameters ?? []}
+            allNodes={nodes as Node<FlowNode>[]}
             onChange={updateNodeData}
             onDelete={deleteNode}
             collapsed={panelCollapsed}

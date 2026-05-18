@@ -54,6 +54,50 @@ def put_flow(regulation_id: str, dsl: RuleDSL) -> dict[str, object]:
     """
     if dsl.regulation_id != regulation_id:
         raise HTTPException(status_code=400, detail="regulation_id в теле не совпадает с URL")
+
+    # ── Auto-bind sensors с sensorSubtype но без bindsTo ─────────────────
+    # UX: пользователь dragged sensor pill, выбрал в PropertyPanel
+    # sensorSubtype, но НЕ нарисовал ребро sensor → input. По старой
+    # логике reconcile_triggers_with_flow требовал явный bindsTo и без
+    # него триггер не создавался — пользователь видел sensor на канвасе,
+    # сохранял, и нигде кроме Flow ничего не появлялось.
+    #
+    # Теперь привязываем sensor к ближайшему по Y input'у без датчика.
+    # Это даёт детерминированный «one-step UX»: drop sensor + pick
+    # subtype + save → datчик связан → trigger создан → виден в Edit
+    # и Turtle. Если все input'ы уже заняты или их нет — sensor остаётся
+    # без bindsTo (никаких сюрпризных привязок).
+    from app.schemas.domain import FlowEdge as _FlowEdge
+
+    inputs = [n for n in dsl.nodes if n.type == "input"]
+    bound_input_ids = {
+        n.bindsTo for n in dsl.nodes
+        if n.type == "sensor" and n.bindsTo and n.sensorSubtype
+    }
+    available_inputs = [n for n in inputs if n.id not in bound_input_ids]
+
+    def _y(node) -> float:
+        return float(node.position.get("y", 0)) if node.position else 0.0
+
+    for sensor in [n for n in dsl.nodes if n.type == "sensor"]:
+        if not sensor.sensorSubtype or sensor.bindsTo:
+            continue
+        if not available_inputs:
+            break
+        sensor_y = _y(sensor)
+        # Берём вход с минимальной |Δy| — визуально пользователь скорее
+        # всего рисовал sensor рядом с тем входом, к которому он относится.
+        nearest = min(available_inputs, key=lambda n: abs(_y(n) - sensor_y))
+        sensor.bindsTo = nearest.id
+        # Реальное ребро sensor→input — без него React Flow не отрисует
+        # связь. dslToFlow восстанавливает edge из bindsTo, но клиент
+        # шлёт прежний edges-список. Дополним.
+        if not any(
+            e.source == sensor.id and e.target == nearest.id for e in dsl.edges
+        ):
+            dsl.edges.append(_FlowEdge(source=sensor.id, target=nearest.id))
+        available_inputs.remove(nearest)
+
     version = save_flow(regulation_id, dsl)
 
     # Sync Flow → Form + Flow → Triggers (один общий save).

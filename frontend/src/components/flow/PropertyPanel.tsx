@@ -11,6 +11,9 @@ import { cn } from '@/lib/cn'
 interface Props {
   node: Node<FlowNode> | null
   parameters: Parameter[]
+  /** Все ноды flow — нужны sensor-секции, чтобы рендерить dropdown
+   *  «привязать к input», вместо free-text. */
+  allNodes?: Node<FlowNode>[]
   onChange: (id: string, patch: Partial<FlowNode>) => void
   onDelete: (id: string) => void
   collapsed: boolean
@@ -26,6 +29,7 @@ interface Props {
 export function PropertyPanel({
   node,
   parameters,
+  allNodes,
   onChange,
   onDelete,
   collapsed,
@@ -81,7 +85,7 @@ export function PropertyPanel({
       />
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         <FieldText label="Метка" value={d.label ?? ''} onChange={(v) => set({ label: v })} />
-        <ByType type={node.type as NodeKind} data={d} parameters={parameters} set={set} />
+        <ByType type={node.type as NodeKind} data={d} parameters={parameters} allNodes={allNodes} set={set} />
         <div className="mt-3 border-t border-stone-100 pt-2 font-mono text-[10px] text-stone-400">
           id: {node.id}
         </div>
@@ -132,7 +136,7 @@ function PanelHeader({
   )
 }
 
-function ByType({ type, data, parameters, set }: { type: NodeKind; data: FlowNode; parameters: Parameter[]; set: (p: Partial<FlowNode>) => void }) {
+function ByType({ type, data, parameters, allNodes, set }: { type: NodeKind; data: FlowNode; parameters: Parameter[]; allNodes?: Node<FlowNode>[]; set: (p: Partial<FlowNode>) => void }) {
   switch (type) {
     case 'input':
       return (
@@ -272,15 +276,42 @@ function ByType({ type, data, parameters, set }: { type: NodeKind; data: FlowNod
             subtypeId={data.sensorSubtype ?? null}
             onChange={(sub) => set({ sensorSubtype: sub })}
           />
-          {/* Привязка к input-ноде регламента — сенсор только указывает «куда
-              лить значение». Выбор из существующих input'ов canvas'а
-              реализуем чуть позже (нужен список нод); пока — свободный текст. */}
-          <FieldText
-            label="ID input-узла"
-            value={data.bindsTo ?? ''}
-            onChange={(v) => set({ bindsTo: v || null })}
-            monospaced
-          />
+          {/* Привязка к input-ноде регламента. Раньше тут был free-text — юзер
+              должен был знать ID input-узла, без подсказки. Теперь dropdown
+              из реальных input'ов канваса: label = параметр (или ID если нет
+              label). Backend на save'e дополнительно auto-bind'ит sensor с
+              sensorSubtype но без bindsTo к ближайшему по Y input'у — так
+              что пропустить этот шаг не критично, но явный выбор лучше. */}
+          {(() => {
+            const inputs = (allNodes ?? []).filter(
+              (n) => (n.data as FlowNode)?.type === 'input',
+            )
+            if (inputs.length === 0) {
+              return (
+                <div className="rounded-md border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-[11px] text-stone-500">
+                  Нет input-узлов на канвасе — sensor не к чему привязать. Добавьте
+                  параметр в Edit/«Поля» или drop'ните Input-пилюлю слева.
+                </div>
+              )
+            }
+            return (
+              <FieldSelect
+                label="Привязать к параметру"
+                value={data.bindsTo ?? ''}
+                onChange={(v) => set({ bindsTo: v || null })}
+                options={[
+                  { value: '', label: '— не привязан (auto-bind при save) —' },
+                  ...inputs.map((n) => {
+                    const fn = n.data as FlowNode
+                    return {
+                      value: n.id,
+                      label: fn.label || fn.paramRef || n.id,
+                    }
+                  }),
+                ]}
+              />
+            )
+          })()}
           <FieldText
             label="External ID (ETL)"
             value={data.externalId ?? ''}
