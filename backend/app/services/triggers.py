@@ -86,20 +86,20 @@ PARAM_TO_EVENT_TYPE: dict[str, str] = {
 def derive_triggers_from_flow(
     dsl: RuleDSL,
     *,
-    apply_hints: bool = True,
+    apply_hints: bool = False,
 ) -> list[RegulationTrigger]:
-    """Сгенерировать триггеры из flow.json.
+    """Сгенерировать триггеры из flow.json — ТОЛЬКО для явных bind'ов sensor → input.
 
-    Стратегия:
-      1. Для каждой input-ноды собираем paramRef.
-      2. Ищем sensor-ноду, у которой `bindsTo` указывает на эту input-ноду —
-         если есть, берём её `sensorSubtype`.
-      3. Если sensor не нашёлся и `apply_hints=True` — пытаемся вывести
-         sensor_subtype из PARAM_TO_SUBTYPE_HINT.
-      4. Аналогично event_type — из PARAM_TO_EVENT_TYPE.
-
-    Триггер с пустым param_ref не создаётся (input-нода без paramRef =
-    битый flow, пропускаем).
+    Стратегия (после ревизии 2026-05-18):
+      • Создаём триггер только если у input-ноды ЕСТЬ привязанный sensor
+        (sensor.bindsTo → input_id, sensor.sensorSubtype заполнен).
+      • `apply_hints=True` — opt-in, для legacy-сидов; по умолчанию выключено,
+        потому что эвристики PARAM_TO_SUBTYPE_HINT / PARAM_TO_EVENT_TYPE
+        создавали ложные привязки. Пользователь видел «уже привязанные»
+        датчики, которых он не выбирал, и редактор начинал работать с
+        зашумлёнными данными.
+      • Триггеры без явного источника НЕ создаются — пустые input-ноды flow
+        теперь не превращаются в фантом-триггеры.
     """
     # Индекс: input_node_id → paramRef.
     input_params: dict[str, tuple[str, str | None]] = {}
@@ -116,22 +116,28 @@ def derive_triggers_from_flow(
     triggers: list[RegulationTrigger] = []
     for input_id, (param_ref, label) in input_params.items():
         explicit_subtype = sensor_by_input.get(input_id)
-        subtype = explicit_subtype
-        if subtype is None and apply_hints:
+        # БЕЗ явного sensor: opt-in через apply_hints (по умолчанию off).
+        if explicit_subtype is None:
+            if not apply_hints:
+                continue
             subtype = PARAM_TO_SUBTYPE_HINT.get(param_ref)
-        event_type = PARAM_TO_EVENT_TYPE.get(param_ref) if apply_hints else None
+            event_type = PARAM_TO_EVENT_TYPE.get(param_ref)
+            if subtype is None:
+                continue
+        else:
+            subtype = explicit_subtype
+            event_type = PARAM_TO_EVENT_TYPE.get(param_ref) if apply_hints else None
         triggers.append(
             RegulationTrigger(
-                # ID триггера — стабильный slug от param_ref. Один input-узел
-                # = один триггер, поэтому коллизий не будет.
                 id=f"trig-{param_ref}",
                 label=label or param_ref,
                 param_ref=param_ref,
                 sensor_subtype=subtype,
                 event_type=event_type,
                 description=(
-                    "Производный триггер из flow.json"
-                    + (" (sensor явно привязан)" if explicit_subtype else " (sensor выведен эвристикой)")
+                    "Производный триггер из flow.json (sensor явно привязан)"
+                    if explicit_subtype
+                    else "Производный триггер из flow.json (sensor выведен эвристикой)"
                 ),
             )
         )
@@ -232,25 +238,20 @@ def reconcile_triggers_with_flow(
                 )
             )
         else:
-            # Новый триггер — создаём с подсказками PARAM_TO_*.
-            inferred_subtype = (
-                explicit_subtype
-                if explicit_subtype is not None
-                else PARAM_TO_SUBTYPE_HINT.get(param_ref)
-            )
-            inferred_event = PARAM_TO_EVENT_TYPE.get(param_ref)
+            # Новый триггер. Создаём ТОЛЬКО если sensor привязан в flow
+            # явно (sensor.bindsTo на этот input). Без явной привязки
+            # пользователь сам решит, какой источник нужен — иначе мы
+            # бы пре-заполнили триггеры эвристикой и засорили редактор.
+            if explicit_subtype is None:
+                continue
             out.append(
                 RegulationTrigger(
                     id=f"trig-{param_ref}",
                     label=label or param_ref,
                     param_ref=param_ref,
-                    sensor_subtype=inferred_subtype,
-                    event_type=inferred_event,
-                    description=(
-                        "Создан из flow: sensor привязан явно"
-                        if explicit_subtype
-                        else "Создан из flow: sensor выведен эвристикой"
-                    ),
+                    sensor_subtype=explicit_subtype,
+                    event_type=None,
+                    description="Создан из flow: sensor привязан явно",
                 )
             )
 
@@ -271,23 +272,27 @@ def reconcile_triggers_with_flow(
 def derive_triggers_from_parameters(
     parameters: list[Parameter],
     *,
-    apply_hints: bool = True,
+    apply_hints: bool = False,
 ) -> list[RegulationTrigger]:
-    """Fallback-деривация когда flow.json у регламента ещё нет.
+    """По умолчанию возвращает пустой список — авто-триггеры отключены.
 
-    Применяется к регламентам, которые имеют параметры в Turtle, но Flow
-    Editor для них ещё не открывали (нет файла `data/flows/<sid>.json`).
-    Такие регламенты иначе остались бы без триггеров — и event-driven
-    маршрутизация на них не работала бы. Один триггер на каждый параметр,
-    sensor_subtype/event_type выводятся из эвристики PARAM_TO_*.
+    Раньше эта функция создавала триггер на каждый параметр с эвристически
+    выведенным sensor_subtype (PARAM_TO_SUBTYPE_HINT). Это пре-заполняло
+    редактор привязками, которых пользователь не делал, и засоряло
+    `regulation_triggers` фантом-записями.
 
-    Аналитик потом может перепривязать датчик или удалить лишний триггер
-    в UI — это всё лишь дефолтная заполненность.
+    `apply_hints=True` оставляем как opt-in для тестов / возможной CLI-
+    утилиты «преднабор по эвристике». В сидинге и backfill'е больше не
+    зовётся.
     """
+    if not apply_hints:
+        return []
     triggers: list[RegulationTrigger] = []
     for p in parameters:
-        subtype = PARAM_TO_SUBTYPE_HINT.get(p.name) if apply_hints else None
-        event_type = PARAM_TO_EVENT_TYPE.get(p.name) if apply_hints else None
+        subtype = PARAM_TO_SUBTYPE_HINT.get(p.name)
+        event_type = PARAM_TO_EVENT_TYPE.get(p.name)
+        if subtype is None:
+            continue
         triggers.append(
             RegulationTrigger(
                 id=f"trig-{p.name}",

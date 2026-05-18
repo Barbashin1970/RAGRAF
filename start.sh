@@ -50,6 +50,23 @@ echo "==> EMBEDDINGS:    ${EMBEDDINGS_ENABLED:-false}"
 #    станет в строй; пользовательские правки на сломанном файле теряются,
 #    но **остаются доступны на Volume** под .broken-* для ручного REPAIR.
 DUCKDB_FILE="${DATA_DIR_PATH}/regulations.duckdb"
+
+# 0a) Опциональный hard-reset Volume по env-флагу.
+#     SEED_FORCE_RESET=1 — ротирует существующий DuckDB в .obsolete-<ts>,
+#     удаляет WAL и оставляет блок seed ниже подняться из чистых фикстур.
+#     Использование: задать в Railway env, задеплоить ОДИН РАЗ, потом убрать
+#     переменную. Цель — сбросить накопленный мусор тестовых датчиков/
+#     триггеров на сайте, не теряя данные навсегда (.obsolete-* остаётся
+#     на Volume и доступен для diagnostic dump).
+if [ -f "$DUCKDB_FILE" ] && [ "${SEED_FORCE_RESET:-0}" = "1" ]; then
+    TS=$(date +%s)
+    echo "==> SEED_FORCE_RESET=1 — ротирую DuckDB в .obsolete-${TS} для re-seed"
+    mv "${DUCKDB_FILE}" "${DUCKDB_FILE}.obsolete-${TS}" || true
+    if [ -f "${DUCKDB_FILE}.wal" ]; then
+        mv "${DUCKDB_FILE}.wal" "${DUCKDB_FILE}.wal.obsolete-${TS}" || true
+    fi
+fi
+
 if [ -f "$DUCKDB_FILE" ]; then
     echo "==> DuckDB integrity check: ${DUCKDB_FILE}"
     # Probe — 3 уровня. Слабый probe (только SELECT) пропускает

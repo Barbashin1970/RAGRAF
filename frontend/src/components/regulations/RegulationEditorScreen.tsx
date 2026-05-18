@@ -100,25 +100,34 @@ export function RegulationEditorScreen() {
 
   const dirty = useMemo(() => {
     if (!regulation || !draft) return false
-    // Сравниваем по полям, а не голым JSON.stringify(reg) !== JSON.stringify(draft):
-    //   - JSON.stringify пропускает поля со значением undefined, поэтому
-    //     добавленный триггер с `sensor_subtype: null` vs unset на сервере
-    //     (приходит как `null` через Pydantic JSON) считался разным даже когда
-    //     данные идентичны;
-    //   - стабильный порядок ключей через нормализацию JSON: stringify с
-    //     отсортированными ключами.
-    const norm = (obj: unknown): string => JSON.stringify(obj, (_, v) => {
-      if (v && typeof v === 'object' && !Array.isArray(v)) {
-        return Object.keys(v).sort().reduce<Record<string, unknown>>((acc, k) => {
-          const val = (v as Record<string, unknown>)[k]
-          // Унифицируем null/undefined → null, чтобы патчи фронта
-          // (где optional поле = undefined) сравнивались с серверным null.
-          acc[k] = val === undefined ? null : val
-          return acc
-        }, {})
-      }
-      return v
-    })
+    // Стабильное сравнение Regulation:
+    //   • ключи объекта сортируются — иначе порядок Pydantic-вывода vs
+    //     порядок добавления в React не совпадает;
+    //   • массивы parameters/triggers сортируются по id перед сравнением —
+    //     backend reconcile_flow_with_triggers может вернуть их в другом
+    //     порядке (по position в flow), что иначе делало бы кнопку
+    //     «Сохранить» вечно активной после save;
+    //   • null/undefined унифицируются в null — Pydantic выводит null,
+    //     React patch'и могут содержать undefined для тех же optional полей.
+    const norm = (obj: unknown): string =>
+      JSON.stringify(obj, (key, v) => {
+        if (Array.isArray(v) && (key === 'parameters' || key === 'triggers')) {
+          // Сортируем по id (стабильный ключ, есть и в parameters, и в triggers).
+          return [...v].sort((a, b) => {
+            const ai = (a as { id?: string })?.id ?? ''
+            const bi = (b as { id?: string })?.id ?? ''
+            return ai.localeCompare(bi)
+          })
+        }
+        if (v && typeof v === 'object' && !Array.isArray(v)) {
+          return Object.keys(v).sort().reduce<Record<string, unknown>>((acc, k) => {
+            const val = (v as Record<string, unknown>)[k]
+            acc[k] = val === undefined ? null : val
+            return acc
+          }, {})
+        }
+        return v
+      })
     return norm(regulation) !== norm(draft)
   }, [regulation, draft])
 

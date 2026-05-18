@@ -224,6 +224,47 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
         """
     )
 
+    # ── Raw Turtle (вербатимное хранилище для встроенного редактора) ─────
+    # `regulation_to_turtle(reg)` — каноническая сериализация: парсер→модель→
+    # ре-сериализация теряет всё, чего нет в Regulation: rdf-комментарии,
+    # порядок triplet'ов, кастомные неймспейсы, пробелы. Когда пользователь
+    # правит «Turtle»-вкладку и пишет, например, дефис в комментарии или
+    # переставляет триплы — после save мы возвращали ему ре-сериализованный
+    # текст БЕЗ его правок. Симптом: «добавил тире → сохранить → тире
+    # исчезло».
+    #
+    # Лечение — `regulation_raw_turtle`: дополнительная таблица с raw-текстом
+    # последнего save. Контракт:
+    #   • PUT /raw → store user's text verbatim + parse+save Regulation.
+    #   • GET /raw → если raw_turtle есть → отдать верзим; иначе fallback на
+    #     regulation_to_turtle(stored).
+    #   • PUT /regulations/{id} (Form save) → save() очищает raw_turtle —
+    #     следующий GET регенерит из структурированной модели (правда — Form).
+    #   • restore() из истории → тоже очищает raw_turtle.
+    # Один источник правды: то, что пользователь сохранил последним.
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS regulation_raw_turtle (
+            source_id   VARCHAR PRIMARY KEY,
+            turtle      TEXT NOT NULL,
+            updated_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
+    # ── Миграции (одноразовые data-migrations) ───────────────────────────
+    # Лёгкий tracker: имя миграции + applied_at. Используется для апгрейдов
+    # данных, которые не выражаются ALTER TABLE — например «удалить триггеры
+    # с эвристическим источником». См. _run_data_migrations() ниже.
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS _migrations (
+            name        VARCHAR PRIMARY KEY,
+            applied_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
 
 # ---- Public API -------------------------------------------------------
 
@@ -233,79 +274,51 @@ def init_db() -> None:
     with _LOCK:
         _connection()  # запустит _init_schema
         _seed_from_fixtures_if_empty()
-        _backfill_triggers_if_missing()
+        _run_data_migrations()
 
 
-def _backfill_triggers_if_missing() -> None:
-    """Идемпотентный backfill триггеров для регламентов БЕЗ декларированных триггеров.
+def _run_data_migrations() -> None:
+    """Запустить одноразовые data-migrations (имена tracked в _migrations).
 
-    Сценарий: пользователь обновил RAGRAF до версии с триггерами, у него уже
-    был DuckDB-файл с 11 сидированными регламентами (без `:hasTrigger` в
-    Turtle). Семя per-id не повторно их деривирует, потому что регламенты
-    уже есть. Backfill один раз пройдётся по таким регламентам и заполнит
-    триггеры из flow.json.
+    Каждая миграция идемпотентна по самой себе, плюс мы отмечаем её как
+    `applied_at` — после первого запуска код миграции уже не выполняется.
 
-    Идемпотентен: если у регламента триггеры уже есть — пропуск. Технические
-    записи в history НЕ создаются — это инфраструктурная миграция, не правка
-    регламента (чтобы лента изменений не засорилась 11 одинаковыми записями).
+    Сценарии добавления миграций:
+      • удаление авто-сгенерированных триггеров после смены политики
+        (heuristic auto-fill → user-driven only);
+      • очистка sensor-нод flow без bindsTo;
+      • любая трансформация данных, которая не выражается ALTER TABLE.
     """
-    from app.services.flow_storage import load_flow
-    from app.services.triggers import derive_triggers_from_flow, derive_triggers_from_parameters
-
     c = _connection()
-    rows = c.execute(
-        """
-        SELECT r.source_id
-        FROM regulations r
-        LEFT JOIN regulation_triggers t ON t.source_id = r.source_id
-        WHERE t.trigger_id IS NULL
-        """
-    ).fetchall()
-    # rows может содержать дубликаты (один regulation_id повторяется N раз
-    # если у него N параметров — LEFT JOIN duplicates). Дедупим.
-    if not rows:
-        return
-    unique_ids = sorted({sid for (sid,) in rows})
+    applied = {row[0] for row in c.execute("SELECT name FROM _migrations").fetchall()}
 
-    filled = 0
-    for sid in unique_ids:
+    # ── strip_auto_triggers_v1 ──────────────────────────────────────────
+    # 2026-05-18. Раньше `_backfill_triggers_if_missing` агрессивно заполнял
+    # триггеры по эвристике PARAM_TO_SUBTYPE_HINT (имя параметра → датчик)
+    # и PARAM_TO_EVENT_TYPE — пользователь видел уже привязанные датчики,
+    # которых он не выбирал. Поведение поменяли: триггер создаётся только
+    # явно пользователем. Эта миграция удаляет хвост авто-триггеров,
+    # оставшийся в БД.
+    #
+    # Критерий — description тех функций. Не трогаем триггеры с явным
+    # source_regulation/sensor_subtype, выбранным руками (description !=
+    # auto-pattern).
+    if "strip_auto_triggers_v1" not in applied:
         try:
-            triggers: list[RegulationTrigger] = []
-            flow = load_flow(sid)
-            if flow is not None:
-                triggers = derive_triggers_from_flow(flow)
-            # Если flow нет или из него ничего не вышло — выводим из параметров.
-            if not triggers:
-                reg = get(sid)
-                if reg is not None:
-                    triggers = derive_triggers_from_parameters(reg.parameters)
-            if not triggers:
-                continue
-            for pos, t in enumerate(triggers):
-                c.execute(
-                    """
-                    INSERT INTO regulation_triggers (
-                        source_id, trigger_id, label, param_ref,
-                        sensor_subtype, event_type,
-                        source_regulation, source_output,
-                        description, position
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT (source_id, trigger_id) DO NOTHING
-                    """,
-                    [
-                        sid, t.id, t.label, t.param_ref,
-                        t.sensor_subtype, t.event_type,
-                        t.source_regulation, t.source_output,
-                        t.description, pos,
-                    ],
-                )
-            filled += 1
+            deleted = c.execute(
+                """
+                DELETE FROM regulation_triggers
+                WHERE description LIKE 'Производный триггер%'
+                   OR description LIKE 'Создан из flow%'
+                """
+            ).fetchall()
+            c.execute(
+                "INSERT INTO _migrations (name) VALUES (?)",
+                ["strip_auto_triggers_v1"],
+            )
+            print("[regulation_store] migration strip_auto_triggers_v1 applied")
         except Exception as e:
-            print(f"[regulation_store] trigger backfill warning for {sid}: {e}")
-
-    if filled:
-        print(f"[regulation_store] backfilled triggers for {filled} regulation(s) from flow.json")
+            print(f"[regulation_store] migration strip_auto_triggers_v1 failed: {e}")
 
 
 def has(source_id: str) -> bool:
@@ -666,7 +679,54 @@ def save(
             # потеря регламента из-за рассинка флоу — недопустима.
             pass
 
+    # Form-save → инвалидируем сохранённый raw turtle. Структурированная модель
+    # теперь — источник правды; следующий GET /raw регенерит каноничный текст
+    # из неё через regulation_to_turtle. Без инвалидации пользователь увидел
+    # бы старый verbatim, не отражающий правки в полях.
+    invalidate_raw_turtle(reg.id)
+
     return version_id
+
+
+# ---- Raw Turtle (вербатимное хранилище для встроенного редактора) ----
+
+def get_raw_turtle(source_id: str) -> str | None:
+    """Возвращает verbatim Turtle, сохранённый через PUT /raw, или None.
+
+    None означает «структурированная модель — источник правды, регенерируйте».
+    """
+    with _LOCK:
+        c = _connection()
+        row = c.execute(
+            "SELECT turtle FROM regulation_raw_turtle WHERE source_id = ?",
+            [source_id],
+        ).fetchone()
+    return row[0] if row else None
+
+
+def save_raw_turtle(source_id: str, turtle: str) -> None:
+    """Сохранить verbatim Turtle (вызов из PUT /raw)."""
+    with _LOCK:
+        c = _connection()
+        c.execute(
+            """
+            INSERT INTO regulation_raw_turtle (source_id, turtle, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT (source_id) DO UPDATE SET
+                turtle = EXCLUDED.turtle,
+                updated_at = EXCLUDED.updated_at
+            """,
+            [source_id, turtle],
+        )
+
+
+def invalidate_raw_turtle(source_id: str) -> None:
+    """Удалить verbatim Turtle — следующий GET /raw регенерит из модели."""
+    with _LOCK:
+        c = _connection()
+        c.execute(
+            "DELETE FROM regulation_raw_turtle WHERE source_id = ?", [source_id]
+        )
 
 
 def history(source_id: str) -> list[dict[str, Any]]:
@@ -796,6 +856,7 @@ def delete(source_id: str) -> bool:
             c.execute("DELETE FROM parameters WHERE source_id = ?", [source_id])
             c.execute("DELETE FROM regulation_triggers WHERE source_id = ?", [source_id])
             c.execute("DELETE FROM regulation_history WHERE source_id = ?", [source_id])
+            c.execute("DELETE FROM regulation_raw_turtle WHERE source_id = ?", [source_id])
             c.execute("DELETE FROM regulations WHERE source_id = ?", [source_id])
             c.commit()
         except Exception:
@@ -956,21 +1017,14 @@ def _seed_from_fixtures_if_empty() -> None:
             reg.domain = meta["domain"]
             # Имя из реестра приоритетнее имени в Turtle — оно длиннее и описательнее.
             reg.name = meta.get("name") or reg.name
-            # Деривация триггеров — для старых фикстур, в которых Turtle ещё
-            # не содержит :hasTrigger декларации. Двухуровневый fallback:
-            #   1) flow.json есть → derive_triggers_from_flow (учитывает
-            #      явные sensor.bindsTo привязки);
-            #   2) flow.json нет → derive_triggers_from_parameters (триггер
-            #      на каждый параметр, sensor выводится эвристикой).
-            # Без второго уровня регламенты без flow остались бы без триггеров.
+            # Деривация триггеров — только для фикстур с явной привязкой
+            # sensor.bindsTo в flow.json. БЕЗ эвристик по имени параметра —
+            # пользователь сам решает, какой источник привязать к входу.
             if not reg.triggers:
                 try:
                     flow = load_flow(sid)
                     if flow is not None:
                         reg.triggers = derive_triggers_from_flow(flow)
-                    if not reg.triggers:
-                        from app.services.triggers import derive_triggers_from_parameters
-                        reg.triggers = derive_triggers_from_parameters(reg.parameters)
                 except Exception:
                     pass
             save(reg, author="system-seed", comment=f"Сидинг из фикстуры {sid}")

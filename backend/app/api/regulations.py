@@ -196,11 +196,17 @@ def archive_regulation(source_id: str) -> Regulation:
 async def get_regulation_raw(source_id: str) -> str:
     """Получить регламент сырым Turtle.
 
-    Приоритет: локальный DuckDB-store (через `regulation_to_turtle`) →
-    upstream фикстура. Раньше всегда шли в upstream, и встроенный редактор
-    вкладки «Turtle» показывал НЕ свежие данные после правки регламента —
-    они были на сервере (DuckDB), но мы тащили upstream-копию (фикстуру).
+    Приоритет:
+      1) `regulation_raw_turtle` — verbatim, сохранённый последним PUT /raw.
+         Это то, что пользователь видел/писал в редакторе — без потери
+         комментариев, порядка triplet'ов, кастомных префиксов.
+      2) Если raw нет (Form-save → invalidate_raw_turtle) → каноничная
+         сериализация через `regulation_to_turtle(stored)`.
+      3) Регламента вообще нет в DuckDB → fallback на upstream (legacy).
     """
+    raw = regulation_store.get_raw_turtle(source_id)
+    if raw is not None:
+        return raw
     stored = regulation_store.get(source_id)
     if stored is not None:
         # Triggers — теперь часть Turtle через :hasTrigger. Парсер шейпов
@@ -288,6 +294,13 @@ async def update_regulation_raw(source_id: str, request: Request) -> dict[str, A
         reg.triggers = existing.triggers
 
     version_id = regulation_store.save(reg, author="anonymous", comment="Правка через Turtle-редактор")
+
+    # ВАЖНО: save() выше уже инвалидирует raw_turtle (контракт Form-save),
+    # поэтому сохраняем verbatim ПОСЛЕ save(). Контракт PUT /raw:
+    # «вернуть пользователю ровно то, что он отправил» — иначе следующий
+    # GET /raw регенерит каноничный Turtle из модели и теряет cosmetic
+    # правки (комментарии, отступы, дефисы в строках, порядок triplet'ов).
+    regulation_store.save_raw_turtle(source_id, turtle)
 
     pushed = False
     if getattr(settings, "writeback_upstream", False):
