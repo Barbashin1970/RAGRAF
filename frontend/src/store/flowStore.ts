@@ -4,6 +4,11 @@ import type { ValidationError } from '@/lib/api'
 type FlowState = {
   errorsByNode: Record<string, ValidationError[]>
   globalErrors: ValidationError[]
+  /** Все ошибки в порядке прихода — для списка в UI и счётчиков. */
+  allErrors: ValidationError[]
+  /** Маркер «валидация запускалась» — нужен чтобы отличать состояния
+   *  «не проверяли» (allErrors=[]) и «проверили, всё чисто» (validated=true). */
+  validated: boolean
   selectedNodeId: string | null
   setSelected: (id: string | null) => void
   setErrors: (errors: ValidationError[]) => void
@@ -13,6 +18,8 @@ type FlowState = {
 export const useFlowStore = create<FlowState>((set) => ({
   errorsByNode: {},
   globalErrors: [],
+  allErrors: [],
+  validated: false,
   selectedNodeId: null,
   setSelected: (id) => set({ selectedNodeId: id }),
   setErrors: (errors) => {
@@ -26,7 +33,7 @@ export const useFlowStore = create<FlowState>((set) => ({
         global.push(e)
       }
     }
-    set({ errorsByNode: byNode, globalErrors: global })
+    set({ errorsByNode: byNode, globalErrors: global, allErrors: errors, validated: true })
   },
-  clearErrors: () => set({ errorsByNode: {}, globalErrors: [] }),
+  clearErrors: () => set({ errorsByNode: {}, globalErrors: [], allErrors: [], validated: false }),
 }))

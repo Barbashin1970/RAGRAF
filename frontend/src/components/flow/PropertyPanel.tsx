@@ -3,10 +3,11 @@ import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Node } from 'reactflow'
-import { api, NODE_KIND_META, type FlowNode, type NodeKind, type Parameter, type SensorFieldSchema } from '@/lib/api'
+import { api, NODE_KIND_META, type FlowNode, type NodeKind, type Parameter, type SensorFieldSchema, type ValidationError } from '@/lib/api'
 import { nanoid } from '@/lib/nanoid'
 import { Button } from '@/components/ui'
 import { cn } from '@/lib/cn'
+import { useFlowStore } from '@/store/flowStore'
 
 interface Props {
   node: Node<FlowNode> | null
@@ -81,6 +82,9 @@ export function PropertyPanel({
   const d = node.data
   const set = (patch: Partial<FlowNode>) => onChange(node.id, patch)
   const meta = NODE_KIND_META[node.type as NodeKind]
+  // Ошибки валидации для текущего узла — рисуем заметным красным блоком
+  // ВНУТРИ панели, не только тонкой красной рамкой на канвасе.
+  const nodeErrors = useFlowStore((s) => s.errorsByNode[node.id]) ?? []
 
   return (
     <aside className="flex w-72 shrink-0 flex-col border-l border-stone-200 bg-white text-sm">
@@ -90,6 +94,22 @@ export function PropertyPanel({
         onToggleCollapsed={onToggleCollapsed}
       />
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
+        {nodeErrors.length > 0 && (
+          <div className="mb-2 rounded-md border border-rose-300 bg-rose-50 p-2 text-[11px] text-rose-900">
+            <div className="mb-1 flex items-center gap-1 font-semibold uppercase tracking-wide text-rose-700">
+              <span className="inline-flex h-3.5 w-3.5 items-center justify-center rounded bg-rose-600 text-[9px] font-bold text-white">!</span>
+              {nodeErrors.length === 1 ? 'Ошибка валидации' : `${nodeErrors.length} ошибок валидации`}
+            </div>
+            <ul className="ml-1 space-y-1">
+              {nodeErrors.map((e, i) => (
+                <li key={i} className="leading-snug">
+                  <span className="text-rose-900">{e.message}</span>
+                  <span className="ml-1 font-mono text-[10px] text-rose-500">({e.code})</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <FieldText label="Метка" value={d.label ?? ''} onChange={(v) => set({ label: v })} />
         <ByType type={node.type as NodeKind} data={d} parameters={parameters} allNodes={allNodes} constraints={constraints} regulationId={regulationId} set={set} />
         <div className="mt-3 border-t border-stone-100 pt-2 font-mono text-[10px] text-stone-400">

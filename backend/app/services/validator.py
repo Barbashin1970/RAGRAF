@@ -77,20 +77,48 @@ def validate_dsl(
                 )
             )
 
-    # 3. Type safety — `compare` requires decimal on both inputs (heuristic)
-    # Implementation: ensure compare has at least 2 inbound edges
+    # 3. Type safety — `compare` нужен либо 2 входа, либо 1 вход от
+    # threshold-узла (threshold уже несёт `value` + `refValue ± deviation`,
+    # это самодостаточный «значение+диапазон» комплект — таков паттерн
+    # всех 11 фикстур RAGRAF: input → threshold → compare → output).
+    # Раньше правило безусловно требовало in_degree ≥ 2 — это давало
+    # ложные warning'и на каждом регламенте.
+    #
+    # Стратегия: warn только если предшественников 0, ИЛИ их 1 и это
+    # НЕ threshold. Двойной legit-кейс остаётся: явные value+range из двух
+    # input-нод или формул.
     for n in dsl.nodes:
-        if n.type == "compare":
-            in_deg = g.in_degree(n.id) if n.id in g else 0
-            if in_deg < 2:
-                errors.append(
-                    ValidationError(
-                        nodeId=n.id,
-                        code="COMPARE_INSUFFICIENT_INPUTS",
-                        message="Узел сравнения требует 2 входа (value + range)",
-                        severity="warning",
-                    )
+        if n.type != "compare":
+            continue
+        in_deg = g.in_degree(n.id) if n.id in g else 0
+        if in_deg == 0:
+            errors.append(
+                ValidationError(
+                    nodeId=n.id,
+                    code="COMPARE_INSUFFICIENT_INPUTS",
+                    message="Узел сравнения не подключён к источнику данных",
+                    severity="warning",
                 )
+            )
+            continue
+        if in_deg >= 2:
+            continue
+        # Ровно один предшественник — допустимо если это threshold.
+        pred_id = next(iter(g.predecessors(n.id)))
+        pred = node_by_id.get(pred_id)
+        if pred is None or pred.type != "threshold":
+            errors.append(
+                ValidationError(
+                    nodeId=n.id,
+                    code="COMPARE_INSUFFICIENT_INPUTS",
+                    message=(
+                        "Узел сравнения с одним входом ожидает threshold "
+                        "(value+range внутри). Подключите threshold или добавьте "
+                        "второй вход."
+                    ),
+                    severity="warning",
+                )
+            )
 
     # 4. Reference integrity — paramRef must exist
     for n in dsl.nodes:
@@ -104,41 +132,51 @@ def validate_dsl(
                     )
                 )
 
-    # 5. Threshold bounds — refValue ± deviation must be within param bounds
+    # 5. Threshold bounds — сам refValue должен быть в SHACL bounds.
+    # Раньше требовали `refValue ± deviation ⊆ [min, max]`. Это давало
+    # ложные warning'и для счётчиков типа `pdkExceedanceHours` ref=0 dev=4:
+    # нижний порог -4 < 0, но физически 0 — это нормальный baseline шумящего
+    # измерителя, его «отклонение» — это просто допустимый разброс вокруг
+    # baseline'а, не запрет на нижнюю границу.
+    #
+    # Семантика правильная: refValue (= точка калибровки) обязан быть в
+    # допустимом физическом диапазоне; deviation — окно срабатывания,
+    # его выход за SHACL bounds означает «измерения могут попасть за края,
+    # тогда сработает out_of_range» — это нормальное поведение.
     for n in dsl.nodes:
-        if n.type == "threshold" and n.refValue is not None and n.deviation is not None:
-            lo = n.refValue - n.deviation
-            hi = n.refValue + n.deviation
-            # find connected input → param
-            for e in dsl.edges:
-                if e.target == n.id:
-                    src = node_by_id.get(e.source)
-                    if src and src.type == "input" and src.paramRef in params_by_id:
-                        p = params_by_id[src.paramRef]
-                        if p.minInclusive is not None and lo < p.minInclusive:
-                            errors.append(
-                                ValidationError(
-                                    nodeId=n.id,
-                                    code="THRESHOLD_OUT_OF_BOUNDS",
-                                    message=(
-                                        f"Нижний порог {lo} ниже допустимого минимума параметра "
-                                        f"{p.name} ({p.minInclusive})"
-                                    ),
-                                    severity="warning",
-                                )
-                            )
-                        if p.maxInclusive is not None and hi > p.maxInclusive:
-                            errors.append(
-                                ValidationError(
-                                    nodeId=n.id,
-                                    code="THRESHOLD_OUT_OF_BOUNDS",
-                                    message=(
-                                        f"Верхний порог {hi} выше допустимого максимума параметра "
-                                        f"{p.name} ({p.maxInclusive})"
-                                    ),
-                                    severity="warning",
-                                )
-                            )
+        if n.type != "threshold" or n.refValue is None:
+            continue
+        for e in dsl.edges:
+            if e.target != n.id:
+                continue
+            src = node_by_id.get(e.source)
+            if src is None or src.type != "input" or src.paramRef not in params_by_id:
+                continue
+            p = params_by_id[src.paramRef]
+            if p.minInclusive is not None and n.refValue < p.minInclusive:
+                errors.append(
+                    ValidationError(
+                        nodeId=n.id,
+                        code="THRESHOLD_OUT_OF_BOUNDS",
+                        message=(
+                            f"refValue {n.refValue} ниже допустимого минимума параметра "
+                            f"{p.name} ({p.minInclusive})"
+                        ),
+                        severity="warning",
+                    )
+                )
+            if p.maxInclusive is not None and n.refValue > p.maxInclusive:
+                errors.append(
+                    ValidationError(
+                        nodeId=n.id,
+                        code="THRESHOLD_OUT_OF_BOUNDS",
+                        message=(
+                            f"refValue {n.refValue} выше допустимого максимума параметра "
+                            f"{p.name} ({p.maxInclusive})"
+                        ),
+                        severity="warning",
+                    )
+                )
 
     # 6. Cycle detection — DAG required
     try:

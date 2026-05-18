@@ -36,6 +36,9 @@ export function FlowEditorScreen() {
   const setErrors = useFlowStore((s) => s.setErrors)
   const clearErrors = useFlowStore((s) => s.clearErrors)
   const globalErrors = useFlowStore((s) => s.globalErrors)
+  const allErrors = useFlowStore((s) => s.allErrors)
+  const validated = useFlowStore((s) => s.validated)
+  const [showErrorList, setShowErrorList] = useState(false)
 
   const dslKey = ['flow', id] as const
   const regKey = ['regulation', id] as const
@@ -215,12 +218,96 @@ export function FlowEditorScreen() {
     { icon: Shield,            value: regulation?.constraints.length ?? 0, label: 'ограничений' },
   ]
 
-  const subHeader = globalErrors.length > 0 ? (
-    <div className="border-t border-rose-200 bg-rose-50 px-5 py-1.5 text-xs text-rose-700">
-      <XCircle size={12} className="-mt-0.5 mr-1 inline" />
-      {globalErrors.map((e) => `${e.code}: ${e.message}`).join(' · ')}
-    </div>
-  ) : null
+  // Подсветка одного узла по клику на ошибку в списке: меняем selectedId,
+  // прокручиваем канвас к узлу.
+  const focusNode = (nodeId: string) => {
+    setSelectedId(nodeId)
+    // React Flow держит view внутри Provider'а — нужно подождать обновления
+    // selectedId, чтобы highlight отрисовался. Достаточно scrollIntoView
+    // если узел вне видимой области (React Flow его не центрирует сам).
+    setTimeout(() => {
+      const el = document.querySelector(`[data-id="${nodeId}"]`) as HTMLElement | null
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+    }, 50)
+  }
+
+  // Подсчёт ошибок по severity. ValidationResult API даёт `severity: error /
+  // warning / info` (default error). Считаем error и warning отдельно.
+  const errorCount = allErrors.filter((e) => (e.severity ?? 'error') === 'error').length
+  const warningCount = allErrors.filter((e) => e.severity === 'warning').length
+  const subHeader = (
+    <>
+      {/* Validation summary: показываем banner с количеством, кнопку
+          «развернуть список». Если validated && ошибок нет — зелёный
+          «всё чисто». Если validated=false — ничего не показываем. */}
+      {validated && allErrors.length === 0 && (
+        <div className="border-t border-emerald-200 bg-emerald-50 px-5 py-1.5 text-xs text-emerald-800">
+          <CheckCircle2 size={12} className="-mt-0.5 mr-1 inline" />
+          Проверка пройдена: ошибок не найдено.
+        </div>
+      )}
+      {validated && allErrors.length > 0 && (
+        <div className="border-t border-rose-200 bg-rose-50 px-5 py-1.5">
+          <button
+            type="button"
+            onClick={() => setShowErrorList((x) => !x)}
+            className="flex w-full items-center gap-2 text-xs text-rose-800 hover:text-rose-900"
+          >
+            <XCircle size={12} />
+            <span>
+              <b>Проверка: {allErrors.length} {allErrors.length === 1 ? 'ошибка' : 'ошибок'}</b>
+              {errorCount > 0 && <span> · {errorCount} критич.</span>}
+              {warningCount > 0 && <span> · {warningCount} предупр.</span>}
+            </span>
+            <span className="ml-auto text-rose-600">
+              {showErrorList ? 'скрыть' : 'развернуть'} ▾
+            </span>
+          </button>
+          {showErrorList && (
+            <ul className="mt-1.5 space-y-0.5 border-t border-rose-200 pt-1.5 text-[11px]">
+              {allErrors.map((e, i) => (
+                <li key={`${e.nodeId ?? e.edgeId ?? 'graph'}-${i}`} className="flex items-start gap-2">
+                  <span
+                    className={cn(
+                      'mt-0.5 inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded text-[9px] font-bold uppercase',
+                      (e.severity ?? 'error') === 'error'
+                        ? 'bg-rose-600 text-white'
+                        : 'bg-amber-500 text-white',
+                    )}
+                  >
+                    !
+                  </span>
+                  <span className="flex-1">
+                    {e.nodeId && (
+                      <button
+                        type="button"
+                        onClick={() => focusNode(e.nodeId as string)}
+                        className="font-mono text-rose-700 underline hover:text-rose-900"
+                      >
+                        {e.nodeId}
+                      </button>
+                    )}
+                    {!e.nodeId && <span className="font-mono text-rose-700">граф</span>}
+                    <span className="ml-1 text-rose-900">— {e.message}</span>
+                    <span className="ml-1 text-rose-500">({e.code})</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+      {/* Сохраняем legacy globalErrors-баннер только для случаев когда
+          validated=false но есть глобальные ошибки (например после save
+          бэкенд тоже может вернуть errors — старый pipeline). */}
+      {!validated && globalErrors.length > 0 && (
+        <div className="border-t border-rose-200 bg-rose-50 px-5 py-1.5 text-xs text-rose-700">
+          <XCircle size={12} className="-mt-0.5 mr-1 inline" />
+          {globalErrors.map((e) => `${e.code}: ${e.message}`).join(' · ')}
+        </div>
+      )}
+    </>
+  )
 
   return (
     <div className="flex h-full flex-col bg-stone-50">
