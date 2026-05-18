@@ -282,6 +282,7 @@ erDiagram
   PARAMETER ||--o{ REGULATION_TRIGGER : "param_ref FK"
   SENSOR_SUBTYPE ||--o{ REGULATION_TRIGGER : "sensor_subtype FK"
   CONSTRAINT ||--o{ FLOW_NODE : "constraintRef из shacl_constraint"
+  PROCESS ||--o{ REGULATION : "включает (regulation_ids JSON)"
 
   REGULATION {
     string id PK "напр. heat-inlet-breach"
@@ -357,6 +358,14 @@ erDiagram
     timestamp created_at
     string diff_summary
   }
+  PROCESS {
+    string id PK "12-char uuid"
+    string name "напр. Реагирование на прорыв тепловвода"
+    string description
+    json regulation_ids "массив FK на Regulation.id"
+    timestamp created_at
+    timestamp updated_at
+  }
 ```
 
 ### 4.2 Таблицы DuckDB
@@ -365,7 +374,8 @@ erDiagram
 |------------------------|-----------------------------------------------------------|----------------------------------------------------------------------------|
 | `regulations`          | Карточка регламента (head-таблица)                        | `source_id` PK · `name` · `domain` · `version` · `status` · `recommendation` · `recommendation_priority` · **`source_document`** · **`source_clause`** · **`valid_from`** · **`valid_to`** |
 | `parameters`           | Параметры регламента (1:N)                                | `(source_id, id)` PK · `name` · `datatype` · `ref_value` · `deviation` · `unit` · `min_inclusive` · `max_inclusive` · `position` |
-| `regulation_triggers`  | Декларация «вход регламента → датчик/событие». O(1) reverse-lookup от датчика к регламенту (индексы `idx_trig_subtype`, `idx_trig_event`). Автоматически выводится из flow.json при сидинге; пользователь редактирует в секции «Триггеры». | `(source_id, trigger_id)` PK · `param_ref` · `sensor_subtype` · `event_type` · `label` · `description` · `position` |
+| `regulation_triggers`  | Декларация «вход регламента → датчик/событие». O(1) reverse-lookup от датчика к регламенту (индексы `idx_trig_subtype`, `idx_trig_event`). Автоматически выводится из flow.json при сидинге; пользователь редактирует в секции «Триггеры». | `(source_id, trigger_id)` PK · `param_ref` · `sensor_subtype` · `event_type` · `label` · `description` · `position` · `source_regulation` · `source_output` |
+| `processes`            | Цифровые двойники — именованные коллекции регламентов. Страница `/twins`, экспорт в Turtle / SIGMA-bundle ZIP. M:N к регламентам через JSON-массив. | `id` PK (uuid12) · `name` · `description` · `regulation_ids` (JSON) · `created_at` · `updated_at` |
 | `regulation_history`   | Snapshot-ы при каждом save (полный JSON)                  | `version_id` PK · `source_id` FK · `snapshot` (JSON) · `created_at` · `author` · `comment` |
 | `flow_versions`        | История Rule DSL Flow                                     | `version_id` PK · `regulation_id` FK · `dsl_snapshot` (JSON) · `diff_summary` |
 | `sensor_subtypes`      | Подтипы датчиков (22 в seed: видеодетекторы Нетрис, Войслинк, DAS, air-варианты) | `subtype_id` PK · `class_id` (= SensorType литерал) · `label` · `description` · `position` |

@@ -249,13 +249,14 @@ export function LandingScreen() {
             Центр ИИ НГУ · Платформа городской среды
           </div>
           <h1 className="max-w-3xl text-4xl font-bold leading-[1.05] tracking-tight sm:text-5xl lg:text-6xl">
-            <span className="block">Цифровые регламенты</span>
-            <span className="block text-blue-200">для города</span>
+            <span className="block">Цифровой двойник</span>
+            <span className="block text-blue-200">процессов управления</span>
           </h1>
           <p className="mt-6 max-w-2xl text-base leading-relaxed text-blue-50 sm:text-lg">
-            Платформа интеллектуального управления городской средой на базе фреймворка{' '}
-            <span className="font-semibold text-white">Σ Сигма</span>. От события — к
-            объяснимой рекомендации за секунды.
+            Среда проектирования операционного цифрового двойника на базе фреймворка{' '}
+            <span className="font-semibold text-white">Σ Сигма</span>: датчики, регламенты,
+            события и решения — в одной картине. От сигнала с датчика — к объяснимой
+            рекомендации за секунды.
           </p>
 
           {/* Hero CTA: ТОЛЬКО якорь вниз (single anchor, как в Stripe/Linear) +

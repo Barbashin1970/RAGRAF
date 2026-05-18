@@ -36,10 +36,50 @@ echo "==> STATIC_DIR:    ${STATIC_DIR:-(not set)}"
 echo "==> LLM_PROVIDER:  ${LLM_PROVIDER:-(not set)}"
 echo "==> EMBEDDINGS:    ${EMBEDDINGS_ENABLED:-false}"
 
-# 1) Seed Volume при первом запуске. Если в /data уже лежит DuckDB
-#    (пользовательские правки), НИЧЕГО не трогаем — иначе можно
-#    затереть продакшен-данные при ребилде. Маркером считаем сам
-#    файл regulations.duckdb.
+# 1) Pre-flight DuckDB integrity check.
+#    Если файл DuckDB на Volume повреждён (несовместимая версия после
+#    апгрейда библиотеки, abrupt-shutdown без флаша WAL, битый блок на
+#    диске), при open() из uvicorn-процесса будет **сегфолт в native-коде
+#    DuckDB** — Python не успеет его перехватить, контейнер крашится до
+#    bind порта, healthcheck не проходит, деплой fail.
+#
+#    Защита: лёгкая Python-проба (open + SELECT 1). Если упало — ротируем
+#    `regulations.duckdb` и `regulations.duckdb.wal` в `.broken-<ts>` для
+#    возможной диагностики, дальше блок seed скопирует свежий файл.
+#    Самовосстановление: при следующем деплое контейнер пройдёт probe и
+#    станет в строй; пользовательские правки на сломанном файле теряются,
+#    но **остаются доступны на Volume** под .broken-* для ручного REPAIR.
+DUCKDB_FILE="${DATA_DIR_PATH}/regulations.duckdb"
+if [ -f "$DUCKDB_FILE" ]; then
+    echo "==> DuckDB integrity check: ${DUCKDB_FILE}"
+    if python -c "
+import duckdb, sys
+try:
+    c = duckdb.connect('${DUCKDB_FILE}')
+    c.execute('SELECT 1').fetchone()
+    c.close()
+    sys.exit(0)
+except Exception as e:
+    print(f'duckdb probe failed: {type(e).__name__}: {e}', file=sys.stderr)
+    sys.exit(1)
+" 2>&1; then
+        echo "==> DuckDB OK — продолжаем"
+    else
+        TS=$(date +%s)
+        echo "==> WARN: DuckDB-файл повреждён (exit $? включая SIGSEGV) — ротируем в .broken-${TS}"
+        mv "${DUCKDB_FILE}" "${DUCKDB_FILE}.broken-${TS}" 2>/dev/null || true
+        # WAL без главного файла бесполезен и может вызвать тот же crash при
+        # реоткрытии — тоже ротируем. -f чтобы не падать если WAL нет.
+        if [ -f "${DUCKDB_FILE}.wal" ]; then
+            mv "${DUCKDB_FILE}.wal" "${DUCKDB_FILE}.wal.broken-${TS}" 2>/dev/null || true
+        fi
+        echo "==> ротация выполнена; init_db() / seed сейчас создадут свежий файл"
+    fi
+fi
+
+# 2) Seed Volume при первом запуске или после ротации повреждённого файла.
+#    Если в /data уже лежит валидный DuckDB (probe выше прошёл), НИЧЕГО
+#    не трогаем. Маркером считаем сам файл regulations.duckdb.
 if [ ! -f "${DATA_DIR_PATH}/regulations.duckdb" ]; then
     if [ -d "$SEED_DIR" ]; then
         echo "==> /data пустой — копируем seed из ${SEED_DIR}"
@@ -50,6 +90,7 @@ if [ ! -f "${DATA_DIR_PATH}/regulations.duckdb" ]; then
         mkdir -p "$DATA_DIR_PATH"
         find "$SEED_DIR" -mindepth 1 -maxdepth 1 \
             ! -name '*.bak-*' \
+            ! -name '*.broken-*' \
             -exec cp -rnL {} "$DATA_DIR_PATH"/ \;
         echo "==> seed copied:"
         ls -la "$DATA_DIR_PATH" | head -20

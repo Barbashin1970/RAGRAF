@@ -87,6 +87,19 @@ export const regulationSchema = z.object({
   source_mime_type: z.string().nullable().optional(),
 })
 
+// Process — цифровой двойник процесса управления (страница /twins).
+// Именованная коллекция регламентов; экспорт в Turtle / SIGMA-bundle.
+export const processSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable().optional(),
+  regulation_ids: z.array(z.string()).default([]),
+  created_at: z.string().nullable().optional(),
+  updated_at: z.string().nullable().optional(),
+})
+export const processesListSchema = z.array(processSchema)
+
+
 export const sourceUploadResponseSchema = z.object({
   ok: z.boolean(),
   filename: z.string(),

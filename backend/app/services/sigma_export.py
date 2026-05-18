@@ -159,17 +159,30 @@ async def build_regulation_bundle(source_id: str) -> bytes:
     return buf.getvalue()
 
 
-async def build_corpus_bundle(domain: str | None = None) -> tuple[bytes, dict[str, Any]]:
-    """Batch-экспорт всего корпуса (или одного домена) в один ZIP.
+async def build_corpus_bundle(
+    domain: str | None = None,
+    *,
+    regulation_ids: list[str] | None = None,
+) -> tuple[bytes, dict[str, Any]]:
+    """Batch-экспорт корпуса в один ZIP.
 
     Каждый регламент — своя папка внутри. На корневом уровне `corpus_manifest.json`
     с общим перечнем что попало в архив.
+
+    Фильтры (применяются в порядке):
+      - `regulation_ids` — явный whitelist (для экспорта Process — N выбранных
+         регламентов одного цифрового двойника). Если указан, `domain` игнорируется.
+      - `domain` — фильтр по домену (backward-compat для /sigma-export/corpus?domain=heating).
+      - оба None — экспорт всего корпуса.
 
     Возвращает `(zip_bytes, corpus_manifest)`. Manifest также пишется в JSON-файл
     в архив, но возвращается отдельно для логирования.
     """
     items = regulation_store.list_all()
-    if domain:
+    if regulation_ids is not None:
+        wanted = set(regulation_ids)
+        items = [it for it in items if it.get("id") in wanted]
+    elif domain:
         items = [it for it in items if it.get("domain") == domain]
 
     included: list[dict[str, Any]] = []
@@ -208,7 +221,8 @@ async def build_corpus_bundle(domain: str | None = None) -> tuple[bytes, dict[st
         corpus_manifest = {
             "format_version": EXPORT_FORMAT_VERSION,
             "exported_at": datetime.now(timezone.utc).isoformat(),
-            "domain_filter": domain,
+            "domain_filter": domain if regulation_ids is None else None,
+            "regulation_ids_filter": list(regulation_ids) if regulation_ids is not None else None,
             "total_included": len(included),
             "total_failed": len(failed),
             "included": included,

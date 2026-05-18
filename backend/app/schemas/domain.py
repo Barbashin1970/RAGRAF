@@ -234,6 +234,41 @@ class RuleDSL(BaseModel):
     edges: list[FlowEdge] = Field(default_factory=list)
 
 
+# --- Process / Operational Digital Twin ---------------------------------
+#
+# Process — именованный «цифровой двойник управленческого процесса».
+# Сущность, объединяющая несколько регламентов в одну операционную картину:
+# аналитик собирает 2-N регламентов, видит граф их композиционных связей
+# (через :sourceRegulation триггеры), симулирует сценарии на цепочке,
+# экспортирует артефакт (Turtle / SIGMA-bundle ZIP).
+#
+# Архитектурно это **view-of-the-system**, не функциональная единица:
+# регламенты остаются авторитативными в `regulations`, Process только
+# собирает их в логическую группу и даёт UI/экспорт операций над группой.
+# Удаление Process не удаляет регламенты — это просто разгруппировка.
+#
+# Хранение: `processes` DuckDB-таблица с JSON-полем `regulation_ids`
+# (списком идентификаторов). M:N через JSON, а не через отдельную таблицу
+# `process_regulations` — потому что список малый (типично 2-10), порядок
+# важен для UI (как у user_domains.list), и денормализация даёт более
+# читаемый snapshot.
+
+
+class Process(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+    # Список ID регламентов, собранных в этот процесс. Порядок UI-важен:
+    # отражает «верхнеуровневую → низкоуровневую» цепочку как её видит
+    # аналитик. Не валидируем на существование регламентов здесь —
+    # это делается на read через JOIN в process_store.
+    regulation_ids: list[str] = Field(default_factory=list)
+    # ISO datetime, выставляется в process_store. None на новом черновике
+    # до первого save.
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
 # --- Validation ---------------------------------------------------------
 
 

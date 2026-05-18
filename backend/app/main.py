@@ -6,9 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import datasets, extraction_terms, flow, graph, ragu, regulations, sandbox, sensor_schemas, shacl, search, validate, versions
+from app.api import datasets, extraction_terms, flow, graph, processes, ragu, regulations, sandbox, sensor_schemas, shacl, search, validate, versions
 from app.config import settings
-from app.services import regulation_store, sensor_schema_store
+from app.services import process_store, regulation_store, sensor_schema_store
 
 
 @asynccontextmanager
@@ -29,6 +29,12 @@ async def lifespan(_: FastAPI):
         extraction_term_store.init_db()
     except Exception as e:
         print(f"[lifespan] extraction_term_store.init_db failed: {e}")
+    # Цифровые двойники (Process) — DuckDB-таблица, пустая по умолчанию;
+    # пользователь создаёт их сам на странице /twins.
+    try:
+        process_store.init_db()
+    except Exception as e:
+        print(f"[lifespan] process_store.init_db failed: {e}")
     # Демо-документы (ТЗ, ARC, ARC-SIGMA) — для онбординга в Студии аналитика.
     # Работает и без эмбеддингов: keyword-fallback в retrieve_relevant_chunks
     # обеспечивает осмысленный retrieval по словам из вопроса.
@@ -177,6 +183,7 @@ app.include_router(sandbox.router, prefix="/api", tags=["sandbox"])
 app.include_router(ragu.router, prefix="/api", tags=["ragu"])
 app.include_router(sensor_schemas.router, prefix="/api", tags=["sensor-schemas"])
 app.include_router(extraction_terms.router, prefix="/api", tags=["extraction-terms"])
+app.include_router(processes.router, prefix="/api", tags=["processes"])
 
 
 # ── SPA static serving ────────────────────────────────────────────────

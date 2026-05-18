@@ -146,6 +146,18 @@ export interface Domain {
   hint?: string
 }
 
+// Process — цифровой двойник процесса управления. Именованная коллекция
+// регламентов с возможностью экспорта артефакта (Turtle/SIGMA-bundle).
+// Страница /twins.
+export interface Process {
+  id: string
+  name: string
+  description?: string | null
+  regulation_ids: string[]
+  created_at?: string | null
+  updated_at?: string | null
+}
+
 export interface ValidationError {
   nodeId?: string | null
   edgeId?: string | null
@@ -278,6 +290,8 @@ import {
   searchResponseSchema,
   extractionTermSchema,
   extractionTermsListResponse,
+  processSchema,
+  processesListSchema,
   sensorFieldSchema,
   sensorFieldsByTypeSchema,
   sensorSchemasListResponse,
@@ -730,6 +744,35 @@ export const api = {
     // вместо N для рендера бэйджей в дереве датчиков.
     usageCounts: () =>
       request<Record<string, number>>(`/api/sensor-subtypes/_usage`),
+  },
+  // ── Цифровые двойники процессов (Process) ──────────────────────────
+  // CRUD + экспорт артефактов (Turtle / SIGMA-bundle ZIP). Страница /twins.
+  processes: {
+    list: () => request(`/api/processes`, undefined, processesListSchema),
+    get: (id: string) =>
+      request(`/api/processes/${encodeURIComponent(id)}`, undefined, processSchema),
+    create: (p: Omit<Process, 'id' | 'created_at' | 'updated_at'> & { id?: string }) =>
+      request(
+        `/api/processes`,
+        { method: 'POST', body: JSON.stringify({ id: '', ...p }) },
+        processSchema,
+      ),
+    update: (id: string, p: Process) =>
+      request(
+        `/api/processes/${encodeURIComponent(id)}`,
+        { method: 'PUT', body: JSON.stringify(p) },
+        processSchema,
+      ),
+    delete: (id: string) =>
+      request<{ ok: boolean; process_id: string }>(
+        `/api/processes/${encodeURIComponent(id)}`,
+        { method: 'DELETE' },
+      ),
+    // Экспорт: прямые URL для <a download> — браузер сам скачивает.
+    bundleUrl: (id: string) =>
+      `/api/processes/${encodeURIComponent(id)}/bundle.zip`,
+    turtleUrl: (id: string) =>
+      `/api/processes/${encodeURIComponent(id)}/turtle`,
   },
   // ── Словарь rules-based извлечения ─────────────────────────────────
   // CRUD над DuckDB extraction_terms: пополнение нераспознанными словами

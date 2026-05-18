@@ -1,7 +1,8 @@
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { Activity, Beaker, BookOpen, ExternalLink, FileJson, ListTree, Maximize2, Minimize2, PlayCircle, Radar } from 'lucide-react'
+import { Activity, Beaker, BookOpen, ExternalLink, FileJson, GitBranch, ListTree, Maximize2, Minimize2, PlayCircle, Radar } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { GraphView } from '@/components/graph/GraphView'
+import { TwinDesignerScreen } from '@/components/twins/TwinDesignerScreen'
 import { LandingScreen } from '@/components/landing/LandingScreen'
 import { RegulationList } from '@/components/regulations/RegulationList'
 import { RegulationEditorScreen } from '@/components/regulations/RegulationEditorScreen'
@@ -208,6 +209,10 @@ export default function App() {
             <NavLink to="/regulations" icon={ListTree} label="Регламенты" />
             <NavLink to="/sensors" icon={Radar} label="Датчики" />
             <NavLink to="/graph" icon={Activity} label="Граф связей" />
+            {/* Цифровой двойник — отдельная страница где собираются процессы
+                из 2+ регламентов. Не путать с /graph (карта всего корпуса)
+                и с /regulations/:id/flow (поток одного регламента). */}
+            <NavLink to="/twins" icon={GitBranch} label="Цифровой двойник" />
             {/* RAGU Studio переехала внутрь Студии аналитика как 3-й таб
                 (см. SandboxScreen). Из шапки убрана чтобы навигация была
                 4-уровневой (3 экрана + roadmap), не превращалась в кашу. */}
@@ -215,7 +220,7 @@ export default function App() {
           </nav>
           <div className="ml-auto flex items-center gap-2">
             <span className="hidden text-xs text-stone-500 lg:inline">
-              визуализатор и редактор регламентов
+              среда проектирования цифрового двойника
             </span>
             <FullscreenToggle />
             <DocsMenu />
@@ -243,6 +248,8 @@ export default function App() {
           <Route path="/sensors" element={<SensorLibraryScreen />} />
           <Route path="/execute" element={<ExecuteScreen />} />
           <Route path="/graph" element={<GraphView />} />
+          <Route path="/twins" element={<TwinDesignerScreen />} />
+          <Route path="/twins/:id" element={<TwinDesignerScreen />} />
           <Route path="/sandbox" element={<SandboxScreen />} />
           <Route path="/sandbox/backlog" element={<SandboxBacklog />} />
           {/* Старый маршрут /ragu теперь редиректит в таб RAGU Studio
