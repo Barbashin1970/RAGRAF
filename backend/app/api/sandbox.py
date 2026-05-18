@@ -210,12 +210,27 @@ async def sandbox_llm_info() -> dict[str, Any]:
                     data = resp.json()
                     live = [m["id"] for m in data.get("data", []) if m.get("id")]
                     if live:
-                        # Если текущая модель из настроек есть в живом списке —
-                        # ставим её первой, чтобы UI открывал picker с правильным
-                        # выбором по умолчанию.
-                        if cfg.ragu_llm_model in live:
-                            live = [cfg.ragu_llm_model] + [m for m in live if m != cfg.ragu_llm_model]
-                        info["available_models"] = live
+                        # Стабилизируем порядок. Cerebras `/v1/models` отдаёт
+                        # модели в случайном порядке (разный на каждый запрос) —
+                        # без сортировки чипы в UI «прыгают» при каждом ререндере
+                        # llm-info. Алгоритм:
+                        #   1) curated — список из _provider_model_presets() в
+                        #      нашем порядке (отсортирован по рекомендации);
+                        #   2) сначала те curated-модели, которые реально живые;
+                        #   3) затем «незнакомые» (которые провайдер добавил, а
+                        #      мы ещё не учли) — alphabetically;
+                        #   4) текущая ragu_llm_model — всегда первая (если она
+                        #      есть в живом списке).
+                        known = _provider_model_presets(cfg.llm_provider, cfg.ragu_llm_model)
+                        live_set = set(live)
+                        known_in_live = [m for m in known if m in live_set]
+                        unknown_in_live = sorted([m for m in live if m not in set(known)])
+                        ordered = known_in_live + unknown_in_live
+                        if cfg.ragu_llm_model in ordered:
+                            ordered = [cfg.ragu_llm_model] + [
+                                m for m in ordered if m != cfg.ragu_llm_model
+                            ]
+                        info["available_models"] = ordered
                     info["llm_reachable"] = True
                 else:
                     info["llm_reachable"] = bool(cfg.openai_api_key)

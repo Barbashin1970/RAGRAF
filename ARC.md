@@ -272,12 +272,15 @@ erDiagram
   REGULATION ||--o{ PARAMETER : "содержит"
   REGULATION ||--o{ CONSTRAINT : "SHACL-ограничения"
   REGULATION ||--o{ RECOMMENDATION : "рекомендация по умолчанию"
+  REGULATION ||--o{ REGULATION_TRIGGER : "декларация event → reg"
   REGULATION ||--o{ REGULATION_HISTORY : "snapshot при save"
   REGULATION ||--o| RULE_DSL : "опциональный Rule Flow"
   RULE_DSL ||--o{ FLOW_NODE : "узлы"
   RULE_DSL ||--o{ FLOW_EDGE : "рёбра"
   RULE_DSL ||--o{ FLOW_VERSION : "snapshot при save"
   PARAMETER ||--o{ FLOW_NODE : "paramRef из INPUT"
+  PARAMETER ||--o{ REGULATION_TRIGGER : "param_ref FK"
+  SENSOR_SUBTYPE ||--o{ REGULATION_TRIGGER : "sensor_subtype FK"
   CONSTRAINT ||--o{ FLOW_NODE : "constraintRef из shacl_constraint"
 
   REGULATION {
@@ -318,6 +321,14 @@ erDiagram
     int priority "1=критический, 2=важный, 3=обычный"
     array linkedParameters
   }
+  REGULATION_TRIGGER {
+    string id PK "уникален в рамках регламента"
+    string param_ref FK "= Parameter.name"
+    string sensor_subtype FK "опционально, = SensorSubtype.subtype_id"
+    string event_type "telemetry.pressure / alert.smoke / ..."
+    string label
+    string description
+  }
   FLOW_NODE {
     string id PK
     enum type "input/threshold/compare/formula/switch/output/shacl_constraint"
@@ -354,6 +365,7 @@ erDiagram
 |------------------------|-----------------------------------------------------------|----------------------------------------------------------------------------|
 | `regulations`          | Карточка регламента (head-таблица)                        | `source_id` PK · `name` · `domain` · `version` · `status` · `recommendation` · `recommendation_priority` · **`source_document`** · **`source_clause`** · **`valid_from`** · **`valid_to`** |
 | `parameters`           | Параметры регламента (1:N)                                | `(source_id, id)` PK · `name` · `datatype` · `ref_value` · `deviation` · `unit` · `min_inclusive` · `max_inclusive` · `position` |
+| `regulation_triggers`  | Декларация «вход регламента → датчик/событие». O(1) reverse-lookup от датчика к регламенту (индексы `idx_trig_subtype`, `idx_trig_event`). Автоматически выводится из flow.json при сидинге; пользователь редактирует в секции «Триггеры». | `(source_id, trigger_id)` PK · `param_ref` · `sensor_subtype` · `event_type` · `label` · `description` · `position` |
 | `regulation_history`   | Snapshot-ы при каждом save (полный JSON)                  | `version_id` PK · `source_id` FK · `snapshot` (JSON) · `created_at` · `author` · `comment` |
 | `flow_versions`        | История Rule DSL Flow                                     | `version_id` PK · `regulation_id` FK · `dsl_snapshot` (JSON) · `diff_summary` |
 | `sensor_subtypes`      | Подтипы датчиков (22 в seed: видеодетекторы Нетрис, Войслинк, DAS, air-варианты) | `subtype_id` PK · `class_id` (= SensorType литерал) · `label` · `description` · `position` |

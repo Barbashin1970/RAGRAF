@@ -125,6 +125,7 @@
 - **Симулятор** (`POST /api/regulations/{id}/execute`) — без LLM, чистый интерпретатор Rule DSL: пресеты «Норма / Внимание / Критика» или ручной ввод значений → `{level, recommendation, fired_nodes, fired_edges, trace}`.
 - **Sensor-нода** — оранжевый кружок с типом физического датчика. Ребро sensor → input автоматически проставляет `bindsTo`.
 - **Подсветка сработавшего пути** на канвасе (fired_nodes / fired_edges), карточка результата + step-by-step trace внизу панели.
+- **Триггеры регламента** — отдельная секция в редакторе регламента: декларативный список «датчик → параметр → тип события». Хранится и в Turtle (`:hasTrigger`), и в DuckDB-таблице `regulation_triggers` с индексами на `sensor_subtype` / `event_type` — это даёт O(1) reverse-lookup «какие регламенты слушают этот датчик» (видно бэйджем в Sensor Library). Для существующих фикстур триггеры автоматически выводятся из flow.json при первом старте.
 - **Статус «beta»** — приёмник реальных событий от СИГМЫ (`/api/events/ingest`), журнал срабатываний, webhook-actions на OUTPUT — в [BACKLOG.md](BACKLOG.md).
 
 ### 9. Библиотека датчиков (`/sensors`)

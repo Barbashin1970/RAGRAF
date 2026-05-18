@@ -26,9 +26,41 @@ from app.schemas.domain import (
     SensorFieldsByType,
     SensorSubtype,
 )
-from app.services import sensor_schema_store
+from app.services import regulation_store, sensor_schema_store
 
 router = APIRouter()
+
+
+# ── Event-driven сцепка: датчик → регламенты ──────────────────────────
+
+
+@router.get("/sensor-subtypes/{subtype_id}/regulations")
+def list_regulations_using_subtype(subtype_id: str) -> dict[str, object]:
+    """Какие регламенты слушают этот подтип датчика (reverse-lookup).
+
+    O(1) запрос благодаря индексу `idx_trig_subtype` на regulation_triggers.
+    Возвращает плоский список триггеров — один регламент может встретиться
+    несколько раз если у него несколько триггеров на этот подтип.
+
+    UI «Библиотека датчиков» показывает рядом с подтипом бэйдж «в N
+    регламентах», и при клике — список с переходом на регламент.
+    """
+    triggers = regulation_store.list_by_sensor_subtype(subtype_id)
+    return {
+        "subtype_id": subtype_id,
+        "count": len(triggers),
+        "triggers": triggers,
+    }
+
+
+@router.get("/sensor-subtypes/_usage")
+def subtypes_usage_counts() -> dict[str, int]:
+    """Агрегированный счётчик: subtype_id → N регламентов.
+
+    Для UI Sensor Library — один запрос вместо N. Названо `_usage` чтобы
+    не конфликтовать с `/{subtype_id}/regulations` через path-collision.
+    """
+    return regulation_store.count_by_sensor_subtype()
 
 
 # ── Subtypes ───────────────────────────────────────────────────────────

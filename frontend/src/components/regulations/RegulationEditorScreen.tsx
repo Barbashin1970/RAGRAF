@@ -30,6 +30,7 @@ import {
   Paperclip,
   Plus,
   Quote,
+  Radio,
   Ruler,
   RotateCcw,
   Save,
@@ -41,8 +42,9 @@ import {
   Timer,
   Trash2,
   Upload,
+  Zap,
 } from 'lucide-react'
-import { api, type Parameter, type Regulation } from '@/lib/api'
+import { api, type Parameter, type Regulation, type RegulationTrigger } from '@/lib/api'
 import { nanoid } from '@/lib/nanoid'
 import { cn } from '@/lib/cn'
 import { deriveSliderRange, fillPercent as computeFillPercent } from '@/lib/sliderDomain'
@@ -287,6 +289,35 @@ function FormView({
     setDraft({ ...draft, recommendations: [next] })
   }
 
+  // Триггеры — патч одного, добавление, удаление. Триггеры жёстко привязаны
+  // к параметрам (param_ref): UI не позволяет создавать триггер с param_ref'ом,
+  // которого нет в parameters — это рассинхрон, ловим валидацией ниже.
+  const triggers = draft.triggers ?? []
+  const patchTrigger = (idx: number, p: Partial<RegulationTrigger>) => {
+    const next = triggers.map((t, i) => (i === idx ? { ...t, ...p } : t))
+    setDraft({ ...draft, triggers: next })
+  }
+  const addTrigger = () => {
+    // По умолчанию привязываем к первому параметру без триггера. Если все
+    // покрыты — берём первый параметр (пользователь выберет потом).
+    const used = new Set(triggers.map((t) => t.param_ref))
+    const unbound = draft.parameters.find((p) => !used.has(p.name))
+    const target = unbound ?? draft.parameters[0]
+    const param_ref = target?.name ?? ''
+    const nt: RegulationTrigger = {
+      id: `trig-${param_ref || nanoid(5)}`,
+      label: target?.name ?? 'Новый триггер',
+      param_ref,
+      sensor_subtype: null,
+      event_type: null,
+      description: null,
+    }
+    setDraft({ ...draft, triggers: [...triggers, nt] })
+  }
+  const removeTrigger = (idx: number) => {
+    setDraft({ ...draft, triggers: triggers.filter((_, i) => i !== idx) })
+  }
+
   return (
     <div className="space-y-4">
       {/* Метаданные */}
@@ -488,6 +519,35 @@ function FormView({
         </div>
       </Section>
 
+      {/* Триггеры */}
+      <Section
+        title={
+          <SectionTitle icon={Zap} label="Триггеры (событие → регламент)">
+            <Badge tone="neutral">{triggers.length}</Badge>
+          </SectionTitle>
+        }
+        description="Декларация «какие датчики и события активируют этот регламент». Один параметр = один триггер. Привязка datchik→param_ref индексирует регламент для ETL-приёмника Сигмы."
+        actions={
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Plus size={12} />}
+            onClick={addTrigger}
+            disabled={draft.parameters.length === 0}
+          >
+            Добавить триггер
+          </Button>
+        }
+        elevated
+      >
+        <TriggersList
+          triggers={triggers}
+          parameters={draft.parameters}
+          onPatch={patchTrigger}
+          onRemove={removeTrigger}
+        />
+      </Section>
+
       {/* Рекомендация */}
       <Section
         title={<SectionTitle icon={ListTodo} label="Рекомендация" />}
@@ -552,6 +612,149 @@ function SectionTitle({
       <span>{label}</span>
       {children}
     </span>
+  )
+}
+
+
+// ──────────────────────────────────────────────────────────
+// Триггеры — список с привязкой к параметру и подтипу датчика
+// ──────────────────────────────────────────────────────────
+
+function TriggersList({
+  triggers,
+  parameters,
+  onPatch,
+  onRemove,
+}: {
+  triggers: RegulationTrigger[]
+  parameters: Parameter[]
+  onPatch: (idx: number, p: Partial<RegulationTrigger>) => void
+  onRemove: (idx: number) => void
+}) {
+  // Подгружаем все подтипы датчиков для выпадашки. Один запрос на компонент,
+  // данные кэшированы react-query — повторное открытие редактора регламента
+  // не идёт по сети.
+  const { data: classes = [] } = useQuery({
+    queryKey: ['sensor-subtypes'],
+    queryFn: () => api.sensorSubtypes.list(),
+  })
+  const allSubtypes = useMemo(
+    () => classes.flatMap((c) => c.subtypes),
+    [classes],
+  )
+
+  if (triggers.length === 0) {
+    return (
+      <div className="rounded-md border border-dashed border-stone-300 p-4 text-center text-sm text-stone-400">
+        Триггеров нет. Если у регламента есть параметры — нажмите «Добавить триггер» и привяжите их к датчикам.
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {triggers.map((t, idx) => {
+        // Найти подтип чтобы показать класс рядом с label'ом.
+        const subtype = allSubtypes.find((s) => s.subtype_id === t.sensor_subtype)
+        const orphan = t.param_ref && !parameters.some((p) => p.name === t.param_ref)
+        return (
+          <div
+            key={t.id}
+            className={cn(
+              'flex overflow-hidden rounded-md border bg-white shadow-sm transition',
+              orphan ? 'border-rose-300' : 'border-stone-200 hover:border-primary/40',
+            )}
+          >
+            <div
+              className={cn(
+                'flex w-9 shrink-0 items-start justify-center pt-3 text-white',
+                orphan ? 'bg-rose-500/90' : 'bg-amber-500/90',
+              )}
+              title={orphan ? `param_ref «${t.param_ref}» не найден среди параметров` : 'Триггер'}
+            >
+              <Zap size={14} />
+            </div>
+            <div className="min-w-0 flex-1 p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="font-mono text-[10px] uppercase tracking-wider text-stone-400">
+                  #{idx + 1} · {t.id}
+                </span>
+                {orphan && (
+                  <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">
+                    параметр не найден
+                  </span>
+                )}
+                <button
+                  onClick={() => onRemove(idx)}
+                  title="Удалить триггер"
+                  className="ml-auto rounded-md p-1 text-stone-400 transition hover:bg-rose-50 hover:text-rose-600"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[1.2fr_1.2fr_1.6fr_1.4fr]">
+                <FormRow label="Метка" icon={Tag} compact>
+                  <input
+                    value={t.label ?? ''}
+                    onChange={(e) => onPatch(idx, { label: e.target.value || null })}
+                    className={tx}
+                    placeholder={t.param_ref}
+                  />
+                </FormRow>
+                <FormRow label="Параметр" icon={Target} compact>
+                  <select
+                    value={t.param_ref}
+                    onChange={(e) => onPatch(idx, { param_ref: e.target.value })}
+                    className={cn(tx, 'pr-7')}
+                  >
+                    {parameters.length === 0 && <option value="">—</option>}
+                    {parameters.map((p) => (
+                      <option key={p.id} value={p.name}>
+                        {p.name}
+                      </option>
+                    ))}
+                    {orphan && (
+                      <option value={t.param_ref}>{t.param_ref} (orphan)</option>
+                    )}
+                  </select>
+                </FormRow>
+                <FormRow label="Датчик" icon={Radio} compact>
+                  <select
+                    value={t.sensor_subtype ?? ''}
+                    onChange={(e) => onPatch(idx, { sensor_subtype: e.target.value || null })}
+                    className={cn(tx, 'pr-7')}
+                  >
+                    <option value="">— не привязан —</option>
+                    {classes.map((c) => (
+                      <optgroup key={c.class_id} label={c.class_id}>
+                        {c.subtypes.map((s) => (
+                          <option key={s.subtype_id} value={s.subtype_id}>
+                            {s.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </FormRow>
+                <FormRow label="Тип события" icon={Send} compact>
+                  <input
+                    value={t.event_type ?? ''}
+                    onChange={(e) => onPatch(idx, { event_type: e.target.value || null })}
+                    className={tx}
+                    placeholder="telemetry.pressure"
+                  />
+                </FormRow>
+              </div>
+              {subtype?.description && (
+                <p className="mt-2 text-[11px] leading-relaxed text-stone-500">
+                  {subtype.description}
+                </p>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 

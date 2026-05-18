@@ -573,7 +573,7 @@ export function LandingScreen() {
               <div className="mt-4 space-y-1.5 text-xs text-slate-400">
                 <div className="flex items-start gap-2">
                   <MapPin size={13} className="mt-0.5 shrink-0 text-slate-500" />
-                  <span>630090, г. Новосибирск, ул. Пирогова, 1</span>
+                  <span>630090, г. Новосибирск, ул. Пирогова, д. 3, 5 этаж, ауд. 522</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Mail size={13} className="shrink-0 text-slate-500" />

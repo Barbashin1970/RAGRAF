@@ -51,6 +51,50 @@ class Recommendation(BaseModel):
     linkedParameters: list[str] = Field(default_factory=list)
 
 
+class RegulationTrigger(BaseModel):
+    """Декларативная привязка «вход регламента → источник события».
+
+    Закрывает архитектурный разрыв event-driven Сигмы: раньше связь
+    «датчик → параметр регламента» жила ТОЛЬКО в flow.json (через цепочку
+    `sensor.bindsTo → input.paramRef`), без явной декларации в Turtle.
+    Это значит ETL-приёмнику нужно было обходить все flow.json чтобы найти
+    «какие регламенты слушают этот сенсор». На N=10 регламентов терпимо,
+    на N=10К — катастрофа.
+
+    Один регламент = несколько триггеров (по числу входных параметров).
+    Пример heat-inlet-breach: 3 триггера — inletPressure / pressureFallRate /
+    inletTemperature, каждый со своим датчиком и типом события.
+
+    Поля:
+      - `id` — уникален в рамках регламента (kebab-case, например 'pressure-in').
+      - `label` — UI-имя ("Давление на входе").
+      - `param_ref` — ID параметра регламента, который наполняется триггером
+        (FK на Parameter.name). Используется flow_executor.py для resolve.
+      - `sensor_subtype` — FK на SensorSubtype.subtype_id. None если триггер
+        не привязан к конкретному датчику (например, ручной ввод оператором).
+      - `event_type` — тип события в ETL-шине ('telemetry.pressure',
+        'video.intrusion'). None если фид сырой.
+      - `description` — дополнительное пояснение.
+
+    Сериализация в data.ttl (см. turtle_bridge.py):
+        :reg :hasTrigger :reg-pressure-in .
+        :reg-pressure-in a :Trigger ;
+            rdfs:label "Давление на входе" ;
+            :paramRef "inletPressure" ;
+            :sensorSubtype "industrial-pressure" ;
+            :eventType "telemetry.pressure" .
+
+    Индекс в DuckDB (regulation_triggers) позволяет за один SELECT найти
+    «какие регламенты слушают sensor_subtype=X» — это и есть O(1) маршрутизация.
+    """
+    id: str
+    label: str | None = None
+    param_ref: str
+    sensor_subtype: str | None = None
+    event_type: str | None = None
+    description: str | None = None
+
+
 class Regulation(BaseModel):
     id: str
     name: str
@@ -61,6 +105,11 @@ class Regulation(BaseModel):
     parameters: list[Parameter] = Field(default_factory=list)
     constraints: list[Constraint] = Field(default_factory=list)
     recommendations: list[Recommendation] = Field(default_factory=list)
+    # Декларативные триггеры — на какие события/датчики реагирует регламент.
+    # Список потому что у регламента может быть несколько входов (давление +
+    # температура + расход — три разных датчика, каждый свой триггер).
+    # Подробнее: RegulationTrigger выше.
+    triggers: list["RegulationTrigger"] = Field(default_factory=list)
     # SIGMA-compliance (ТЗ §4.1.3 «каждое правило связано с источником,
     # периодом действия и историей изменений»):
     # - source_document: название нормативного акта («СП 124.13330.2012»)

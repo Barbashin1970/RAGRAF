@@ -30,7 +30,7 @@ import uuid
 from rdflib import Graph, Literal, Namespace, URIRef
 from rdflib.namespace import OWL, RDF, SH, XSD
 
-from app.schemas.domain import Constraint, Parameter, Recommendation, Regulation
+from app.schemas.domain import Constraint, Parameter, Recommendation, Regulation, RegulationTrigger
 
 REG = Namespace("http://regulations.local/ontology#")
 
@@ -107,6 +107,9 @@ PARAM_UNITS: dict[str, str] = {
 META_PROPS = {
     "name", "date", "recommendation", "version", "status",
     "sourceDocument", "sourceClause", "validFrom", "validTo",
+    # Триггеры — отдельные subject'ы, не параметры. Исключаем, чтобы парсер
+    # не пытался прочитать URI как числовое значение.
+    "hasTrigger",
 }
 
 
@@ -291,6 +294,28 @@ def regulation_to_turtle(reg: Regulation) -> str:
         # source_file_path локальный — в Turtle НЕ выгружаем (это путь внутри
         # RAGRAF, СИГМЕ не нужен). Зато добавим в manifest.json через sigma_export.
 
+    # ── Триггеры (event-driven сцепка датчик ↔ регламент) ────────────────
+    # Декларативная привязка вход регламента → датчик/событие. Сериализуем
+    # как отдельные узлы типа :Trigger со ссылкой через :hasTrigger. Это
+    # делает регламент самодостаточным для маршрутизации: ETL-приёмнику не
+    # нужно обходить flow.json — достаточно SPARQL по :hasTrigger/:sensorSubtype.
+    if reg.triggers:
+        g.add((REG_NS["hasTrigger"], RDF.type, OWL.ObjectProperty))
+        g.add((REG_NS["Trigger"], RDF.type, OWL.Class))
+        for t in reg.triggers:
+            trig_uri = REG_NS[f"{_instance_local_name(reg.id).removesuffix('Regulation')}_Trigger_{t.id}"]
+            g.add((instance, REG_NS["hasTrigger"], trig_uri))
+            g.add((trig_uri, RDF.type, REG_NS["Trigger"]))
+            if t.label:
+                g.add((trig_uri, RDFS.label, Literal(t.label, lang="ru")))
+            g.add((trig_uri, REG_NS["paramRef"], Literal(t.param_ref)))
+            if t.sensor_subtype:
+                g.add((trig_uri, REG_NS["sensorSubtype"], Literal(t.sensor_subtype)))
+            if t.event_type:
+                g.add((trig_uri, REG_NS["eventType"], Literal(t.event_type)))
+            if t.description:
+                g.add((trig_uri, REG_NS["description"], Literal(t.description, lang="ru")))
+
     return g.serialize(format="turtle")
 
 
@@ -472,6 +497,47 @@ def parse_regulation_turtle(
             )
         )
 
+    # Триггеры: subject регламента → :hasTrigger → :Trigger nodes. Парсим
+    # подузлы (label/paramRef/sensorSubtype/eventType/description) и собираем
+    # RegulationTrigger. Предикаты узнаём по local-name, чтобы не привязываться
+    # к конкретному префиксу в input'е.
+    triggers: list[RegulationTrigger] = []
+    for _, p, o in g.triples((reg_subject, None, None)):
+        if _local_name(p) != "hasTrigger":
+            continue
+        trig_props: dict[str, str] = {}
+        trig_label: str | None = None
+        for _, sp, so in g.triples((o, None, None)):
+            ln = _local_name(sp)
+            if ln == "type":
+                continue
+            if ln == "label":
+                trig_label = str(so)
+            else:
+                trig_props[ln] = str(so)
+        param_ref = trig_props.get("paramRef")
+        if not param_ref:
+            # Триггер без param_ref — невалидная декларация. Пропускаем,
+            # чтобы не падать на старых/битых фикстурах.
+            continue
+        # ID триггера выводим из URI узла: REG_NS#X_Trigger_<id> → <id>.
+        # Это парный формат с regulation_to_turtle. Fallback — local_name целиком.
+        local = _local_name(o)
+        if "_Trigger_" in local:
+            trig_id = local.split("_Trigger_", 1)[1]
+        else:
+            trig_id = local
+        triggers.append(
+            RegulationTrigger(
+                id=trig_id,
+                label=trig_label,
+                param_ref=param_ref,
+                sensor_subtype=trig_props.get("sensorSubtype"),
+                event_type=trig_props.get("eventType"),
+                description=trig_props.get("description"),
+            )
+        )
+
     # PROV-O attachment: ищем prov:wasDerivedFrom → :Source_* и оттуда тянем
     # URL/excerpt/checksum/mimeType. URI предиката проверяем по local name —
     # граф может прийти с любым префиксом для prov:.
@@ -503,6 +569,7 @@ def parse_regulation_turtle(
         parameters=parameters,
         constraints=parse_shapes_turtle(shapes_turtle) if shapes_turtle else [],
         recommendations=recommendations,
+        triggers=triggers,
         source_document=props.get("sourceDocument"),
         source_clause=props.get("sourceClause"),
         valid_from=props.get("validFrom"),

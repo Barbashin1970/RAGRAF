@@ -25,7 +25,7 @@ from typing import Any
 import duckdb
 
 from app.config import settings
-from app.schemas.domain import Parameter, Recommendation, Regulation
+from app.schemas.domain import Parameter, Recommendation, Regulation, RegulationTrigger
 
 # DuckDB allows multiple cursors over one connection — но для предсказуемости
 # в multi-threaded FastAPI используем один process-wide connection + reentrant
@@ -117,6 +117,34 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
     )
     c.execute("CREATE INDEX IF NOT EXISTS idx_hist_src ON regulation_history(source_id, created_at DESC)")
 
+    # ── Триггеры регламента (event-driven сцепка) ────────────────────────
+    # Декларативная связь «вход регламента → датчик/событие». Один регламент
+    # имеет N триггеров — по числу входов (input-нод flow'а). Индекс на
+    # sensor_subtype даёт O(1) reverse-lookup «какие регламенты слушают этот
+    # датчик» — критично для будущего ETL-приёмника СИГМЫ. Подробнее: модель
+    # `RegulationTrigger` в schemas/domain.py.
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS regulation_triggers (
+            source_id      VARCHAR NOT NULL,
+            trigger_id     VARCHAR NOT NULL,
+            label          VARCHAR,
+            param_ref      VARCHAR NOT NULL,
+            sensor_subtype VARCHAR,
+            event_type     VARCHAR,
+            description    VARCHAR,
+            position       INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (source_id, trigger_id)
+        )
+        """
+    )
+    c.execute(
+        "CREATE INDEX IF NOT EXISTS idx_trig_subtype ON regulation_triggers(sensor_subtype)"
+    )
+    c.execute(
+        "CREATE INDEX IF NOT EXISTS idx_trig_event ON regulation_triggers(event_type)"
+    )
+
     # ── Документы аналитика (загруженные PDF/DOCX как контекст для Q&A) ──
     # Лимит — 10 документов на пользователя (single-user instance). Хранение
     # одной таблицей вместе с метаданными; chunks отдельно для семантического
@@ -192,6 +220,75 @@ def init_db() -> None:
     with _LOCK:
         _connection()  # запустит _init_schema
         _seed_from_fixtures_if_empty()
+        _backfill_triggers_if_missing()
+
+
+def _backfill_triggers_if_missing() -> None:
+    """Идемпотентный backfill триггеров для регламентов БЕЗ декларированных триггеров.
+
+    Сценарий: пользователь обновил RAGRAF до версии с триггерами, у него уже
+    был DuckDB-файл с 11 сидированными регламентами (без `:hasTrigger` в
+    Turtle). Семя per-id не повторно их деривирует, потому что регламенты
+    уже есть. Backfill один раз пройдётся по таким регламентам и заполнит
+    триггеры из flow.json.
+
+    Идемпотентен: если у регламента триггеры уже есть — пропуск. Технические
+    записи в history НЕ создаются — это инфраструктурная миграция, не правка
+    регламента (чтобы лента изменений не засорилась 11 одинаковыми записями).
+    """
+    from app.services.flow_storage import load_flow
+    from app.services.triggers import derive_triggers_from_flow, derive_triggers_from_parameters
+
+    c = _connection()
+    rows = c.execute(
+        """
+        SELECT r.source_id
+        FROM regulations r
+        LEFT JOIN regulation_triggers t ON t.source_id = r.source_id
+        WHERE t.trigger_id IS NULL
+        """
+    ).fetchall()
+    # rows может содержать дубликаты (один regulation_id повторяется N раз
+    # если у него N параметров — LEFT JOIN duplicates). Дедупим.
+    if not rows:
+        return
+    unique_ids = sorted({sid for (sid,) in rows})
+
+    filled = 0
+    for sid in unique_ids:
+        try:
+            triggers: list[RegulationTrigger] = []
+            flow = load_flow(sid)
+            if flow is not None:
+                triggers = derive_triggers_from_flow(flow)
+            # Если flow нет или из него ничего не вышло — выводим из параметров.
+            if not triggers:
+                reg = get(sid)
+                if reg is not None:
+                    triggers = derive_triggers_from_parameters(reg.parameters)
+            if not triggers:
+                continue
+            for pos, t in enumerate(triggers):
+                c.execute(
+                    """
+                    INSERT INTO regulation_triggers (
+                        source_id, trigger_id, label, param_ref,
+                        sensor_subtype, event_type, description, position
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT (source_id, trigger_id) DO NOTHING
+                    """,
+                    [
+                        sid, t.id, t.label, t.param_ref,
+                        t.sensor_subtype, t.event_type, t.description, pos,
+                    ],
+                )
+            filled += 1
+        except Exception as e:
+            print(f"[regulation_store] trigger backfill warning for {sid}: {e}")
+
+    if filled:
+        print(f"[regulation_store] backfilled triggers for {filled} regulation(s) from flow.json")
 
 
 def has(source_id: str) -> bool:
@@ -263,6 +360,14 @@ def get(source_id: str) -> Regulation | None:
             """,
             [source_id],
         ).fetchall()
+        trig_rows = c.execute(
+            """
+            SELECT trigger_id, label, param_ref, sensor_subtype, event_type, description
+            FROM regulation_triggers WHERE source_id = ?
+            ORDER BY position, trigger_id
+            """,
+            [source_id],
+        ).fetchall()
     parameters = [
         Parameter(
             id=row[0],
@@ -286,6 +391,17 @@ def get(source_id: str) -> Regulation | None:
                 linkedParameters=[p.id for p in parameters],
             )
         )
+    triggers = [
+        RegulationTrigger(
+            id=row[0],
+            label=row[1],
+            param_ref=row[2],
+            sensor_subtype=row[3],
+            event_type=row[4],
+            description=row[5],
+        )
+        for row in trig_rows
+    ]
     return Regulation(
         id=head[0],
         name=head[1],
@@ -296,6 +412,7 @@ def get(source_id: str) -> Regulation | None:
         parameters=parameters,
         constraints=[],  # constraints живут в upstream /shapes
         recommendations=recommendations,
+        triggers=triggers,
         source_document=head[8],
         source_clause=head[9],
         valid_from=head[10],
@@ -388,6 +505,30 @@ def save(
                         p.unit,
                         p.minInclusive,
                         p.maxInclusive,
+                        pos,
+                    ],
+                )
+            # Триггеры — drop+insert той же стратегией. trigger_id уникален
+            # в рамках регламента; полная замена позволяет переименовывать
+            # триггеры без отдельной миграционной логики.
+            c.execute("DELETE FROM regulation_triggers WHERE source_id = ?", [reg.id])
+            for pos, t in enumerate(reg.triggers):
+                c.execute(
+                    """
+                    INSERT INTO regulation_triggers (
+                        source_id, trigger_id, label, param_ref,
+                        sensor_subtype, event_type, description, position
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    [
+                        reg.id,
+                        t.id,
+                        t.label,
+                        t.param_ref,
+                        t.sensor_subtype,
+                        t.event_type,
+                        t.description,
                         pos,
                     ],
                 )
@@ -549,6 +690,7 @@ def delete(source_id: str) -> bool:
         c.begin()
         try:
             c.execute("DELETE FROM parameters WHERE source_id = ?", [source_id])
+            c.execute("DELETE FROM regulation_triggers WHERE source_id = ?", [source_id])
             c.execute("DELETE FROM regulation_history WHERE source_id = ?", [source_id])
             c.execute("DELETE FROM regulations WHERE source_id = ?", [source_id])
             c.commit()
@@ -556,6 +698,66 @@ def delete(source_id: str) -> bool:
             c.rollback()
             raise
     return True
+
+
+# ---- Triggers reverse-lookup ------------------------------------------
+
+
+def list_by_sensor_subtype(subtype_id: str) -> list[dict[str, Any]]:
+    """Какие регламенты слушают этот подтип датчика.
+
+    O(1) запрос благодаря индексу `idx_trig_subtype` на regulation_triggers.
+    Возвращает регламенты с краткой меткой триггера (label/param_ref) —
+    UI рисует список «датчик air-quality-pm25 используется в 3 регламентах».
+
+    Один регламент может появиться несколько раз если на один подтип
+    привязано несколько триггеров — DISTINCT не делаем, UI группирует сам.
+    """
+    with _LOCK:
+        c = _connection()
+        rows = c.execute(
+            """
+            SELECT t.source_id, r.name, r.domain, t.trigger_id, t.label,
+                   t.param_ref, t.event_type
+            FROM regulation_triggers t
+            JOIN regulations r ON r.source_id = t.source_id
+            WHERE t.sensor_subtype = ?
+            ORDER BY r.domain, r.source_id, t.position, t.trigger_id
+            """,
+            [subtype_id],
+        ).fetchall()
+    return [
+        {
+            "regulation_id": r[0],
+            "regulation_name": r[1],
+            "domain": r[2],
+            "trigger_id": r[3],
+            "trigger_label": r[4],
+            "param_ref": r[5],
+            "event_type": r[6],
+        }
+        for r in rows
+    ]
+
+
+def count_by_sensor_subtype() -> dict[str, int]:
+    """Агрегат: subtype_id → число регламентов, его использующих.
+
+    Для UI Sensor Library — бэйдж «в N регламентах» на каждой карточке
+    подтипа без N запросов. Регламенты считаются distinct — если у регламента
+    два триггера на один и тот же подтип, считается один раз.
+    """
+    with _LOCK:
+        c = _connection()
+        rows = c.execute(
+            """
+            SELECT sensor_subtype, COUNT(DISTINCT source_id) AS reg_count
+            FROM regulation_triggers
+            WHERE sensor_subtype IS NOT NULL
+            GROUP BY sensor_subtype
+            """
+        ).fetchall()
+    return {r[0]: int(r[1]) for r in rows}
 
 
 # ---- Seeding ----------------------------------------------------------
@@ -573,6 +775,8 @@ def _seed_from_fixtures_if_empty() -> None:
     """
     from app.services import fixtures  # local import to avoid cycle at module-load time
     from app.services.turtle_bridge import parse_regulation_turtle
+    from app.services.flow_storage import load_flow
+    from app.services.triggers import derive_triggers_from_flow
 
     c = _connection()
     existing_rows = c.execute("SELECT source_id FROM regulations").fetchall()
@@ -589,6 +793,23 @@ def _seed_from_fixtures_if_empty() -> None:
             reg.domain = meta["domain"]
             # Имя из реестра приоритетнее имени в Turtle — оно длиннее и описательнее.
             reg.name = meta.get("name") or reg.name
+            # Деривация триггеров — для старых фикстур, в которых Turtle ещё
+            # не содержит :hasTrigger декларации. Двухуровневый fallback:
+            #   1) flow.json есть → derive_triggers_from_flow (учитывает
+            #      явные sensor.bindsTo привязки);
+            #   2) flow.json нет → derive_triggers_from_parameters (триггер
+            #      на каждый параметр, sensor выводится эвристикой).
+            # Без второго уровня регламенты без flow остались бы без триггеров.
+            if not reg.triggers:
+                try:
+                    flow = load_flow(sid)
+                    if flow is not None:
+                        reg.triggers = derive_triggers_from_flow(flow)
+                    if not reg.triggers:
+                        from app.services.triggers import derive_triggers_from_parameters
+                        reg.triggers = derive_triggers_from_parameters(reg.parameters)
+                except Exception:
+                    pass
             save(reg, author="system-seed", comment=f"Сидинг из фикстуры {sid}")
             seeded += 1
         except Exception as e:

@@ -43,6 +43,12 @@ export function SensorLibraryScreen() {
     queryKey: ['sensor-subtypes'],
     queryFn: () => api.sensorSubtypes.list(),
   })
+  // Агрегат «подтип → N регламентов» для бэйджей. Один запрос, инвалидируется
+  // вместе с sensor-subtypes — этого достаточно, бэйдж не realtime-критичен.
+  const { data: usage = {} } = useQuery({
+    queryKey: ['sensor-subtypes-usage'],
+    queryFn: () => api.sensorSubtypes.usageCounts(),
+  })
 
   // expandedClasses — какие классы раскрыты в дереве. По умолчанию открыт detector
   // (с большим количеством видеодетекторов).
@@ -131,6 +137,7 @@ export function SensorLibraryScreen() {
             <ClassTreeNode
               key={cls.class_id}
               cls={cls}
+              usage={usage}
               expanded={expandedClasses.has(cls.class_id)}
               onToggle={() => toggleClass(cls.class_id)}
               selectedSubtype={selectedSubtype}
@@ -176,6 +183,7 @@ export function SensorLibraryScreen() {
 
 interface ClassTreeNodeProps {
   cls: SensorClassWithSubtypes
+  usage: Record<string, number>
   expanded: boolean
   onToggle: () => void
   selectedSubtype: string | null
@@ -190,6 +198,7 @@ interface ClassTreeNodeProps {
 
 function ClassTreeNode({
   cls,
+  usage,
   expanded,
   onToggle,
   selectedSubtype,
@@ -228,6 +237,7 @@ function ClassTreeNode({
           {cls.subtypes.map((sub) => {
             const active = sub.subtype_id === selectedSubtype
             const isGeneric = sub.subtype_id === cls.class_id
+            const regCount = usage[sub.subtype_id] ?? 0
             return (
               <div key={sub.subtype_id} className="group flex items-center gap-1">
                 <button
@@ -237,9 +247,24 @@ function ClassTreeNode({
                     'flex flex-1 items-center gap-1 truncate rounded px-1.5 py-1 text-left text-[12px]',
                     active ? 'bg-stone-100 font-semibold text-stone-900' : 'text-stone-700 hover:bg-stone-50',
                   )}
-                  title={sub.description ?? sub.label}
+                  title={
+                    regCount > 0
+                      ? `${sub.description ?? sub.label} — используется в ${regCount} регламент${pluralRus(regCount)}`
+                      : (sub.description ?? sub.label)
+                  }
                 >
                   <span className="truncate">{sub.label}</span>
+                  {regCount > 0 && (
+                    <span
+                      className={cn(
+                        'ml-auto inline-flex h-4 min-w-[18px] items-center justify-center rounded-full px-1 text-[9px] font-semibold tabular-nums',
+                        active ? 'bg-violet-200 text-violet-800' : 'bg-violet-100 text-violet-700',
+                      )}
+                      aria-label={`Используется в ${regCount} регламентах`}
+                    >
+                      {regCount}
+                    </span>
+                  )}
                 </button>
                 {!isGeneric && (
                   <button
@@ -623,6 +648,15 @@ function JsonPreview({ subtypeId, fields }: { subtypeId: string; fields: SensorF
       <pre className="overflow-x-auto whitespace-pre">{JSON.stringify(wrapped, null, 2)}</pre>
     </div>
   )
+}
+
+/** «1 регламент» / «2 регламента» / «5 регламентов» — окончания из tooltip'а. */
+function pluralRus(n: number): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return 'е'
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return 'ах'
+  return 'ах'
 }
 
 function decodeExample(f: SensorFieldSchema): unknown {

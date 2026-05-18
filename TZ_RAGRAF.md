@@ -393,7 +393,35 @@ Batch-bundle добавляет на корневой уровень `corpus_man
 - `POST /api/events/ingest` — приёмник реальных событий от СИГМЫ;
 - Журнал срабатываний в DuckDB + UI-timeline;
 - Webhook-actions на OUTPUT-ноде;
-- `POST /api/etl/match-event` — поиск подходящего регламента по полям payload события.
+- `POST /api/etl/match-event` — поиск подходящего регламента по полям payload события (предусловие — таблица `regulation_triggers` готова, см. §4.2.11).
+
+#### 4.2.11. Триггеры (декларативная сцепка событие → регламент)
+
+Маршрут — секция «Триггеры» в редакторе регламента (`/regulations/{id}/edit`). Закрывает event-driven разрыв: до этой итерации связь «датчик → параметр регламента» жила только в `flow.json` (через цепочку `sensor.bindsTo → input.paramRef`), без декларации в Turtle. ETL-приёмнику для маршрутизации пришлось бы обходить все flow.json — на 11 регламентах терпимо, на десятках тысяч нереально.
+
+**Модель** (`RegulationTrigger` в `app/schemas/domain.py`):
+
+| Поле             | Назначение                                                                       |
+| ---------------- | --------------------------------------------------------------------------------- |
+| `id`             | Уникален в рамках регламента (kebab-case, например `trig-inletPressure`).         |
+| `label`          | UI-имя.                                                                           |
+| `param_ref`      | FK на `Parameter.name` — какой параметр регламента наполняет триггер.             |
+| `sensor_subtype` | FK на `SensorSubtype.subtype_id`. Может быть пустым (ручной ввод / не привязан). |
+| `event_type`     | Тип события в ETL-шине (`telemetry.pressure`, `alert.smoke`).                     |
+| `description`    | Дополнительное пояснение.                                                         |
+
+**Множественность.** Один регламент = N триггеров (по числу входов). Пример `heat-inlet-breach`: три триггера — давление, скорость падения, температура. У каждого может быть свой подтип датчика и тип события.
+
+**Хранение.** Двухслойное: (1) триплы `:hasTrigger`/`:Trigger`/`:sensorSubtype` в `data.ttl` — онтологическая декларация для SIGMA-bundle; (2) DuckDB-таблица `regulation_triggers` с индексами на `sensor_subtype` и `event_type` — O(1) reverse-lookup «какие регламенты слушают этот датчик».
+
+**Автодеривация.** При сидинге фикстур и через идемпотентный `_backfill_triggers_if_missing` для уже существующих регламентов: для каждой input-ноды flow собирается `paramRef`, привязка к датчику ищется через sensor.bindsTo; если sensor явно не привязан — заполняется эвристическим словарём `PARAM_TO_SUBTYPE_HINT` (`inletPressure → industrial-pressure`, `pm25Concentration → air-quality-pm`, …). Аналитик может перепривязать в UI — значение пользователя приоритетно.
+
+**API:**
+- `GET /api/sensor-subtypes/{subtype_id}/regulations` — список регламентов, использующих подтип (+ trigger_label / event_type на каждый триггер);
+- `GET /api/sensor-subtypes/_usage` — агрегат `subtype_id → N регламентов` для бэйджей в Sensor Library;
+- Триггеры в составе `Regulation` сохраняются через стандартный `PUT /api/regulations/{id}`.
+
+**Зачем для СИГМЫ.** Регламент становится самодостаточным для ETL-маршрутизации: бэкенду СИГМЫ при приёме события не нужно сканировать flow.json — достаточно SPARQL по `:hasTrigger/:sensorSubtype` (или SQL по таблице индекса). Это снимает претензию «10К регламентов = 10К I/O» и закладывает фундамент под будущий `/api/events/ingest`.
 
 #### 4.2.10. Библиотека датчиков
 

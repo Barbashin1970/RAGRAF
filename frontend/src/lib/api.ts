@@ -90,6 +90,18 @@ export interface Constraint {
   severity: 'violation' | 'warning' | 'info'
 }
 
+// Декларативная привязка «вход регламента → датчик/событие». Зеркалит
+// backend `RegulationTrigger`. Закрывает event-driven gap: маршрутизация
+// «датчик → регламент» теперь явная, а не через обход flow.json.
+export interface RegulationTrigger {
+  id: string
+  label?: string | null
+  param_ref: string
+  sensor_subtype?: string | null
+  event_type?: string | null
+  description?: string | null
+}
+
 export interface Regulation {
   id: string
   name: string
@@ -105,6 +117,10 @@ export interface Regulation {
     priority: 1 | 2 | 3
     linkedParameters: string[]
   }>
+  // Optional с дефолтом `[]` на бэкенде — старые регламенты без триггеров
+  // приходят без поля, новые — с массивом. Optional освобождает места,
+  // где Regulation конструируется во временных тестовых заглушках.
+  triggers?: RegulationTrigger[]
   // SIGMA-compliance (ТЗ §4.1.3): нормативное основание + период действия.
   source_document?: string | null
   source_clause?: string | null
@@ -659,6 +675,27 @@ export const api = {
         `/api/sensor-subtypes/${encodeURIComponent(subtypeId)}`,
         { method: 'DELETE' },
       ),
+    // Reverse-lookup: какие регламенты слушают этот подтип. Возвращает
+    // плоский список триггеров (один регламент может быть несколько раз
+    // если у него несколько триггеров на этот подтип).
+    regulationsUsing: (subtypeId: string) =>
+      request<{
+        subtype_id: string
+        count: number
+        triggers: Array<{
+          regulation_id: string
+          regulation_name: string
+          domain?: string | null
+          trigger_id: string
+          trigger_label?: string | null
+          param_ref: string
+          event_type?: string | null
+        }>
+      }>(`/api/sensor-subtypes/${encodeURIComponent(subtypeId)}/regulations`),
+    // Агрегированный счётчик: subtype_id → N регламентов. Один запрос
+    // вместо N для рендера бэйджей в дереве датчиков.
+    usageCounts: () =>
+      request<Record<string, number>>(`/api/sensor-subtypes/_usage`),
   },
   // ── Словарь rules-based извлечения ─────────────────────────────────
   // CRUD над DuckDB extraction_terms: пополнение нераспознанными словами
