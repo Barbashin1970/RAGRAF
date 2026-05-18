@@ -365,6 +365,20 @@ export const api = {
         saveResponseSchema,
       ),
     raw: (id: string) => request<string>(`/api/regulations/${encodeURIComponent(id)}/raw`),
+    /** PUT /raw — встроенный редактор вкладки «Turtle» в Regulation Editor.
+     *  Backend парсит Turtle → сохраняет в DuckDB store + history. */
+    updateRaw: async (id: string, turtle: string) => {
+      const r = await fetch(`/api/regulations/${encodeURIComponent(id)}/raw`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: turtle,
+      })
+      if (!r.ok) {
+        const text = await r.text().catch(() => '')
+        throw new Error(`${r.status} ${r.statusText}: ${text}`)
+      }
+      return r.json() as Promise<{ ok: boolean; version: string; pushed_upstream: boolean }>
+    },
     /** Удаление регламента. Бэкенд требует ?confirm=true чтобы случайный
      *  curl/код не сносил данные; UI всегда подтверждает через диалог. */
     delete: (id: string) =>

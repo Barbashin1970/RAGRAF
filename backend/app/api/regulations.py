@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
@@ -194,20 +194,102 @@ def archive_regulation(source_id: str) -> Regulation:
 
 @router.get("/regulations/{source_id}/raw", response_class=PlainTextResponse)
 async def get_regulation_raw(source_id: str) -> str:
-    """Получить регламент сырым Turtle (для отладки и инспекции)."""
+    """Получить регламент сырым Turtle.
+
+    Приоритет: локальный DuckDB-store (через `regulation_to_turtle`) →
+    upstream фикстура. Раньше всегда шли в upstream, и встроенный редактор
+    вкладки «Turtle» показывал НЕ свежие данные после правки регламента —
+    они были на сервере (DuckDB), но мы тащили upstream-копию (фикстуру).
+    """
+    stored = regulation_store.get(source_id)
+    if stored is not None:
+        # Triggers — теперь часть Turtle через :hasTrigger. Парсер шейпов
+        # тащим из upstream только для bounds; на render Turtle они не нужны.
+        return regulation_to_turtle(stored)
     try:
         return await client.get_data(source_id)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Upstream: {e}") from e
 
 
-@router.put("/regulations/{source_id}/raw", status_code=204)
-async def update_regulation_raw(source_id: str, turtle: str):
-    """Записать сырой Turtle в upstream (используется редактором источников)."""
+@router.put("/regulations/{source_id}/raw")
+async def update_regulation_raw(source_id: str, request: Request) -> dict[str, Any]:
+    """Сохранить сырой Turtle регламента (встроенный редактор вкладки «Turtle»).
+
+    Body: `text/plain` — Turtle-документ как есть.
+
+    Поток:
+      1. Читаем body как UTF-8 строку.
+      2. Парсим через `parse_regulation_turtle` → структурированный Regulation.
+         Восстанавливаем `domain` и PROV-O attachment (`source_file_path` и пр.)
+         из текущего store — их нет в Turtle, теряются при чистом парсинге.
+      3. Сохраняем `regulation_store.save()` — это пишет в DuckDB + history.
+      4. (опц.) `WRITEBACK_UPSTREAM=true` → пушим raw Turtle в upstream.
+
+    Использование: пользователь правит комментарии / опечатки / структуру
+    напрямую в Turtle. Раньше endpoint только пробрасывал в upstream, не
+    обновляя DuckDB — правки не сохранялись.
+    """
+    body_bytes = await request.body()
+    if not body_bytes:
+        raise HTTPException(status_code=400, detail="Пустое тело запроса")
     try:
-        await client.update_data(source_id, turtle)
+        turtle = body_bytes.decode("utf-8")
+    except UnicodeDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Не UTF-8: {e}") from e
+
+    existing = regulation_store.get(source_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail=f"Регламент '{source_id}' не найден")
+
+    # SHACL shapes для bounds — берём текущие из upstream/фикстуры; если
+    # недоступны, парсим без них.
+    shapes_turtle = ""
+    try:
+        shapes_turtle = await client.get_shapes(source_id)
+    except Exception:
+        pass
+
+    try:
+        reg = parse_regulation_turtle(turtle, source_id, shapes_turtle=shapes_turtle)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Upstream: {e}") from e
+        raise HTTPException(
+            status_code=400,
+            detail=f"Не удалось распарсить Turtle: {type(e).__name__}: {e}",
+        ) from e
+
+    if not reg.parameters and not reg.recommendations and reg.name == source_id:
+        # parse_regulation_turtle возвращает stub-Regulation если ничего не
+        # распарсил. Защищаемся от потери данных при сломанном Turtle.
+        raise HTTPException(
+            status_code=400,
+            detail="В Turtle не найдены параметры, имя или рекомендация — отклонено как недействительный документ. Проверьте синтаксис.",
+        )
+
+    # Восстанавливаем поля, которые в Turtle не выгружаются (domain, PROV-O
+    # локальный файл, mime/checksum). Это сохраняет привязки регламента
+    # после правки в редакторе.
+    reg.domain = existing.domain or reg.domain
+    reg.status = existing.status
+    if not reg.source_file_path:
+        reg.source_file_path = existing.source_file_path
+    if not reg.source_mime_type:
+        reg.source_mime_type = existing.source_mime_type
+    # Триггеры: parse_regulation_turtle уже их распарсит, но если в Turtle
+    # их нет (например пользователь стёр), не теряем — оставляем из store.
+    if not reg.triggers and existing.triggers:
+        reg.triggers = existing.triggers
+
+    version_id = regulation_store.save(reg, author="anonymous", comment="Правка через Turtle-редактор")
+
+    pushed = False
+    if getattr(settings, "writeback_upstream", False):
+        try:
+            await client.update_data(source_id, turtle)
+            pushed = True
+        except Exception:
+            pass
+    return {"ok": True, "version": version_id, "pushed_upstream": pushed}
 
 
 # ── Source document (документ-основание, PROV-O attachment) ─────────────

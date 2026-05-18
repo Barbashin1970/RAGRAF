@@ -156,13 +156,16 @@ export function TwinDesignerScreen() {
                   key={t.id}
                   onClick={() => navigate(`/twins/${t.id}`)}
                   className={cn(
-                    'flex flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left text-sm transition',
+                    'flex w-full flex-col items-start gap-0.5 rounded-md px-2 py-1.5 text-left text-sm transition',
                     active
                       ? 'bg-violet-50 text-violet-900 ring-1 ring-violet-200'
                       : 'text-stone-700 hover:bg-stone-50',
                   )}
+                  title={t.name}
                 >
-                  <span className="truncate font-medium">{t.name}</span>
+                  <span className="line-clamp-2 break-words font-medium leading-snug">
+                    {t.name}
+                  </span>
                   <span className="text-[10px] text-stone-500">
                     {t.regulation_ids.length}{' '}
                     {pluralRus(t.regulation_ids.length, ['регламент', 'регламента', 'регламентов'])}

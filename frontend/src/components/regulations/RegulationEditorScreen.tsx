@@ -76,14 +76,33 @@ export function RegulationEditorScreen() {
     enabled: !!id,
   })
 
-  // Локальная редактируемая копия. При перезагрузке regulation — сбрасываем.
+  // Локальная редактируемая копия.
   const [draft, setDraft] = useState<Regulation | null>(null)
   const [tab, setTab] = useState<Tab>('form')
   const [showHistory, setShowHistory] = useState(false)
+  // Флаг «после save ожидаем свежие данные с сервера» — единственная
+  // причина для перезаливки draft из regulation. По умолчанию (фоновый
+  // refetch react-query: window focus, инвалидация соседних query) draft
+  // НЕ затирается, иначе любая правка пропадает при переключении окна.
+  const [pendingServerSync, setPendingServerSync] = useState(false)
 
   useEffect(() => {
-    if (regulation) setDraft(structuredClone(regulation) as Regulation)
-  }, [regulation])
+    if (!regulation) return
+    setDraft((current) => {
+      // Первичная загрузка / переход на другой регламент → инициализируем.
+      if (current === null || current.id !== regulation.id) {
+        return structuredClone(regulation) as Regulation
+      }
+      // Свежие данные с сервера после save / publish / archive / restore →
+      // обновляем, флаг снимаем ниже в useEffect-cleanup.
+      if (pendingServerSync) {
+        return structuredClone(regulation) as Regulation
+      }
+      // Фоновый refetch (focus / mutate соседних) — не трогаем local edits.
+      return current
+    })
+    if (pendingServerSync) setPendingServerSync(false)
+  }, [regulation, pendingServerSync])
 
   const dirty = useMemo(() => {
     if (!regulation || !draft) return false
@@ -126,18 +145,32 @@ export function RegulationEditorScreen() {
     qc.refetchQueries({ queryKey: ['flow', id] })
   }
 
+  // Все мутации ставят `pendingServerSync` — это сигнал useEffect выше
+  // ОДНОКРАТНО перезалить draft из свежего regulation после refetch.
+  // Без этого фонового refetch'а от react-query (window focus, инвалидация
+  // соседних query) затирал бы local edits, и кнопка «Сохранить» казалась
+  // неактивной потому что dirty=false на свежезаписанных данных.
   const save = useMutation({
     mutationFn: (next: Regulation) => api.regulations.save(id, next),
-    onSuccess: invalidateAll,
+    onSuccess: () => {
+      setPendingServerSync(true)
+      invalidateAll()
+    },
   })
 
   const publish = useMutation({
     mutationFn: () => api.regulations.publish(id),
-    onSuccess: invalidateAll,
+    onSuccess: () => {
+      setPendingServerSync(true)
+      invalidateAll()
+    },
   })
   const archive = useMutation({
     mutationFn: () => api.regulations.archive(id),
-    onSuccess: invalidateAll,
+    onSuccess: () => {
+      setPendingServerSync(true)
+      invalidateAll()
+    },
   })
 
   const stats = [
@@ -268,7 +301,15 @@ export function RegulationEditorScreen() {
             <SourceView sourceId={id} draft={draft} />
           )}
         </div>
-        {showHistory && <HistoryPanel id={id} onRestore={() => qc.invalidateQueries({ queryKey: ['regulation', id] })} />}
+        {showHistory && (
+          <HistoryPanel
+            id={id}
+            onRestore={() => {
+              setPendingServerSync(true)
+              invalidateAll()
+            }}
+          />
+        )}
       </div>
     </div>
   )
@@ -1319,27 +1360,96 @@ function SliderRow({
 // View 3 — Source Turtle (read-only preview)
 // ──────────────────────────────────────────────────────────
 
-function SourceView({ sourceId, draft }: { sourceId: string; draft: Regulation }) {
+function SourceView({ sourceId }: { sourceId: string; draft: Regulation }) {
+  const qc = useQueryClient()
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['regulation-raw', sourceId, JSON.stringify(draft)],
+    queryKey: ['regulation-raw', sourceId],
     queryFn: () => api.regulations.raw(sourceId),
-    // Здесь показываем что лежит в backend; при правке draft пересоберётся в Turtle уже после save.
+  })
+
+  // Локальный буфер для редактирования. Заполняется из server-data при первой
+  // загрузке (и при «Сбросить»), не затирается фоновыми refetch'ами react-query.
+  const [buffer, setBuffer] = useState<string | null>(null)
+  useEffect(() => {
+    if (data && buffer === null) setBuffer(data)
+  }, [data, buffer])
+
+  const dirty = buffer !== null && data !== undefined && buffer !== data
+
+  const save = useMutation({
+    mutationFn: (turtle: string) => api.regulations.updateRaw(sourceId, turtle),
+    onSuccess: () => {
+      // Инвалидируем и сам regulation (структурированное представление
+      // обновится — Поля/Слайдеры покажут свежее), и raw — чтобы сразу
+      // отобразилось как backend нормализовал Turtle (отступы, порядок
+      // префиксов и т.п.).
+      qc.invalidateQueries({ queryKey: ['regulation', sourceId] })
+      qc.invalidateQueries({ queryKey: ['flow', sourceId] })
+      qc.invalidateQueries({ queryKey: ['regulation-history', sourceId] })
+      qc.refetchQueries({ queryKey: ['regulation-raw', sourceId] })
+      // После refetch локальный буфер должен подтянуть свежее (см. useEffect ниже).
+      setBuffer(null)
+    },
   })
 
   return (
-    <div>
-      <div className="mb-3 rounded-md border border-stone-200 bg-stone-50/60 p-3 text-xs text-stone-600">
-        Сырой Turtle из локального store (DuckDB). Изменения в редакторе появятся здесь после «Сохранить» — это и есть
-        то, что мы отдаём наружу через <code>GET /api/regulations/{sourceId}/raw</code> (и при <code>WRITEBACK_UPSTREAM=true</code>
-        отправляем в upstream <code>PUT /data</code>).
-        <button onClick={() => refetch()} className="ml-2 underline">Обновить</button>
+    <div className="flex h-full flex-col gap-3">
+      <div className="rounded-md border border-stone-200 bg-stone-50/60 p-3 text-xs text-stone-600">
+        Сырой Turtle регламента из локального DuckDB-store. Правки сохраняются
+        в store + добавляют запись в историю версий. Это **встроенный редактор**:
+        можно править комментарии, опечатки, формулировки рекомендации, добавлять/
+        убирать триплы. Структурированное представление на вкладках «Поля» /
+        «Слайдеры» автоматически пересоберётся из обновлённого Turtle.
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="primary"
+          size="sm"
+          icon={<Save size={13} />}
+          onClick={() => buffer && save.mutate(buffer)}
+          disabled={!dirty || save.isPending}
+          loading={save.isPending}
+        >
+          {save.isPending ? 'Сохраняю…' : 'Сохранить Turtle'}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<RotateCcw size={13} />}
+          onClick={() => {
+            setBuffer(data ?? '')
+          }}
+          disabled={!dirty}
+        >
+          Сбросить
+        </Button>
+        <button
+          onClick={() => refetch()}
+          className="ml-2 text-xs text-stone-500 underline hover:text-stone-700"
+        >
+          Перезагрузить с сервера
+        </button>
+        {dirty && (
+          <span className="ml-auto text-[11px] text-amber-700">
+            Несохранённые правки в Turtle
+          </span>
+        )}
+        {save.isError && (
+          <span className="ml-auto text-[11px] text-rose-700">
+            Ошибка: {(save.error as Error).message}
+          </span>
+        )}
       </div>
       {isLoading && <div className="text-sm text-stone-500">Загрузка…</div>}
       {error && <div className="text-sm text-rose-700">Ошибка: {(error as Error).message}</div>}
-      {data && (
-        <pre className="overflow-auto rounded-lg border border-stone-200 bg-stone-900 p-4 font-mono text-xs leading-relaxed text-stone-100">
-          {data}
-        </pre>
+      {buffer !== null && (
+        <textarea
+          value={buffer}
+          onChange={(e) => setBuffer(e.target.value)}
+          spellCheck={false}
+          className="min-h-[520px] flex-1 resize-y overflow-auto rounded-lg border border-stone-300 bg-stone-900 p-4 font-mono text-xs leading-relaxed text-stone-100 caret-emerald-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/40"
+          style={{ tabSize: 2 }}
+        />
       )}
     </div>
   )
