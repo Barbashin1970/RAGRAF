@@ -194,6 +194,52 @@ function LLMStatusDot({ isGenerating }: { isGenerating?: boolean }) {
   )
 }
 
+/**
+ * Chip-кнопка с моделью + статус-огоньком для тулбара чат-инпута. Показывает
+ * текущего провайдера (Cerebras / Ollama / …) и tone-dot. Клик раскрывает
+ * правую панель настроек, где есть полный селектор моделей.
+ *
+ * Имя провайдера приоритетнее tag'а модели — он короче и узнаваемее
+ * (Cerebras vs qwen-3-235b-a22b-instruct-2507). Tag показываем в title.
+ */
+function ModelChip({
+  modelKind,
+  isGenerating,
+  onOpenPicker,
+}: {
+  modelKind: ModelKind
+  isGenerating?: boolean
+  onOpenPicker: () => void
+}) {
+  const { data: llmInfo } = useLLMStatus()
+  const tone = llmStatusTone(llmInfo, isGenerating)
+  const provider = llmInfo?.provider ?? 'ollama'
+  const providerLabel: Record<string, string> = {
+    ollama: 'Ollama',
+    cerebras: 'Cerebras',
+    groq: 'Groq',
+    openrouter: 'OpenRouter',
+    openai: 'OpenAI',
+    mock: 'Mock',
+  }
+  const resolvedTag = resolveModelTag(modelKind, llmInfo)
+  const shortTag = resolvedTag.split(':')[0]
+  return (
+    <button
+      type="button"
+      onClick={onOpenPicker}
+      className="inline-flex items-center gap-1.5 rounded-full border border-stone-200 px-3 py-1 text-xs text-stone-600 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700"
+      title={`${providerLabel[provider] ?? provider} · ${resolvedTag} — клик откроет настройки LLM`}
+    >
+      <Circle size={8} className={cn('fill-current', TONE_DOT[tone])} />
+      <span className="font-medium">{providerLabel[provider] ?? provider}</span>
+      <span className="hidden truncate font-mono text-[10px] text-stone-400 sm:inline">
+        {shortTag.length > 18 ? shortTag.slice(0, 16) + '…' : shortTag}
+      </span>
+    </button>
+  )
+}
+
 /** Подвал развёрнутой панели с полной инфой про LLM. */
 function LLMStatusFooter({
   regulationsTotal,
@@ -489,6 +535,19 @@ function SearchDemo() {
   // пресеты применяются по клику, дальше пользователь может править руками.
   const [activePresetId, setActivePresetId] = useState<string | null>('default')
   const [userPresets, setUserPresets] = useState<SystemPromptPreset[]>(() => loadUserPresets())
+  // Левая панель «Документы | Регламенты» — раскрытая по умолчанию, можно
+  // свернуть симметрично правой (ChatSettingsPanel). Состояние персистится.
+  const [leftPanelCollapsed, setLeftPanelCollapsed] = useState<boolean>(() => loadLeftCollapsed())
+  useEffect(() => {
+    saveLeftCollapsed(leftPanelCollapsed)
+  }, [leftPanelCollapsed])
+  // Правая панель «Настройки LLM» — теперь поднята сюда, чтобы клик на
+  // model-chip в инпуте чата мог её раскрыть (когда свёрнута). Состояние
+  // персистится в localStorage (тот же ключ что использовал ChatSettingsPanel).
+  const [rightPanelCollapsed, setRightPanelCollapsed] = useState<boolean>(() => loadCollapsed())
+  useEffect(() => {
+    saveCollapsed(rightPanelCollapsed)
+  }, [rightPanelCollapsed])
   // Список всех регламентов нужен для эффекта «снять все галки» при выборе
   // пресета «Резюме документа». Берём из react-query кэша, чтобы не дублить.
   const { data: regsRaw } = useQuery({
@@ -669,6 +728,14 @@ function SearchDemo() {
     if (fx?.max_tokens !== undefined) setMaxTokens(fx.max_tokens)
     if (fx?.num_ctx !== undefined) setNumCtx(fx.num_ctx)
     if (fx?.model !== undefined) setModelKind(fx.model)
+    // Подсказать пользователю заготовленный текст вопроса (preset.userQuery)
+    // — раньше пользователь должен был сам формулировать «дай резюме» после
+    // клика на «Резюме документа». Теперь один клик = system-инструкция +
+    // готовая команда в инпут. Не перезатираем уже введённый текст, чтобы
+    // не потерять draft пользователя.
+    if (preset.userQuery && !input.trim()) {
+      setInput(preset.userQuery)
+    }
   }
 
   const saveCurrentAsPreset = (label: string) => {
@@ -688,8 +755,12 @@ function SearchDemo() {
 
   return (
     <div className="flex min-h-0 flex-1">
-      {/* Левая колонка: документы + регламенты как табы */}
+      {/* Левая колонка: документы + регламенты как табы. Collapsed-состояние
+          поднято сюда, чтобы кнопка «+» в инпуте чата могла раскрыть панель
+          при клике (см. инпут ниже). */}
       <ContextPanel
+        collapsed={leftPanelCollapsed}
+        onToggleCollapsed={() => setLeftPanelCollapsed((p) => !p)}
         disabledRegulationIds={disabledRegulationIds}
         onToggleRegulation={toggleRegulation}
         onSetManyRegulations={setManyRegulations}
@@ -753,27 +824,29 @@ function SearchDemo() {
               className="min-h-[24px] max-h-40 w-full resize-none border-0 bg-transparent px-1 py-0.5 text-sm leading-relaxed placeholder:text-stone-400 focus:outline-none focus:ring-0 disabled:opacity-60"
             />
             <div className="flex items-center gap-2">
-              {/* «+» — быстрая ссылка к левой панели «Документы». Скроллит
-                  фокус к левой колонке (она всегда видима в Студии). */}
+              {/* «+» — раскрывает свёрнутую левую панель «Документы / Регламенты»
+                  если она collapsed; иначе работает как скролл-якорь. */}
               <button
                 type="button"
                 onClick={() => {
+                  if (leftPanelCollapsed) setLeftPanelCollapsed(false)
                   document
                     .querySelector('[data-context-panel]')
                     ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
                 }}
                 disabled={chat.isPending}
                 className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-stone-200 text-stone-500 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-50"
-                title="Добавить контекст — открой левую панель, чтобы выбрать документы или регламенты"
+                title="Открыть панель «Документы / Регламенты»"
               >
                 <Plus size={16} />
               </button>
               {/* Scope-chip: «🔍 Поиск» с подсчётом включённых источников.
-                  Кликом тоже скроллит к левой панели. Дизайн повторяет
-                  Perplexity / Claude — компактно, без занимания всей строки. */}
+                  Кликом раскрывает левую панель (если свёрнута) либо
+                  скроллит к ней. */}
               <button
                 type="button"
                 onClick={() => {
+                  if (leftPanelCollapsed) setLeftPanelCollapsed(false)
                   document
                     .querySelector('[data-context-panel]')
                     ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
@@ -807,6 +880,20 @@ function SearchDemo() {
                   </>
                 )}
               </button>
+
+              {/* Model-chip — справа от scope-chip, перед кнопками действий.
+                  Показывает провайдера (Cerebras/Ollama/...) + tone-dot
+                  (зелёный/янтарный/красный/виолетовый-пульс при generating).
+                  Клик раскрывает правую панель «Настройки LLM» — там можно
+                  переключить модель. Дизайн повторяет model-selector в
+                  Perplexity / Claude (компактный pill, без выпадашки). */}
+              <ModelChip
+                modelKind={modelKind}
+                isGenerating={chat.isPending}
+                onOpenPicker={() => {
+                  if (rightPanelCollapsed) setRightPanelCollapsed(false)
+                }}
+              />
 
               <div className="ml-auto flex items-center gap-1.5">
                 {turns.length > 0 && (
@@ -892,6 +979,8 @@ function SearchDemo() {
           setActivePresetId(null)
         }}
         isGenerating={chat.isPending}
+        collapsed={rightPanelCollapsed}
+        onToggleCollapsed={() => setRightPanelCollapsed((p) => !p)}
       />
     </div>
   )
@@ -911,6 +1000,7 @@ function SearchDemo() {
 // каждая секция запоминает своё open/close state).
 
 const COLLAPSE_STORAGE_KEY = 'ragraf:sandbox:right-panel-collapsed'
+const LEFT_COLLAPSE_STORAGE_KEY = 'ragraf:sandbox:left-panel-collapsed'
 
 function loadCollapsed(): boolean {
   if (typeof window === 'undefined') return false
@@ -918,6 +1008,24 @@ function loadCollapsed(): boolean {
     return window.localStorage.getItem(COLLAPSE_STORAGE_KEY) === '1'
   } catch {
     return false
+  }
+}
+
+function loadLeftCollapsed(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(LEFT_COLLAPSE_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function saveLeftCollapsed(value: boolean): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(LEFT_COLLAPSE_STORAGE_KEY, value ? '1' : '0')
+  } catch {
+    // ignore — private mode / quota
   }
 }
 
@@ -951,6 +1059,8 @@ function ChatSettingsPanel({
   modelKind,
   onModelKindChange,
   isGenerating,
+  collapsed,
+  onToggleCollapsed,
 }: {
   extraSystemPrompt: string
   onExtraSystemPromptChange: (s: string) => void
@@ -972,18 +1082,13 @@ function ChatSettingsPanel({
   modelKind: ModelKind
   onModelKindChange: (k: ModelKind) => void
   isGenerating?: boolean
+  collapsed: boolean
+  onToggleCollapsed: () => void
 }) {
   // llm-info нужен здесь, чтобы передать в LLMStatusFooter правильный tag
   // выбранной модели для текущего провайдера (cerebras qwen-3-32b vs ollama qwen2.5:7b).
   const { data: llmInfoForPanel } = useLLMStatus()
-  const [collapsed, setCollapsed] = useState<boolean>(() => loadCollapsed())
-  const toggleCollapsed = () => {
-    setCollapsed((prev) => {
-      const next = !prev
-      saveCollapsed(next)
-      return next
-    })
-  }
+  const toggleCollapsed = onToggleCollapsed
 
   if (collapsed) {
     // Свёрнутая полоска: шеврон сверху для раскрытия + точка-индикатор LLM

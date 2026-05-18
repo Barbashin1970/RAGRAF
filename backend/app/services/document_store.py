@@ -390,18 +390,43 @@ async def retrieve_relevant_chunks(query: str, top_k: int = 5) -> list[dict[str,
 
     # Fallback: keyword-match (грубый, но лучше чем ничего)
     q_words = {w for w in re.findall(r"\w{3,}", query.lower()) if len(w) >= 3}
-    if not q_words:
-        return []
     scored2: list[tuple[int, str, str, str]] = []
-    for _chunk_id, doc_id, text, _emb, filename in rows:
-        lower = text.lower()
-        hits = sum(1 for w in q_words if w in lower)
-        if hits > 0:
-            scored2.append((hits, doc_id, filename, text))
-    scored2.sort(key=lambda x: x[0], reverse=True)
+    if q_words:
+        for _chunk_id, doc_id, text, _emb, filename in rows:
+            lower = text.lower()
+            hits = sum(1 for w in q_words if w in lower)
+            if hits > 0:
+                scored2.append((hits, doc_id, filename, text))
+        scored2.sort(key=lambda x: x[0], reverse=True)
+
+    if scored2:
+        return [
+            {"doc_id": d, "filename": f, "text": t, "score": float(s)}
+            for s, d, f, t in scored2[:top_k]
+        ]
+
+    # Second-level fallback: запрос без контентных слов («дай резюме»,
+    # «summarize», «о чём документ»). Возвращаем первые top_k чанков
+    # enabled-документов — это даёт LLM реальный кусок текста вместо
+    # пустоты. Без этого LLM при пресете «Резюме документа» галлюцинирует
+    # правдоподобный текст («Анализ рынка возобновляемых источников…»
+    # при загруженном ТЗ RAGRAF).
+    with _LOCK:
+        c = regulation_store._connection()
+        head_rows = c.execute(
+            """
+            SELECT dc.doc_id, dc.text, ud.filename
+            FROM document_chunks dc
+            JOIN user_documents ud ON ud.doc_id = dc.doc_id
+            WHERE ud.enabled = TRUE
+            ORDER BY ud.filename, dc.chunk_index
+            LIMIT ?
+            """,
+            [top_k],
+        ).fetchall()
     return [
-        {"doc_id": d, "filename": f, "text": t, "score": float(s)}
-        for s, d, f, t in scored2[:top_k]
+        {"doc_id": d, "filename": f, "text": t, "score": 0.0}
+        for d, t, f in head_rows
     ]
 
 

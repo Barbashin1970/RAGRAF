@@ -616,18 +616,29 @@ async def chat(
     # документ-only сценариев.
     context = _build_regulation_context(hits) if hits else ""
 
-    # NotebookLM-style: если аналитик включил в контекст загруженные документы
-    # (PDF/DOCX), достаём релевантные chunks. С embeddings_enabled=False
-    # document_store отдаёт keyword-match вместо cosine-search — для коротких
-    # документов работает, для длинных PDF выдача хуже.
+    # NotebookLM-style: если аналитик включил в контекст загруженные документы,
+    # достаём релевантные chunks. `document_store.retrieve_relevant_chunks` сам
+    # выбирает путь: cosine-search по эмбеддингам если они есть, иначе
+    # keyword-fallback (regex по словам ≥3 символа, ранжирование по hit-count).
+    #
+    # ВАЖНО: раньше здесь стоял guard `if settings.embeddings_enabled:` который
+    # полностью пропускал retrieval при выключенных эмбеддингах. Это создавало
+    # критический баг: на проде (Railway, EMBEDDINGS_ENABLED=false) пользователь
+    # выбирал документ + пресет «Резюме документа» → промпт требовал «отвечай
+    # ТОЛЬКО по документам», но самих документов в контексте не было → LLM
+    # послушно галлюцинировал. Теперь fallback внутри document_store работает
+    # даже без эмбеддингов — для буквальных вопросов про термины этого хватает.
+    #
+    # При query типа «дай резюме» keyword-fallback вернёт top-k чанков по
+    # типовым словам («регламент», «система», «модуль») — это даст LLM хотя
+    # бы фактическую опору вместо пустоты.
     doc_chunks: list[dict[str, Any]] = []
-    if settings.embeddings_enabled:
-        try:
-            from app.services import document_store
-            if document_store.count_enabled() > 0:
-                doc_chunks = await document_store.retrieve_relevant_chunks(query, top_k=4)
-        except Exception:
-            doc_chunks = []
+    try:
+        from app.services import document_store
+        if document_store.count_enabled() > 0:
+            doc_chunks = await document_store.retrieve_relevant_chunks(query, top_k=4)
+    except Exception:
+        doc_chunks = []
 
     doc_context_block = ""
     if doc_chunks:
