@@ -6,10 +6,15 @@ from __future__ import annotations
 
 import networkx as nx
 
-from app.schemas.domain import Parameter, RuleDSL, ValidationError, ValidationResult
+from app.schemas.domain import Constraint, Parameter, RuleDSL, ValidationError, ValidationResult
+from app.services.formula_eval import FormulaError, parse_formula
 
 
-def validate_dsl(dsl: RuleDSL, parameters: list[Parameter] | None = None) -> ValidationResult:
+def validate_dsl(
+    dsl: RuleDSL,
+    parameters: list[Parameter] | None = None,
+    constraints: list[Constraint] | None = None,
+) -> ValidationResult:
     errors: list[ValidationError] = []
     parameters = parameters or []
     param_ids = {p.id for p in parameters}
@@ -149,14 +154,51 @@ def validate_dsl(dsl: RuleDSL, parameters: list[Parameter] | None = None) -> Val
         pass
 
     # 7. SHACL consistency — shacl_constraint nodes must reference an existing constraint
-    # (just check the field is non-empty here — actual existence check needs constraint list)
+    constraint_ids = {c.id for c in (constraints or [])}
     for n in dsl.nodes:
-        if n.type == "shacl_constraint" and not n.constraintRef:
+        if n.type != "shacl_constraint":
+            continue
+        if not n.constraintRef:
             errors.append(
                 ValidationError(
                     nodeId=n.id,
                     code="MISSING_CONSTRAINT_REF",
                     message="SHACL-узел не ссылается ни на одно ограничение",
+                )
+            )
+            continue
+        if constraint_ids and n.constraintRef not in constraint_ids:
+            errors.append(
+                ValidationError(
+                    nodeId=n.id,
+                    code="UNKNOWN_CONSTRAINT_REF",
+                    message=(
+                        f"constraintRef '{n.constraintRef}' не существует в SHACL-shapes "
+                        "регламента. Откройте «Ограничения», добавьте или выберите другой."
+                    ),
+                )
+            )
+
+    # 8. Formula syntax — выражение должно проходить безопасный AST-walker
+    # (formula_eval.parse_formula). Иначе пользователь сохранит «битую» формулу,
+    # и при /execute получит вердикт fired=false без объяснения. Валидируем
+    # до сохранения — ошибка подсветится на узле.
+    for n in dsl.nodes:
+        if n.type != "formula":
+            continue
+        expr = (n.expression or "").strip()
+        if not expr:
+            # Пустая формула — допустимая черновая операция, не ошибка
+            # (предупреждение, но severity у нас error/info; пропускаем).
+            continue
+        try:
+            parse_formula(expr)
+        except FormulaError as e:
+            errors.append(
+                ValidationError(
+                    nodeId=n.id,
+                    code="FORMULA_SYNTAX",
+                    message=f"Синтаксис формулы: {e}",
                 )
             )
 

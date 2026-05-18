@@ -93,7 +93,10 @@ function OutputNode(p: NodeProps<FlowNode>) {
 }
 
 function ShaclConstraintNode(p: NodeProps<FlowNode>) {
-  return <BaseNode {...p} inputs={[{ position: Position.Left }]} outputs={[{ position: Position.Right }]} />
+  // SHACL — лист (валидатор upstream-значения). Outputs убраны: edge'и из
+  // SHACL никуда не идут в фикстурах + executor не пробрасывает сигнал
+  // дальше. Раньше outputs={Right} был визуальной ложью.
+  return <BaseNode {...p} inputs={[{ position: Position.Left }]} />
 }
 
 // Sensor — точка входа из ETL: только выход, без входов. Визуально кружок

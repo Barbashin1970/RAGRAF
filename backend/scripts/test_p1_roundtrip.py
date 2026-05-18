@@ -230,6 +230,113 @@ def test_bug_6_output_recommendation_sync() -> bool:
     return ok
 
 
+def test_formula_evaluator() -> bool:
+    """Formula теперь реально вычисляется (не pass-through).
+
+    Сценарий: создаём в Flow цепочку sensor→input→threshold→formula→output.
+    Формула: `pressure > 22`. Выполняем регламент с pressure=23 — должен
+    fired (formula истинна, output fired). С pressure=10 — output НЕ fired.
+    """
+    print("\n=== Formula: реальный AST eval ===")
+    # Загружаем pressure-diameter flow
+    flow = http_get("/api/regulations/pressure-diameter/flow")
+    assert isinstance(flow, dict)
+    nodes = flow["nodes"]
+    edges = flow["edges"]
+
+    # Найдём input + threshold + output ноды
+    input_pressure = next(
+        (n for n in nodes if n.get("type") == "input" and n.get("paramRef") == "pressure"),
+        None,
+    )
+    output = next((n for n in nodes if n.get("type") == "output"), None)
+    if not input_pressure or not output:
+        print("  ⚠ no input/output — skipping")
+        return True
+
+    # Добавим formula-ноду между threshold и output (или просто рядом)
+    formula_id = "test-formula-node"
+    nodes_minus_test = [n for n in nodes if n["id"] != formula_id]
+    nodes_minus_test.append({
+        "id": formula_id,
+        "type": "formula",
+        "label": "pressure > 22?",
+        "expression": "pressure > 22",
+        "position": {"x": 700, "y": 60},
+    })
+    # Edge input → formula → output
+    edges_minus = [
+        e for e in edges
+        if e["source"] != formula_id and e["target"] != formula_id
+    ]
+    edges_minus.append({"source": input_pressure["id"], "target": formula_id})
+    edges_minus.append({"source": formula_id, "target": output["id"]})
+
+    body = {
+        "rule_id": flow.get("rule_id", "rule_pressure-diameter"),
+        "regulation_id": "pressure-diameter",
+        "nodes": nodes_minus_test,
+        "edges": edges_minus,
+    }
+    http_put_json("/api/regulations/pressure-diameter/flow", body)
+
+    # Execute with pressure=23 — formula истинна → output fired
+    exec_body = {"readings": [{"param_id": "pressure", "value": 23}]}
+    r1 = httpx.post(f"{BASE}/api/regulations/pressure-diameter/execute",
+                    json=exec_body, timeout=10)
+    r1.raise_for_status()
+    result_high = r1.json()
+    # Execute with pressure=10 — формула false → не fired
+    r2 = httpx.post(f"{BASE}/api/regulations/pressure-diameter/execute",
+                    json={"readings": [{"param_id": "pressure", "value": 10}]},
+                    timeout=10)
+    r2.raise_for_status()
+    result_low = r2.json()
+
+    ok = True
+    # При pressure=23: формула TRUE → fired_nodes содержит formula
+    ok &= assert_eq("formula fired at p=23", formula_id in result_high["fired_nodes"], True)
+    # При pressure=10: формула FALSE → fired_nodes НЕ содержит formula
+    ok &= assert_eq("formula NOT fired at p=10", formula_id in result_low["fired_nodes"], False)
+    # Trace должен содержать вычисленное выражение
+    formula_trace = [t for t in result_high["trace"] if t["node_id"] == formula_id]
+    if formula_trace:
+        explanation = formula_trace[0]["explanation"]
+        ok &= assert_eq("trace contains expression", "pressure > 22" in (explanation or ""), True)
+    return ok
+
+
+def test_formula_security() -> bool:
+    """Защита: запрещённые конструкции отвергаются validator'ом."""
+    print("\n=== Formula: security validator ===")
+    flow = http_get("/api/regulations/pressure-diameter/flow")
+    assert isinstance(flow, dict)
+    nodes = flow["nodes"]
+
+    # Добавим formula-ноду с попыткой sandbox escape
+    bad_node = {
+        "id": "test-bad-formula",
+        "type": "formula",
+        "label": "bad",
+        "expression": "__import__('os').system('rm -rf /')",
+        "position": {"x": 900, "y": 60},
+    }
+    body = {
+        "rule_id": flow.get("rule_id", "rule_pressure-diameter"),
+        "regulation_id": "pressure-diameter",
+        "nodes": [n for n in nodes if n["id"] != "test-bad-formula"] + [bad_node],
+        "edges": flow["edges"],
+    }
+    # POST validate
+    r = httpx.post(f"{BASE}/api/regulations/pressure-diameter/validate",
+                   json=body, timeout=10)
+    r.raise_for_status()
+    val = r.json()
+    formula_errors = [e for e in val["errors"] if e.get("nodeId") == "test-bad-formula"]
+    ok = assert_eq("validator catches __import__", len(formula_errors) > 0, True)
+    return ok
+
+
 def test_flow_sensor_propagates_to_edit_and_turtle() -> bool:
     """Flow add sensor → trigger в Edit + Turtle (UX-баг из юзер-отчёта 034).
 
@@ -351,6 +458,8 @@ def main() -> int:
         test_bug_6_output_recommendation_sync,
         test_bug_9_custom_unit_preserved,
         test_flow_sensor_propagates_to_edit_and_turtle,
+        test_formula_evaluator,
+        test_formula_security,
     ]
     results = [t() for t in tests]
     passed = sum(results)

@@ -41,13 +41,14 @@ interface Props {
 function isAllowedConnection(srcType: NodeKind, tgtType: NodeKind): boolean {
   // Output — терминал, исходящих рёбер нет.
   if (srcType === 'output') return false
+  // SHACL — тоже терминал (валидатор-лист): edge В SHACL разрешён, ИЗ — нет.
+  // Раньше из SHACL можно было тянуть рёбра, но executor сигнал не
+  // пробрасывал — была визуальная ложь. Теперь явный запрет.
+  if (srcType === 'shacl_constraint') return false
   // Sensor — только в input (он именно к нему привязывается через bindsTo).
   if (srcType === 'sensor') return tgtType === 'input'
   // В sensor никто не должен входить.
   if (tgtType === 'sensor') return false
-  // В input может прийти только sensor (см. правило выше) — отсечено уже.
-  // shacl_constraint — внешний валидатор; вход в него технически возможен
-  // (например после compare-проверки), но из него выход никуда не идёт.
   return true
 }
 

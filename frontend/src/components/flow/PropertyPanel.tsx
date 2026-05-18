@@ -14,6 +14,10 @@ interface Props {
   /** Все ноды flow — нужны sensor-секции, чтобы рендерить dropdown
    *  «привязать к input», вместо free-text. */
   allNodes?: Node<FlowNode>[]
+  /** ID регламента — нужен для shacl_constraint dropdown (constraint list). */
+  regulationId?: string
+  /** Список SHACL ограничений регламента — для dropdown в shacl_constraint. */
+  constraints?: Array<{ id: string; path?: string | null; datatype?: string | null; minInclusive?: number | null; maxInclusive?: number | null; message?: string | null }>
   onChange: (id: string, patch: Partial<FlowNode>) => void
   onDelete: (id: string) => void
   collapsed: boolean
@@ -30,6 +34,8 @@ export function PropertyPanel({
   node,
   parameters,
   allNodes,
+  regulationId,
+  constraints,
   onChange,
   onDelete,
   collapsed,
@@ -85,7 +91,7 @@ export function PropertyPanel({
       />
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
         <FieldText label="Метка" value={d.label ?? ''} onChange={(v) => set({ label: v })} />
-        <ByType type={node.type as NodeKind} data={d} parameters={parameters} allNodes={allNodes} set={set} />
+        <ByType type={node.type as NodeKind} data={d} parameters={parameters} allNodes={allNodes} constraints={constraints} regulationId={regulationId} set={set} />
         <div className="mt-3 border-t border-stone-100 pt-2 font-mono text-[10px] text-stone-400">
           id: {node.id}
         </div>
@@ -136,7 +142,7 @@ function PanelHeader({
   )
 }
 
-function ByType({ type, data, parameters, allNodes, set }: { type: NodeKind; data: FlowNode; parameters: Parameter[]; allNodes?: Node<FlowNode>[]; set: (p: Partial<FlowNode>) => void }) {
+function ByType({ type, data, parameters, allNodes, constraints, regulationId, set }: { type: NodeKind; data: FlowNode; parameters: Parameter[]; allNodes?: Node<FlowNode>[]; constraints?: Props['constraints']; regulationId?: string; set: (p: Partial<FlowNode>) => void }) {
   switch (type) {
     case 'input':
       return (
@@ -173,11 +179,10 @@ function ByType({ type, data, parameters, allNodes, set }: { type: NodeKind; dat
       )
     case 'formula':
       return (
-        <FieldText
-          label="Выражение"
+        <FormulaEditor
           value={data.expression ?? ''}
           onChange={(v) => set({ expression: v || null })}
-          monospaced
+          paramNames={parameters.map((p) => p.id)}
         />
       )
     case 'switch':
@@ -245,8 +250,52 @@ function ByType({ type, data, parameters, allNodes, set }: { type: NodeKind; dat
           />
         </>
       )
-    case 'shacl_constraint':
-      return <FieldText label="ID ограничения" value={data.constraintRef ?? ''} onChange={(v) => set({ constraintRef: v || null })} monospaced />
+    case 'shacl_constraint': {
+      const constraintOptions = (constraints ?? []).map((c) => {
+        const range: string[] = []
+        if (c.minInclusive != null) range.push(`≥${c.minInclusive}`)
+        if (c.maxInclusive != null) range.push(`≤${c.maxInclusive}`)
+        const rangeLabel = range.length ? ` [${range.join(', ')}]` : ''
+        const dt = c.datatype ? ` ${c.datatype}` : ''
+        return {
+          value: c.id,
+          label: `${c.path ?? c.id}${dt}${rangeLabel}`,
+        }
+      })
+      return (
+        <>
+          {constraintOptions.length === 0 ? (
+            <div className="rounded-md border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-[11px] text-stone-500">
+              У регламента нет SHACL-ограничений. Добавьте их во вкладке
+              «Ограничения» вверху страницы.
+            </div>
+          ) : (
+            <FieldSelect
+              label="SHACL-ограничение"
+              value={data.constraintRef ?? ''}
+              onChange={(v) => set({ constraintRef: v || null })}
+              options={[
+                { value: '', label: '— выберите ограничение —' },
+                ...constraintOptions,
+              ]}
+            />
+          )}
+          {regulationId && (
+            <Link
+              to={`/regulations/${encodeURIComponent(regulationId)}/constraints`}
+              className="mt-1 inline-flex items-center gap-1 text-[11px] text-blue-700 underline hover:text-blue-900"
+            >
+              Открыть редактор ограничений →
+            </Link>
+          )}
+          <div className="mt-2 rounded-md border border-stone-200 bg-stone-50 px-2 py-1.5 text-[10px] leading-relaxed text-stone-600">
+            <b>Что делает блок:</b> при исполнении регламента проверяет
+            upstream-значение против выбранного <code>sh:property</code>.
+            Нарушение → trace с severity, не блокирует поток.
+          </div>
+        </>
+      )
+    }
     case 'sensor':
       return (
         <>
@@ -549,4 +598,112 @@ function decodeExample(f: SensorFieldSchema): unknown {
     default:
       return ''
   }
+}
+
+
+// ──────────────────────────────────────────────────────────
+// FormulaEditor — textarea + cheat-sheet
+//
+// Сейчас expression больше не pass-through: backend AST-walker реально
+// вычисляет formula. Поэтому юзеру нужны:
+//   • textarea (мульти-строчная — формулы быстро становятся длинными);
+//   • подсказка с встроенными функциями и переменными регламента;
+//   • monospace + чуть-чуть подсветки для читаемости.
+// Подсветку синтаксиса оставим CodeMirror'у в будущем; пока — JSON-style
+// dark theme через CSS.
+// ──────────────────────────────────────────────────────────
+
+function FormulaEditor({
+  value,
+  onChange,
+  paramNames,
+}: {
+  value: string
+  onChange: (v: string) => void
+  paramNames: string[]
+}) {
+  const [helpOpen, setHelpOpen] = useState(false)
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <label className="text-[10px] font-semibold uppercase tracking-wide text-stone-600">
+          Выражение
+        </label>
+        <button
+          type="button"
+          onClick={() => setHelpOpen((x) => !x)}
+          className="text-[10px] text-blue-700 underline hover:text-blue-900"
+        >
+          {helpOpen ? 'Скрыть подсказку' : 'Что можно писать?'}
+        </button>
+      </div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        spellCheck={false}
+        rows={4}
+        placeholder="например: pressure > 20 && temperature > 50"
+        className="w-full resize-y rounded-md border border-stone-300 bg-stone-900 p-2 font-mono text-xs leading-relaxed text-emerald-200 caret-emerald-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500/40"
+        style={{ tabSize: 2 }}
+      />
+      {helpOpen && (
+        <div className="rounded-md border border-stone-200 bg-stone-50 p-2 text-[10px] leading-relaxed text-stone-700">
+          <div className="mb-1 font-semibold uppercase tracking-wide text-stone-500">
+            Переменные регламента
+          </div>
+          <div className="mb-2 font-mono text-stone-800">
+            {paramNames.length ? paramNames.join(', ') : <em className="text-stone-400">нет параметров — добавьте в «Поля»</em>}
+          </div>
+          <div className="mb-1 font-semibold uppercase tracking-wide text-stone-500">
+            Арифметика
+          </div>
+          <div className="mb-2 font-mono text-stone-800">
+            + − * / ** (степень) % // abs(x) min(a,b) max(a,b) sqrt(x)
+            pow(x,n) log(x) log10(x) exp(x) floor ceil round sign
+          </div>
+          <div className="mb-1 font-semibold uppercase tracking-wide text-stone-500">
+            Тригонометрия и константы
+          </div>
+          <div className="mb-2 font-mono text-stone-800">
+            sin cos tan asin acos atan atan2(y,x) pi e
+          </div>
+          <div className="mb-1 font-semibold uppercase tracking-wide text-stone-500">
+            Логика и сравнения
+          </div>
+          <div className="mb-2 font-mono text-stone-800">
+            and or not && || ! == != &lt; &lt;= &gt; &gt;= in [list]
+            between(x, lo, hi) (a if cond else b)
+          </div>
+          <div className="mb-1 font-semibold uppercase tracking-wide text-stone-500">
+            Время (используется now() backend'а)
+          </div>
+          <div className="mb-2 font-mono text-stone-800">
+            now() hour() minute() day_of_week() is_weekend() is_night(start, end)
+          </div>
+          <div className="mb-1 font-semibold uppercase tracking-wide text-stone-500">
+            Временные ряды (нужен исторический буфер от ETL)
+          </div>
+          <div className="mb-2 font-mono text-stone-800">
+            rate("p", "1h") delta("p", "10m") prev("p") mean("p", "1h")
+            max_over("p", "24h") min_over("p", "1h")
+            count_above("p", value, "1h")
+          </div>
+          <div className="mb-1 font-semibold uppercase tracking-wide text-stone-500">
+            Примеры
+          </div>
+          <ul className="ml-3 list-disc font-mono text-[10px] text-stone-800">
+            <li>pressure &gt; 20 &amp;&amp; temperature &lt; 60</li>
+            <li>abs(pressure - reference) &gt; tolerance</li>
+            <li>sqrt(pressure ** 2 + flow ** 2) &gt; critical_envelope</li>
+            <li>rate("temp", "1h") &gt; 5  // потепление {'>'} 5°/час</li>
+            <li>is_night(22, 6) and waterLevel &gt; 3</li>
+          </ul>
+          <div className="mt-1.5 text-[9px] italic text-stone-500">
+            Backend: исполнитель через изолированный AST-walker (без eval).
+            Синтаксис проверяется при сохранении flow.
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }

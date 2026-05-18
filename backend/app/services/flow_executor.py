@@ -10,36 +10,48 @@
   - Боевом endpoint POST /regulations/{sid}/execute — СИГМА присылает
     ETL-payload с реальных датчиков, RAGRAF возвращает level + recommendation
 
-Это RAGRAF-runtime, не интерпретатор всего DSL: реализованы только те типы
-узлов, которые типично встречаются в фикстурах (input/threshold/output).
-formula/compare/switch на MVP проходятся как pass-through (значение не
-меняется, ветвление по edge.condition не интерпретируется). Расширим, когда
-появятся фикстуры, реально использующие их.
+Поддержаны типы узлов: input, threshold, sensor, formula, compare, switch,
+output, shacl_constraint.
 
 Семантика
 =========
 1. Сенсоры → инжект значений в input-ноды (через FlowNode.bindsTo).
 2. input-нода хранит value в `node_values`.
 3. threshold-нода считает |value − refValue| > deviation → флаг out_of_range.
-4. Распространение «сработавшего сигнала» вперёд по DAG: edge от threshold
-   с out_of_range=True «зажигает» цепочку downstream-узлов.
-5. output-нода считается fired если её достиг сработавший сигнал;
+4. formula-нода вычисляет произвольное выражение через `formula_eval`
+   (безопасный AST-evaluator, см. там docstring). Если результат truthy —
+   «срабатывает» (зажигает downstream); если число — пробрасывается как
+   значение для downstream threshold/output.
+5. compare/switch на MVP проходятся как pass-through (значение не меняется).
+6. shacl_constraint валидирует значение upstream-ноды против Constraint
+   из regulation.constraints — если нарушено, пишет в trace severity и
+   фиксирует violation в результате.
+7. output-нода считается fired если её достиг сработавший сигнал;
    level := max(priority среди fired-output-нод), recommendation — конкат.
-
-Несработавшие пороги дают level=0 («норма»), что соответствует семантике
-ETL-payload'а СИГМЫ (`level: 0` для in-range значений).
 
 Безопасность
 ============
-В отличие от validator'а, executor НЕ парсит произвольные expression'ы
-(formula-нода). Если решим добавить — только через изолированный AST-walker
-(см. ast.parse(mode='eval') + whitelist), никакого raw eval/exec.
+formula evaluator — изолированный AST-walker (formula_eval.py), без raw
+eval/exec. validator при сохранении flow дополнительно проверяет синтаксис.
 """
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from app.schemas.domain import FlowNode, Parameter, Regulation, RuleDSL, SensorType
+from app.schemas.domain import (
+    Constraint,
+    FlowNode,
+    Parameter,
+    Regulation,
+    RuleDSL,
+    SensorType,
+)
+from app.services.formula_eval import (
+    FormulaContext,
+    FormulaError,
+    SampleHistory,
+    evaluate as eval_formula,
+)
 
 
 # ── Payload models ────────────────────────────────────────────────────────
@@ -206,8 +218,23 @@ def execute_flow(
         ))
 
     # ── (3) Распространяем «сработавший» сигнал по DAG ───────────────
-    # BFS из активированных threshold'ов через pass-through compare/formula/
-    # switch к output'ам. Sensor → input уже размечены в шаге выше.
+    # BFS из активированных нод (sensor/input/threshold) через compare/
+    # formula/switch/shacl_constraint к output'ам. Formula реально
+    # вычисляет выражение; результат фильтрует ребро (truthy → дальше).
+    # Constraints формы regulation.constraints доступны SHACL-нодам.
+    constraints_by_id: dict[str, Constraint] = {c.id: c for c in regulation.constraints}
+    # Numeric values по нодам — нужны formula/SHACL чтобы взять upstream
+    # значение из input/sensor/threshold/formula. Для compare/switch — копия
+    # из единственного upstream.
+    node_values: dict[str, float | bool | None] = {}
+    for nid, val in inputs_resolved.items():
+        node_values[nid] = val
+    for tid in threshold_out_of_range.keys():
+        node_values[tid] = _value_from_predecessors(tid, dsl, inputs_resolved)
+
+    formula_scope = _build_formula_scope(dsl, params_by_id, inputs_resolved)
+    formula_history = _build_formula_history(readings)
+
     queue: list[str] = sorted(activated)
     while queue:
         nid = queue.pop(0)
@@ -216,23 +243,58 @@ def execute_flow(
             if target_node is None:
                 continue
             edge_key = _edge_id(nid, tgt)
-            # Ребро sensor → input уже размечено выше, но повторное add OK.
             fired_edges.add(edge_key)
             if tgt in fired_nodes:
                 continue
-            # output / pass-through узлы — fired'аются по факту достижения.
-            # threshold же мы помечаем только если он сам out_of_range.
+            # threshold — fired только если он сам out_of_range
             if target_node.type == "threshold":
                 if threshold_out_of_range.get(tgt, False):
                     fired_nodes.add(tgt)
                     queue.append(tgt)
                 continue
+            # formula — реально вычисляем
+            if target_node.type == "formula":
+                fired, value, explanation = _eval_formula_node(
+                    target_node, formula_scope, formula_history
+                )
+                trace.append(NodeTrace(
+                    node_id=tgt, node_type="formula", fired=fired,
+                    value=value if isinstance(value, (int, float)) else None,
+                    explanation=explanation,
+                ))
+                if fired:
+                    fired_nodes.add(tgt)
+                    queue.append(tgt)
+                    if isinstance(value, (int, float)):
+                        node_values[tgt] = float(value)
+                continue
+            # shacl_constraint — валидируем upstream-значение
+            if target_node.type == "shacl_constraint":
+                upstream_value = node_values.get(nid)
+                ok, msg, severity = _check_shacl(
+                    target_node, upstream_value, constraints_by_id
+                )
+                trace.append(NodeTrace(
+                    node_id=tgt, node_type="shacl_constraint",
+                    fired=not ok,  # «сработал» = нарушение
+                    value=upstream_value if isinstance(upstream_value, (int, float)) else None,
+                    explanation=msg,
+                ))
+                if not ok:
+                    fired_nodes.add(tgt)
+                    # Не подключаем downstream — SHACL обычно лист.
+                    # Но если у пользователя есть outgoing edge, проброс
+                    # сигнала корректен — нарушение = причина дальнейшей
+                    # эскалации.
+                    queue.append(tgt)
+                continue
+            # compare/switch — pass-through (MVP)
             fired_nodes.add(tgt)
             queue.append(tgt)
-            if target_node.type in ("compare", "formula", "switch"):
+            if target_node.type in ("compare", "switch"):
                 trace.append(NodeTrace(
                     node_id=tgt, node_type=target_node.type, fired=True,
-                    explanation="pass-through (executor MVP)",
+                    explanation="pass-through",
                 ))
             elif target_node.type == "output":
                 trace.append(NodeTrace(
@@ -356,3 +418,120 @@ def _output_label(n: FlowNode) -> str:
     prio = n.priority or 0
     name = n.text or n.action or n.label or "output"
     return f"уровень {prio}: {name}"
+
+
+def _build_formula_scope(
+    dsl: RuleDSL,
+    params_by_id: dict[str, Parameter],
+    inputs_resolved: dict[str, float],
+) -> dict[str, float | bool | None]:
+    """Собрать scope для formula evaluator: paramRef → current value.
+
+    Стратегия:
+      • Для каждой input-ноды берём resolved value (если есть).
+      • Ключ scope'а — paramRef (= param.id) ИЛИ p.name для traceability,
+        либо node.label (если пользователь явно его задал).
+    Это даёт пользователю писать формулы как
+      `pressure > 20 && temperature > 50`
+    с переменными = id'ам параметров регламента.
+    """
+    scope: dict[str, float | bool | None] = {}
+    for n in dsl.nodes:
+        if n.type != "input" or not n.paramRef:
+            continue
+        val = inputs_resolved.get(n.id)
+        if val is None:
+            continue
+        # По paramRef и по человекочитаемому имени.
+        scope[n.paramRef] = val
+        param = params_by_id.get(n.paramRef)
+        if param and param.name and param.name != n.paramRef:
+            scope[param.name] = val
+        if n.label and n.label != n.paramRef:
+            scope[n.label] = val
+    return scope
+
+
+def _build_formula_history(
+    readings: list[SensorReading],
+) -> dict[str, SampleHistory]:
+    """Извлечь history из readings — пока что MVP с одним сэмплом на параметр.
+
+    Когда ETL пришлёт `series: [{ts, value}]` в SensorReading, тут будет
+    парсинг. Сейчас readings — single-shot, history заполняется единственным
+    сэмплом «сейчас». Time-series функции (rate/delta) в этом случае
+    вернут None — формула должна корректно обработать (например через
+    `rate(\"p\", \"1h\") or 0`).
+    """
+    # MVP — пустая история. Time-series функции вернут None, формула может
+    # обработать через `is not None`. Полноценный history нужен от ETL.
+    # См. SensorReading.series — пока этого поля нет.
+    return {}
+
+
+def _eval_formula_node(
+    node: FlowNode,
+    scope: dict[str, float | bool | None],
+    history: dict[str, SampleHistory],
+) -> tuple[bool, float | bool | None, str]:
+    """Вычислить formula-ноду.
+
+    Возвращает:
+      fired       — true если результат truthy (зажигает downstream)
+      value       — само значение (число/bool/None)
+      explanation — человекочитаемое объяснение для trace
+    """
+    expr = (node.expression or "").strip()
+    if not expr:
+        return False, None, "пустое выражение (formula expression не задан)"
+    ctx = FormulaContext(variables=scope, history=history)
+    try:
+        result = eval_formula(expr, ctx)
+    except FormulaError as e:
+        return False, None, f"ошибка формулы: {e}"
+    except Exception as e:
+        return False, None, f"ошибка вычисления: {type(e).__name__}: {e}"
+    fired = bool(result)
+    short = repr(result)
+    if len(short) > 60:
+        short = short[:57] + "..."
+    return fired, result, f"{expr} → {short}"
+
+
+def _check_shacl(
+    node: FlowNode,
+    value: float | bool | None,
+    constraints_by_id: dict[str, Constraint],
+) -> tuple[bool, str, str]:
+    """Валидация значения upstream-ноды против SHACL-ограничения.
+
+    Возвращает (ok, message, severity). severity — "violation" / "warning"
+    / "info" — из Constraint.severity.
+    """
+    if not node.constraintRef:
+        return True, "constraintRef не указан — пропуск", "info"
+    constraint = constraints_by_id.get(node.constraintRef)
+    if constraint is None:
+        return True, f"constraintRef '{node.constraintRef}' не найден в shapes — пропуск", "info"
+
+    severity = constraint.severity or "violation"
+    if value is None:
+        return True, f"нет значения для проверки {constraint.path}", severity
+
+    # Числовые значения проверяем по min/max.
+    if isinstance(value, (int, float)):
+        lo = constraint.minInclusive
+        hi = constraint.maxInclusive
+        if lo is not None and value < lo:
+            return False, f"{constraint.path}: {value} < min {lo} — {constraint.message or 'violation'}", severity
+        if hi is not None and value > hi:
+            return False, f"{constraint.path}: {value} > max {hi} — {constraint.message or 'violation'}", severity
+        bracket_parts = []
+        if lo is not None:
+            bracket_parts.append(f"≥{lo}")
+        if hi is not None:
+            bracket_parts.append(f"≤{hi}")
+        bracket = ", ".join(bracket_parts) if bracket_parts else "ограничение"
+        return True, f"{constraint.path}: {value} соответствует {bracket}", severity
+
+    return True, f"{constraint.path}: проверено (не число)", severity

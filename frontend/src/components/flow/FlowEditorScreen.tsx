@@ -266,6 +266,8 @@ export function FlowEditorScreen() {
             node={selected}
             parameters={regulation?.parameters ?? []}
             allNodes={nodes as Node<FlowNode>[]}
+            regulationId={id}
+            constraints={regulation?.constraints ?? []}
             onChange={updateNodeData}
             onDelete={deleteNode}
             collapsed={panelCollapsed}
