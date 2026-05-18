@@ -110,16 +110,19 @@ export function RegulationEditorScreen() {
   }, [regulation, draft])
 
   const invalidateAll = () => {
-    qc.invalidateQueries({ queryKey: ['regulation', id] })
+    // Regulation — force refetch (а не invalidate). Без этого после save
+    // remote-данные приходят с задержкой и dirty не успевает сброситься —
+    // пользователь видит «несохранённую» зелёную кнопку, хотя сервер
+    // принял изменения. refetchQueries дёрнет GET сразу и синхронно
+    // прокинет свежий regulation в react-query → useEffect перезаполнит
+    // draft → dirty станет false.
+    qc.refetchQueries({ queryKey: ['regulation', id] })
     qc.invalidateQueries({ queryKey: ['datasets'] })
     qc.invalidateQueries({ queryKey: ['regulation-history', id] })
     qc.invalidateQueries({ queryKey: ['regulation-triggered-by', id] })
-    // Flow refetch — форсим, не просто invalidate. После save регламента
-    // бэкенд через reconcile_flow_with_triggers мог обновить flow.json
-    // (новые/изменённые sensor-ноды). Если пользователь сейчас на Edit, а
-    // FlowEditor смонтирован в кэше (например открыт в фоне), invalidate
-    // без refetch оставит stale-данные до следующего mount. refetchQueries
-    // дёрнет /flow прямо сейчас, и при переходе пользователь увидит свежее.
+    // Flow refetch — форсим, чтобы при переходе на Flow Editor пилюли
+    // датчиков, добавленные backend'ом через reconcile_flow_with_triggers,
+    // были видны сразу, без зависимости от mount lifecycle.
     qc.refetchQueries({ queryKey: ['flow', id] })
   }
 
@@ -301,7 +304,15 @@ function FormView({
     setDraft({ ...draft, parameters: [...draft.parameters, np] })
   }
   const removeParam = (idx: number) => {
-    setDraft({ ...draft, parameters: draft.parameters.filter((_, i) => i !== idx) })
+    // Удаляем параметр + его триггер (если был). Без этого триггер становится
+    // orphan'ом и подсвечивается красной рамкой; пользователь сам бы потом
+    // его удалял — лишний шаг.
+    const removedParam = draft.parameters[idx]
+    setDraft({
+      ...draft,
+      parameters: draft.parameters.filter((_, i) => i !== idx),
+      triggers: (draft.triggers ?? []).filter((t) => t.param_ref !== removedParam?.name),
+    })
   }
   const recText = draft.recommendations[0]?.text ?? ''
   const recPriority = draft.recommendations[0]?.priority ?? 2
@@ -316,33 +327,45 @@ function FormView({
     setDraft({ ...draft, recommendations: [next] })
   }
 
-  // Триггеры — патч одного, добавление, удаление. Триггеры жёстко привязаны
-  // к параметрам (param_ref): UI не позволяет создавать триггер с param_ref'ом,
-  // которого нет в parameters — это рассинхрон, ловим валидацией ниже.
+  // Триггеры — теперь рисуются inline в карточке каждого параметра.
+  // Один параметр = (опционально) один триггер. UI не показывает отдельную
+  // секцию «Триггеры» — это устраняет orphan-триггеры и делает UX логичным
+  // («параметр + откуда он наполняется» — одно понятие).
+  //
+  // Backend модель не меняется: триггер остаётся отдельной сущностью в
+  // DuckDB + Turtle (`:hasTrigger`) для онтологической чистоты и
+  // O(1) reverse-lookup. Меняется только UI-метафора.
   const triggers = draft.triggers ?? []
-  const patchTrigger = (idx: number, p: Partial<RegulationTrigger>) => {
-    const next = triggers.map((t, i) => (i === idx ? { ...t, ...p } : t))
-    setDraft({ ...draft, triggers: next })
-  }
-  const addTrigger = () => {
-    // По умолчанию привязываем к первому параметру без триггера. Если все
-    // покрыты — берём первый параметр (пользователь выберет потом).
-    const used = new Set(triggers.map((t) => t.param_ref))
-    const unbound = draft.parameters.find((p) => !used.has(p.name))
-    const target = unbound ?? draft.parameters[0]
-    const param_ref = target?.name ?? ''
-    const nt: RegulationTrigger = {
-      id: `trig-${param_ref || nanoid(5)}`,
-      label: target?.name ?? 'Новый триггер',
-      param_ref,
-      sensor_subtype: null,
-      event_type: null,
-      description: null,
+  const triggerForParam = (paramName: string): RegulationTrigger | undefined =>
+    triggers.find((t) => t.param_ref === paramName)
+  const upsertTriggerForParam = (
+    paramName: string,
+    patch: Partial<RegulationTrigger>,
+  ) => {
+    const idx = triggers.findIndex((t) => t.param_ref === paramName)
+    if (idx >= 0) {
+      const next = triggers.map((t, i) => (i === idx ? { ...t, ...patch } : t))
+      setDraft({ ...draft, triggers: next })
+    } else {
+      // Новый триггер для параметра. id выводим из имени параметра —
+      // стабильный slug, по которому Turtle-сериализация делает URI вида
+      // `:HeatInletBreach_Trigger_trig-inletPressure`.
+      const nt: RegulationTrigger = {
+        id: `trig-${paramName}`,
+        label: paramName,
+        param_ref: paramName,
+        sensor_subtype: null,
+        event_type: null,
+        source_regulation: null,
+        source_output: null,
+        description: null,
+        ...patch,
+      }
+      setDraft({ ...draft, triggers: [...triggers, nt] })
     }
-    setDraft({ ...draft, triggers: [...triggers, nt] })
   }
-  const removeTrigger = (idx: number) => {
-    setDraft({ ...draft, triggers: triggers.filter((_, i) => i !== idx) })
+  const removeTriggerForParam = (paramName: string) => {
+    setDraft({ ...draft, triggers: triggers.filter((t) => t.param_ref !== paramName) })
   }
 
   return (
@@ -526,9 +549,12 @@ function FormView({
                     />
                   </FormRow>
                 </div>
-                <ParamTriggerBadge
+                <ParamTriggerInline
                   paramName={p.name}
-                  triggers={triggers}
+                  trigger={triggerForParam(p.name)}
+                  currentRegulationId={draft.id}
+                  onUpsert={(patch) => upsertTriggerForParam(p.name, patch)}
+                  onRemove={() => removeTriggerForParam(p.name)}
                 />
                 <div className="mt-3 grid grid-cols-2 gap-2.5 rounded-md border border-emerald-100 bg-emerald-50/40 p-2">
                   <FormRow label="SHACL min ≥" icon={ShieldCheck} compact>
@@ -556,35 +582,8 @@ function FormView({
         </div>
       </Section>
 
-      {/* Триггеры */}
-      <Section
-        title={
-          <SectionTitle icon={Zap} label="Триггеры (событие → регламент)">
-            <Badge tone="neutral">{triggers.length}</Badge>
-          </SectionTitle>
-        }
-        description="Декларация «какие датчики и события активируют этот регламент». Один параметр = один триггер. Привязка datchik→param_ref индексирует регламент для ETL-приёмника Сигмы."
-        actions={
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<Plus size={12} />}
-            onClick={addTrigger}
-            disabled={draft.parameters.length === 0}
-          >
-            Добавить триггер
-          </Button>
-        }
-        elevated
-      >
-        <TriggersList
-          triggers={triggers}
-          parameters={draft.parameters}
-          currentRegulationId={draft.id}
-          onPatch={patchTrigger}
-          onRemove={removeTrigger}
-        />
-      </Section>
+      {/* Секция «Триггеры» удалена — триггеры теперь рисуются inline на
+          карточке каждого параметра, как «откуда наполняется этот вход». */}
 
       {/* Рекомендация */}
       <Section
@@ -735,115 +734,127 @@ function TriggeredByBanner({ regulationId }: { regulationId: string }) {
 
 
 // ──────────────────────────────────────────────────────────
-// Плашка «датчик + событие» под карточкой параметра.
-// Делает связь Param ↔ Trigger ↔ Sensor видимой без переключения вкладок.
+// Inline-форма триггера в карточке параметра.
+// Архитектурное решение: «один параметр = (опционально) один триггер»
+// делается визуально явным — триггер живёт там же, где параметр, а не в
+// отдельной секции ниже. Это устраняет orphan-триггеры (id триггера и
+// param_ref выводятся из имени параметра) и делает UX логичным:
+// карточка параметра отвечает на оба вопроса — «что за параметр» и
+// «откуда он наполняется».
+//
+// Backend модель не меняется: триггер по-прежнему отдельная сущность
+// (DuckDB regulation_triggers + Turtle :hasTrigger) для онтологической
+// чистоты и O(1) reverse-lookup. Меняется только UI-метафора.
 // ──────────────────────────────────────────────────────────
 
-function ParamTriggerBadge({
+function ParamTriggerInline({
   paramName,
-  triggers,
+  trigger,
+  currentRegulationId,
+  onUpsert,
+  onRemove,
 }: {
   paramName: string
-  triggers: RegulationTrigger[]
+  trigger: RegulationTrigger | undefined
+  currentRegulationId: string
+  onUpsert: (patch: Partial<RegulationTrigger>) => void
+  onRemove: () => void
 }) {
-  // Те же sensor-subtypes что в TriggersList — react-query закэширует один
-  // запрос на оба компонента (key 'sensor-subtypes' общий).
   const { data: classes = [] } = useQuery({
     queryKey: ['sensor-subtypes'],
     queryFn: () => api.sensorSubtypes.list(),
   })
-  const allSubtypes = useMemo(
-    () => classes.flatMap((c) => c.subtypes),
-    [classes],
-  )
+  const { data: datasetsRaw } = useQuery({
+    queryKey: ['datasets'],
+    queryFn: () => api.datasets.list(),
+  })
+  const allRegulations = useMemo<Array<{ id: string; name: string; domain?: string | null }>>(() => {
+    if (!datasetsRaw) return []
+    const items: Array<{ id: string; name?: string; domain?: string | null }> =
+      Array.isArray(datasetsRaw)
+        ? datasetsRaw
+        : ('items' in datasetsRaw && Array.isArray(datasetsRaw.items) ? datasetsRaw.items : [])
+    return items
+      .filter((r) => r.id !== currentRegulationId)
+      .map((r) => ({ id: r.id, name: r.name ?? r.id, domain: r.domain }))
+      .sort(
+        (a, b) =>
+          (a.domain ?? '').localeCompare(b.domain ?? '') ||
+          a.name.localeCompare(b.name),
+      )
+  }, [datasetsRaw, currentRegulationId])
 
-  // Триггер для этого параметра (берём первый — UI не позволяет нескольких).
-  const trigger = triggers.find((t) => t.param_ref === paramName)
+  // Если триггера нет — компактная кнопка-плашка «Привязать датчик/регламент»;
+  // клик создаёт триггер без источника (mode='sensor' открывается следующим
+  // рендером, потому что upsert поставит дефолты).
   if (!trigger) {
-    // Триггера нет вообще — мягкая подсказка только если у параметра уже есть
-    // имя (свежий placeholder param_N не подсвечиваем — лишний шум).
-    if (!paramName || paramName.startsWith('param_')) return null
     return (
-      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-stone-400">
-        <Zap size={11} className="opacity-60" />
-        <span>Триггер не создан — добавьте в секции ниже.</span>
+      <div className="mt-2 flex items-center gap-2 rounded-md border border-dashed border-stone-300 bg-stone-50/60 px-2.5 py-1.5">
+        <Zap size={12} className="text-stone-400" />
+        <span className="text-[11px] text-stone-500">
+          Источник этого входа не указан.
+        </span>
+        <button
+          type="button"
+          onClick={() => onUpsert({})}
+          className="ml-auto inline-flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800 hover:bg-amber-100"
+        >
+          <Plus size={11} />
+          Привязать источник
+        </button>
       </div>
     )
   }
 
-  const subtype = trigger.sensor_subtype
-    ? allSubtypes.find((s) => s.subtype_id === trigger.sensor_subtype)
-    : null
-  const hasSensor = Boolean(trigger.sensor_subtype)
-  const hasSourceReg = Boolean(trigger.source_regulation)
-  const hasEvent = Boolean(trigger.event_type)
-  const hasAnySource = hasSensor || hasSourceReg
-
-  // Цвета: жёлтый — датчик, фиолетовый — композиция (другой регламент),
-  // серый — нет источника. Цвет разный чтобы аналитик с одного взгляда
-  // отличал «event_driven by sensor» от «event-driven by regulation».
-  const styles = hasSourceReg
-    ? 'border-violet-200 bg-violet-50/60 text-violet-900'
-    : hasSensor
-      ? 'border-amber-200 bg-amber-50/60 text-amber-900'
-      : 'border-stone-200 bg-stone-50 text-stone-500'
+  const mode = inferSourceMode(trigger)
+  const accent =
+    mode === 'regulation'
+      ? 'border-violet-200 bg-violet-50/40'
+      : mode === 'sensor'
+        ? 'border-amber-200 bg-amber-50/40'
+        : 'border-stone-200 bg-stone-50/40'
 
   return (
-    <div
-      className={cn(
-        'mt-2 flex flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5 text-[11px]',
-        styles,
-      )}
-      title={
-        hasSourceReg
-          ? `Output регламента «${trigger.source_regulation}»${trigger.source_output ? ` / ${trigger.source_output}` : ''} наполняет этот параметр`
-          : hasSensor
-            ? `Событие от датчика «${subtype?.label ?? trigger.sensor_subtype}» наполняет этот параметр`
-            : 'Триггер существует, но источник к нему не привязан'
-      }
-    >
-      {hasSourceReg ? (
-        <>
-          <Network size={11} className="text-violet-600" />
-          <span className="font-medium">Регламент:</span>
-          <span className="rounded bg-white/70 px-1 py-px font-mono">
-            {trigger.source_regulation}
-          </span>
-          {trigger.source_output && (
-            <>
-              <span className="mx-0.5 text-violet-400">/</span>
-              <span className="rounded bg-white/70 px-1 py-px font-mono">
-                {trigger.source_output}
-              </span>
-            </>
-          )}
-        </>
-      ) : hasSensor ? (
-        <>
-          <Zap size={11} className="text-amber-600" />
-          <span className="font-medium">Датчик:</span>
-          <span className="rounded bg-white/70 px-1 py-px font-mono">
-            {trigger.sensor_subtype}
-          </span>
-          {subtype?.label && (
-            <span className="text-stone-600">— {subtype.label}</span>
-          )}
-        </>
-      ) : (
-        <>
-          <Zap size={11} className="text-stone-400" />
-          <span>Триггер «{trigger.id}» — источник не привязан</span>
-        </>
-      )}
-      {hasEvent && (
-        <>
-          <span className="mx-1 text-stone-300">·</span>
-          <Send size={10} className={hasAnySource ? 'text-stone-500' : 'text-stone-400'} />
-          <span className="rounded bg-white/70 px-1 py-px font-mono">
-            {trigger.event_type}
-          </span>
-        </>
-      )}
+    <div className={cn('mt-2 rounded-md border p-2.5', accent)}>
+      <div className="mb-2 flex items-center gap-2">
+        <Zap size={12} className={mode === 'regulation' ? 'text-violet-600' : 'text-amber-600'} />
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-600">
+          Триггер
+        </span>
+        <span className="text-[10px] font-mono text-stone-400">{trigger.id}</span>
+        <button
+          type="button"
+          onClick={onRemove}
+          title="Убрать привязку источника"
+          className="ml-auto rounded p-0.5 text-stone-400 hover:bg-rose-50 hover:text-rose-600"
+        >
+          <Trash2 size={11} />
+        </button>
+      </div>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1.4fr_1.4fr]">
+        <FormRow label="Метка" icon={Tag} compact>
+          <input
+            value={trigger.label ?? ''}
+            onChange={(e) => onUpsert({ label: e.target.value || null })}
+            className={tx}
+            placeholder={paramName}
+          />
+        </FormRow>
+        <FormRow label="Тип события" icon={Send} compact>
+          <input
+            value={trigger.event_type ?? ''}
+            onChange={(e) => onUpsert({ event_type: e.target.value || null })}
+            className={tx}
+            placeholder="telemetry.pressure"
+          />
+        </FormRow>
+      </div>
+      <TriggerSourcePicker
+        trigger={trigger}
+        classes={classes}
+        allRegulations={allRegulations}
+        onPatch={(patch) => onUpsert(patch)}
+      />
     </div>
   )
 }
@@ -1024,159 +1035,9 @@ function TriggerSourcePicker({
 }
 
 
-// ──────────────────────────────────────────────────────────
-// Триггеры — список с привязкой к параметру и подтипу датчика
-// ──────────────────────────────────────────────────────────
-
-function TriggersList({
-  triggers,
-  parameters,
-  currentRegulationId,
-  onPatch,
-  onRemove,
-}: {
-  triggers: RegulationTrigger[]
-  parameters: Parameter[]
-  currentRegulationId: string
-  onPatch: (idx: number, p: Partial<RegulationTrigger>) => void
-  onRemove: (idx: number) => void
-}) {
-  // Подгружаем все подтипы датчиков для выпадашки. Один запрос на компонент,
-  // данные кэшированы react-query — повторное открытие редактора регламента
-  // не идёт по сети.
-  const { data: classes = [] } = useQuery({
-    queryKey: ['sensor-subtypes'],
-    queryFn: () => api.sensorSubtypes.list(),
-  })
-  const allSubtypes = useMemo(
-    () => classes.flatMap((c) => c.subtypes),
-    [classes],
-  )
-  // Все регламенты для селекта source_regulation. Исключаем текущий, чтобы
-  // нельзя было сделать self-loop. Кросс-цикл (A→B→A) пока не детектим —
-  // оставим на будущее (нужен топологический обход регламентов).
-  const { data: datasetsRaw } = useQuery({
-    queryKey: ['datasets'],
-    queryFn: () => api.datasets.list(),
-  })
-  const allRegulations = useMemo<Array<{ id: string; name: string; domain?: string | null }>>(() => {
-    if (!datasetsRaw) return []
-    const items: Array<{ id: string; name?: string; domain?: string | null }> =
-      Array.isArray(datasetsRaw)
-        ? datasetsRaw
-        : ('items' in datasetsRaw && Array.isArray(datasetsRaw.items) ? datasetsRaw.items : [])
-    return items
-      .filter((r) => r.id !== currentRegulationId)
-      .map((r) => ({ id: r.id, name: r.name ?? r.id, domain: r.domain }))
-      .sort(
-        (a, b) =>
-          (a.domain ?? '').localeCompare(b.domain ?? '') ||
-          a.name.localeCompare(b.name),
-      )
-  }, [datasetsRaw, currentRegulationId])
-
-  if (triggers.length === 0) {
-    return (
-      <div className="rounded-md border border-dashed border-stone-300 p-4 text-center text-sm text-stone-400">
-        Триггеров нет. Если у регламента есть параметры — нажмите «Добавить триггер» и привяжите их к датчикам.
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-2">
-      {triggers.map((t, idx) => {
-        // Найти подтип чтобы показать класс рядом с label'ом.
-        const subtype = allSubtypes.find((s) => s.subtype_id === t.sensor_subtype)
-        const orphan = t.param_ref && !parameters.some((p) => p.name === t.param_ref)
-        return (
-          <div
-            key={t.id}
-            className={cn(
-              'flex overflow-hidden rounded-md border bg-white shadow-sm transition',
-              orphan ? 'border-rose-300' : 'border-stone-200 hover:border-primary/40',
-            )}
-          >
-            <div
-              className={cn(
-                'flex w-9 shrink-0 items-start justify-center pt-3 text-white',
-                orphan ? 'bg-rose-500/90' : 'bg-amber-500/90',
-              )}
-              title={orphan ? `param_ref «${t.param_ref}» не найден среди параметров` : 'Триггер'}
-            >
-              <Zap size={14} />
-            </div>
-            <div className="min-w-0 flex-1 p-3">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="font-mono text-[10px] uppercase tracking-wider text-stone-400">
-                  #{idx + 1} · {t.id}
-                </span>
-                {orphan && (
-                  <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-700">
-                    параметр не найден
-                  </span>
-                )}
-                <button
-                  onClick={() => onRemove(idx)}
-                  title="Удалить триггер"
-                  className="ml-auto rounded-md p-1 text-stone-400 transition hover:bg-rose-50 hover:text-rose-600"
-                >
-                  <Trash2 size={13} />
-                </button>
-              </div>
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[1.2fr_1.2fr_1.4fr]">
-                <FormRow label="Метка" icon={Tag} compact>
-                  <input
-                    value={t.label ?? ''}
-                    onChange={(e) => onPatch(idx, { label: e.target.value || null })}
-                    className={tx}
-                    placeholder={t.param_ref}
-                  />
-                </FormRow>
-                <FormRow label="Параметр" icon={Target} compact>
-                  <select
-                    value={t.param_ref}
-                    onChange={(e) => onPatch(idx, { param_ref: e.target.value })}
-                    className={cn(tx, 'pr-7')}
-                  >
-                    {parameters.length === 0 && <option value="">—</option>}
-                    {parameters.map((p) => (
-                      <option key={p.id} value={p.name}>
-                        {p.name}
-                      </option>
-                    ))}
-                    {orphan && (
-                      <option value={t.param_ref}>{t.param_ref} (orphan)</option>
-                    )}
-                  </select>
-                </FormRow>
-                <FormRow label="Тип события" icon={Send} compact>
-                  <input
-                    value={t.event_type ?? ''}
-                    onChange={(e) => onPatch(idx, { event_type: e.target.value || null })}
-                    className={tx}
-                    placeholder="telemetry.pressure"
-                  />
-                </FormRow>
-              </div>
-              <TriggerSourcePicker
-                trigger={t}
-                classes={classes}
-                allRegulations={allRegulations}
-                onPatch={(p) => onPatch(idx, p)}
-              />
-              {subtype?.description && (
-                <p className="mt-2 text-[11px] leading-relaxed text-stone-500">
-                  {subtype.description}
-                </p>
-              )}
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
+// TriggersList удалён — секция «Триггеры» как отдельный список больше не
+// используется. Триггер рисуется inline в карточке параметра через
+// `ParamTriggerInline` выше.
 
 // ──────────────────────────────────────────────────────────
 // View 2 — Sliders (быстрая настройка ref/dev)

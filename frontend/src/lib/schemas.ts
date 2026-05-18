@@ -47,6 +47,21 @@ export const recommendationSchema = z.object({
   linkedParameters: z.array(z.string()),
 })
 
+// Event-driven сцепка: триггер — декларация «какие датчики/события активируют
+// регламент». Без этой схемы zod при .parse() молча СТРИПАЕТ поле `triggers`
+// из ответа GET /api/regulations/{id} — и в UI триггеры просто исчезали
+// после save (классический баг «триггер пропал»).
+export const regulationTriggerSchema = z.object({
+  id: z.string(),
+  label: z.string().nullable().optional(),
+  param_ref: z.string(),
+  sensor_subtype: z.string().nullable().optional(),
+  event_type: z.string().nullable().optional(),
+  source_regulation: z.string().nullable().optional(),
+  source_output: z.string().nullable().optional(),
+  description: z.string().nullable().optional(),
+})
+
 export const regulationSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -57,6 +72,9 @@ export const regulationSchema = z.object({
   parameters: z.array(parameterSchema),
   constraints: z.array(constraintSchema),
   recommendations: z.array(recommendationSchema),
+  // Триггеры event-driven цепочки. `default([])` — backend всегда возвращает
+  // массив (Pydantic default_factory), но защищаемся от старых ответов.
+  triggers: z.array(regulationTriggerSchema).default([]),
   // SIGMA-compliance + PROV-O attachment
   source_document: z.string().nullable().optional(),
   source_clause: z.string().nullable().optional(),

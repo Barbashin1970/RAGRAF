@@ -379,6 +379,16 @@ def reconcile_flow_with_triggers(
                 bindsTo=input_id,
                 position={"x": base_x, "y": base_y},
             ))
+            # FlowEdge sensor → input: чтобы пилюля датчика была визуально
+            # связана с входом регламента, а не висела «сама по себе» на
+            # канвасе. Без edge'а bindsTo есть только в data-поле, но
+            # React Flow рисует только то, что в flow.edges.
+            existing_edge = next(
+                (e for e in flow.edges if e.source == new_id and e.target == input_id),
+                None,
+            )
+            if existing_edge is None:
+                flow.edges.append(FlowEdge(source=new_id, target=input_id))
             diff["added"].append(t.param_ref)
             changed = True
         else:
