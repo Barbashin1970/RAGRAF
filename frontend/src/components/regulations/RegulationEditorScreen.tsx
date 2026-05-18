@@ -850,7 +850,20 @@ function TriggerSourcePicker({
   allRegulations: Array<{ id: string; name: string; domain?: string | null }>
   onPatch: (p: Partial<RegulationTrigger>) => void
 }) {
-  const mode = inferSourceMode(trigger)
+  // Mode хранится локально, потому что нужно показать селект подтипа сразу
+  // после клика «Датчик» — даже когда sensor_subtype ещё пустой. Если
+  // выводить mode из самих полей триггера (inferSourceMode), пустой триггер
+  // после клика останется в mode='none' и пользователь не увидит селекта.
+  // Инициализируем из trigger один раз; при внешних изменениях триггера
+  // (например, sync с flow на бэке) подстраиваемся через useEffect.
+  const [mode, setModeRaw] = useState<TriggerSourceMode>(() => inferSourceMode(trigger))
+  useEffect(() => {
+    // Если родительская модель триггера стала указывать на регламент, а у нас
+    // mode был 'sensor' — синхронизируемся; то же в обратную сторону.
+    const next = inferSourceMode(trigger)
+    if (next !== 'none') setModeRaw(next)
+  }, [trigger.sensor_subtype, trigger.source_regulation])
+
   // Output-actions выбранного source_regulation — для второго селекта.
   const { data: outputData } = useQuery({
     queryKey: ['regulation-output-actions', trigger.source_regulation],
@@ -860,6 +873,7 @@ function TriggerSourcePicker({
   const outputActions = outputData?.actions ?? []
 
   const setMode = (next: TriggerSourceMode) => {
+    setModeRaw(next)  // визуальное переключение немедленно
     if (next === 'sensor') {
       onPatch({ source_regulation: null, source_output: null })
     } else if (next === 'regulation') {

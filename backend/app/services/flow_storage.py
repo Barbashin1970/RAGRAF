@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.config import settings
-from app.schemas.domain import FlowEdge, FlowNode, FlowVersion, Parameter, RuleDSL
+from app.schemas.domain import FlowEdge, FlowNode, FlowVersion, Parameter, RegulationTrigger, RuleDSL
 
 
 def _data_root() -> Path:
@@ -287,6 +287,127 @@ def reconcile_flow_with_params(
         comment=f"Sync с регламентом: {'; '.join(summary_parts) if summary_parts else 'технические правки'}",
     )
     return {"removed": removed_params, "added": added_params, "updated": updated_params}
+
+
+def reconcile_flow_with_triggers(
+    regulation_id: str, triggers: list[RegulationTrigger]
+) -> dict[str, list[str]]:
+    """Sync Triggers → Flow: согласовать sensor-узлы flow со списком триггеров.
+
+    Закрывает дыру обратного синка: если пользователь в Edit/«Триггеры»
+    выбрал датчик `industrial-pressure` для параметра `pressure`, то в
+    Flow Editor должна появиться оранжевая пилюля sensor-нода с этим
+    подтипом, привязанная к input-ноде через `bindsTo`.
+
+    Стратегия (зеркалит reconcile_flow_with_params + reconcile_triggers_with_flow):
+      1) Индексируем input-ноды flow по paramRef.
+      2) Индексируем sensor-ноды flow по bindsTo (input_id).
+      3) Для каждого триггера с sensor_subtype:
+         - находим input-ноду по trigger.param_ref → input_id;
+         - если sensor-нода с этим bindsTo уже есть → обновляем
+           её sensorSubtype/sensorType/label если они поменялись;
+         - если нет → создаём новую sensor-ноду рядом с input.
+      4) Для триггеров без sensor_subtype: если у соответствующего input
+         висит «сиротская» sensor-нода — оставляем (пользователь мог
+         её нарисовать руками в Flow Editor и не хотеть сноса).
+         НЕ удаляем, чтобы Triggers→Flow не уничтожал ручной ввод в Flow.
+      5) Удаления возможны только когда пользователь явно удалил sensor
+         в Flow Editor — обратный путь синка через reconcile_triggers_with_flow.
+
+    sensor.sensorType (литерал класса 'p','t',...) выводится из class_id
+    подтипа через sensor_schema_store. Если подтип неизвестен — fallback
+    на 'detector' (наиболее общий универсальный класс CCTV-аналитики).
+
+    Возвращает diff для UI/тостов.
+    """
+    from app.services import sensor_schema_store  # local import — избегаем
+    # циклической зависимости regulation_store → flow_storage → sensor_schema_store.
+
+    flow = load_flow(regulation_id)
+    diff: dict[str, list[str]] = {"added": [], "updated": [], "removed": []}
+    if flow is None:
+        return diff  # нечего синкать — flow ещё не создан
+
+    # Индекс param_ref → input_id (если input существует).
+    input_by_param: dict[str, str] = {}
+    for n in flow.nodes:
+        if n.type == "input" and n.paramRef:
+            input_by_param[n.paramRef] = n.id
+
+    # Индекс input_id → sensor-нода.
+    sensor_by_input: dict[str, FlowNode] = {}
+    for n in flow.nodes:
+        if n.type == "sensor" and n.bindsTo:
+            sensor_by_input[n.bindsTo] = n
+
+    changed = False
+    for t in triggers:
+        if not t.sensor_subtype:
+            continue  # триггеры без датчика flow не трогают
+        input_id = input_by_param.get(t.param_ref)
+        if not input_id:
+            # input для этого param_ref ещё не существует в flow.json —
+            # reconcile_flow_with_params его создаст в первую очередь,
+            # потом следующий save пересинкает sensor. Пропускаем.
+            continue
+        existing_sensor = sensor_by_input.get(input_id)
+
+        # Получаем подтип чтобы вытащить class_id и label.
+        try:
+            subtype = sensor_schema_store.get_subtype(t.sensor_subtype)
+        except Exception:
+            subtype = None
+        sensor_type = subtype.class_id if subtype and subtype.class_id else "detector"
+        sensor_label = subtype.label if subtype and subtype.label else t.sensor_subtype
+
+        if existing_sensor is None:
+            # Создаём новую sensor-ноду рядом с input — слева, чтобы не
+            # перекрывать существующие узлы цепочки.
+            input_node = next((n for n in flow.nodes if n.id == input_id), None)
+            base_x = 0.0
+            base_y = 0.0
+            if input_node and input_node.position:
+                base_x = float(input_node.position.get("x", 0)) - 220.0
+                base_y = float(input_node.position.get("y", 0))
+            new_id = _unique_node_id(flow.nodes, f"n_sensor_{t.param_ref}")
+            flow.nodes.append(FlowNode(
+                id=new_id,
+                type="sensor",
+                label=sensor_label,
+                sensorType=sensor_type,  # type: ignore[arg-type]
+                sensorSubtype=t.sensor_subtype,
+                bindsTo=input_id,
+                position={"x": base_x, "y": base_y},
+            ))
+            diff["added"].append(t.param_ref)
+            changed = True
+        else:
+            # Обновляем только если что-то реально поменялось.
+            mutated = False
+            if existing_sensor.sensorSubtype != t.sensor_subtype:
+                existing_sensor.sensorSubtype = t.sensor_subtype
+                mutated = True
+            if existing_sensor.sensorType != sensor_type:
+                existing_sensor.sensorType = sensor_type  # type: ignore[assignment]
+                mutated = True
+            # Label обновляем только если он был авто-сгенерирован (равен
+            # subtype_id или пустой) — не затираем ручные подписи.
+            if existing_sensor.label in (None, "", existing_sensor.sensorSubtype):
+                existing_sensor.label = sensor_label
+                mutated = True
+            if mutated:
+                diff["updated"].append(t.param_ref)
+                changed = True
+
+    if changed:
+        # Сохраняем напрямую через файл, минуя save_flow + создание
+        # immutable-снапшота: иначе каждое сохранение регламента плодит
+        # версию flow на ровном месте. История изменений регламента
+        # сама знает что изменилось — sensor-sync виден из неё.
+        path = _flow_path(regulation_id)
+        path.write_text(flow.model_dump_json(indent=2), encoding="utf-8")
+
+    return diff
 
 
 def _unique_node_id(existing_nodes: list[FlowNode], base: str) -> str:

@@ -578,9 +578,17 @@ def save(
     # синка не должен откатывать запись регламента.
     if sync_flow:
         try:
-            from app.services.flow_storage import reconcile_flow_with_params
+            from app.services.flow_storage import (
+                reconcile_flow_with_params,
+                reconcile_flow_with_triggers,
+            )
 
+            # Порядок важен: сначала параметры (создаёт input-ноды для новых
+            # параметров), потом триггеры (привязывает sensor-узлы к этим
+            # input-нодам). В обратном порядке reconcile_flow_with_triggers
+            # не нашёл бы input и пропустил бы создание sensor.
             reconcile_flow_with_params(reg.id, reg.parameters)
+            reconcile_flow_with_triggers(reg.id, reg.triggers)
         except Exception:
             # Сознательно глотаем: flow можно поправить вручную в Flow Editor,
             # потеря регламента из-за рассинка флоу — недопустима.
