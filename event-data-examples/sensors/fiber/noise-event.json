@@ -1,9 +1,0 @@
-{
-  "description": "Шумовое событие на координатах (6342 м от 0 до 10 км)",
-  "timestamp": "2026-05-16T23:51:05Z",
-  "payload": {
-    "x": 6342,
-    "event": "noise_event",
-    "confidence": 0.98
-  }
-}

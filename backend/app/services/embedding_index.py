@@ -171,7 +171,7 @@ _INDEX: EmbeddingIndex | None = None
 
 
 def get_index() -> EmbeddingIndex:
-    global _INDEX
+    global _INDEX  # sigma:allow P3 — process-singleton lazy-init, не рекурсия.
     if _INDEX is None:
         _INDEX = EmbeddingIndex()
     return _INDEX

@@ -1,9 +1,0 @@
-{
-  "description": "Копка на координатах (3946 м от 0 до 10 км)",
-  "timestamp": "2026-05-16T21:08:05Z",
-  "payload": {
-    "x": 3946,
-    "event": "digging",
-    "confidence": 0.88
-  }
-}

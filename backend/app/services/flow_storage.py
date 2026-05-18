@@ -147,9 +147,19 @@ def reconcile_flow_with_params(
             incoming[e.target] = incoming.get(e.target, 0) + 1
 
         to_remove: set[str] = set()
+        # P1-compliant: верхняя граница обхода — общее число узлов flow.
+        # Линейная цепочка `input → threshold → compare → …` не может
+        # содержать больше уникальных узлов, чем есть в графе. Лишний
+        # `seen` set ловит цикл (если flow.json приехал с битым DAG'ом)
+        # и не даёт зациклиться.
+        max_chain_len = max(1, len(flow.nodes))
         for inp in stale_inputs:
             cursor = inp.id
-            while True:
+            seen: set[str] = set()
+            for _ in range(max_chain_len):
+                if cursor in seen:
+                    break  # защита от цикла в графе
+                seen.add(cursor)
                 to_remove.add(cursor)
                 succ = successors.get(cursor, [])
                 if len(succ) != 1:

@@ -47,7 +47,7 @@ def get_knowledge_graph() -> Any:
     Раньше клиент пробрасывался кусками в каждый wrapper — отказались в пользу
     единого клиента с rate-limit/retry/cache shared.
     """
-    global _kg
+    global _kg  # sigma:allow P3 — process-singleton KnowledgeGraph, не рекурсия.
     _ensure_enabled()
     if _kg is not None:
         return _kg

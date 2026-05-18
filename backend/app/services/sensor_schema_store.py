@@ -64,7 +64,7 @@ def _db_path() -> Path:
 
 
 def _connection() -> duckdb.DuckDBPyConnection:
-    global _conn
+    global _conn  # sigma:allow P3 — singleton lazy-init, не рекурсия; защищён _LOCK.
     if _conn is None:
         _conn = duckdb.connect(str(_db_path()))
         _init_schema(_conn)

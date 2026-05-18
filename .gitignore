@@ -9,3 +9,7 @@ __pycache__
 backend/data/flows
 backend/data/versions
 backend/data/ragu_store
+
+# Внешние программы-референсы — не часть RAGRAF, лежат локально для
+# сверки контрактов и не должны попадать в публичный git/github.
+external/event-data-examples/

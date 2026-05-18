@@ -94,7 +94,7 @@ _DEFAULTS_CACHE: dict[str, dict[str, Any]] | None = None
 
 def _defaults() -> dict[str, dict[str, Any]]:
     """Memoized default-templates. Один импорт RAGU за весь процесс."""
-    global _DEFAULTS_CACHE
+    global _DEFAULTS_CACHE  # sigma:allow P3 — memo-кэш дефолтов, не рекурсия.
     if _DEFAULTS_CACHE is None:
         loaded = _load_ragu_defaults()
         _DEFAULTS_CACHE = loaded or {}
