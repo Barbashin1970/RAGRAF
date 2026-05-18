@@ -1353,47 +1353,87 @@ function SliderRow({
 }
 
 // ──────────────────────────────────────────────────────────
-// View 3 — Source Turtle (read-only preview)
+// View 3 — Source Turtle (встроенный текстовый редактор)
+//
+// Прозрачная модель состояния:
+//   • `baseline` — что сейчас на сервере (последний успешный save или
+//     первичная загрузка). Источник правды для dirty-флага.
+//   • `buffer` — то, что пользователь видит и редактирует. Изменяется
+//     только onChange textarea ИЛИ при явных кнопках «Сбросить» /
+//     «Перезагрузить с сервера». Mutation onSuccess его НЕ трогает —
+//     иначе при наборе во время save буква, добавленная между фронт-
+//     send и onSuccess, терялась бы.
+//   • `dirty` = baseline !== buffer.
+//
+// Сохранение → POST text → backend кладёт verbatim → onSuccess: baseline
+// становится отправленным текстом, react-query cache синхронизируется
+// через setQueryData (без re-fetch) и инвалидирует Поля/Поток/Историю.
+// Никаких fetchQuery после save — нечего гонять туда-сюда, мы УЖЕ знаем
+// что было сохранено (то, что отправили).
 // ──────────────────────────────────────────────────────────
 
 function SourceView({ sourceId }: { sourceId: string; draft: Regulation }) {
   const qc = useQueryClient()
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data: serverData, isLoading, error, refetch } = useQuery({
     queryKey: ['regulation-raw', sourceId],
     queryFn: () => api.regulations.raw(sourceId),
+    // Защита от затирания: window focus refetch мог переписать редактор
+    // во время паузы пользователя на «подумать». Только явное действие
+    // («Перезагрузить с сервера») должно обновлять.
+    refetchOnWindowFocus: false,
   })
 
-  // Локальный буфер. Инициализируется один раз когда придёт data; после
-  // этого фоновые refetch react-query НЕ затирают (как в RegulationEditor
-  // pendingServerSync паттерн). После save мы явно перезаписываем буфер
-  // тем, что вернул refetch — не полагаемся на useEffect chain.
   const [buffer, setBuffer] = useState<string | null>(null)
-  useEffect(() => {
-    if (data !== undefined && buffer === null) setBuffer(data)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data])
+  const [baseline, setBaseline] = useState<string | null>(null)
 
-  const dirty = buffer !== null && data !== undefined && buffer !== data
+  // Первичная инициализация — единожды, когда сервер ответил.
+  useEffect(() => {
+    if (serverData !== undefined && baseline === null) {
+      setBuffer(serverData)
+      setBaseline(serverData)
+    }
+  }, [serverData, baseline])
+
+  // Если пользователь сделал «Перезагрузить с сервера», serverData может
+  // переписаться. Тогда обновляем baseline и сбрасываем buffer на свежее.
+  // Условие: baseline уже инициализирован И serverData отличается, И
+  // buffer === baseline (нет несохранённых правок — иначе НЕ трогаем).
+  useEffect(() => {
+    if (
+      baseline !== null
+      && serverData !== undefined
+      && serverData !== baseline
+      && buffer === baseline
+    ) {
+      setBuffer(serverData)
+      setBaseline(serverData)
+    }
+  }, [serverData, baseline, buffer])
+
+  const dirty = buffer !== null && baseline !== null && buffer !== baseline
 
   const save = useMutation({
-    mutationFn: (turtle: string) => api.regulations.updateRaw(sourceId, turtle),
-    onSuccess: async () => {
-      // Инвалидируем структурированные представления (Поля/Слайдеры/История)
-      // и поток (могла поменяться привязка sensor через триггеры).
+    // mutationFn возвращает ТО, ЧТО ОТПРАВИЛ — это и есть «новый baseline»,
+    // потому что backend кладёт raw_turtle verbatim. Сравнение с
+    // serverData / fetchQuery после save не нужно — нечего разруливать.
+    mutationFn: async (turtle: string) => {
+      await api.regulations.updateRaw(sourceId, turtle)
+      return turtle
+    },
+    onSuccess: (savedText) => {
+      setBaseline(savedText)
+      // Синхронизируем react-query кэш `regulation-raw` без re-fetch:
+      // следующий mount/visit этой вкладки увидит то же, что юзер только
+      // что сохранил. Если ему нужна каноническая версия от backend —
+      // нажмёт «Перезагрузить с сервера».
+      qc.setQueryData(['regulation-raw', sourceId], savedText)
+      // Структурированные представления (Поля/Слайдеры/Поток/История)
+      // должны подхватить новые параметры из backend — там парсер уже
+      // обновил структуру в DuckDB.
       qc.invalidateQueries({ queryKey: ['regulation', sourceId] })
       qc.invalidateQueries({ queryKey: ['flow', sourceId] })
       qc.invalidateQueries({ queryKey: ['regulation-history', sourceId] })
-      // Phase 1: ждём пока вернётся свежий Turtle с сервера. Без await
-      // следующая строка setBuffer записала бы локально OLD data, потому
-      // что react-query refetch — асинхронный.
-      const fresh = await qc.fetchQuery({
-        queryKey: ['regulation-raw', sourceId],
-        queryFn: () => api.regulations.raw(sourceId),
-      })
-      // Phase 2: буфер = свежий Turtle с сервера → dirty=false → кнопка
-      // «Сохранить» гасится. Если backend нормализовал отступы/префиксы,
-      // пользователь сразу видит результат.
-      setBuffer(fresh ?? '')
+      qc.invalidateQueries({ queryKey: ['regulation-triggered-by', sourceId] })
     },
   })
 
@@ -1401,17 +1441,16 @@ function SourceView({ sourceId }: { sourceId: string; draft: Regulation }) {
     <div className="flex h-full flex-col gap-3">
       <div className="rounded-md border border-stone-200 bg-stone-50/60 p-3 text-xs text-stone-600">
         Сырой Turtle регламента из локального DuckDB-store. Правки сохраняются
-        в store + добавляют запись в историю версий. Это **встроенный редактор**:
-        можно править комментарии, опечатки, формулировки рекомендации, добавлять/
-        убирать триплы. Структурированное представление на вкладках «Поля» /
-        «Слайдеры» автоматически пересоберётся из обновлённого Turtle.
+        verbatim — комментарии и порядок triplet'ов не теряются. Структурированное
+        представление на вкладках «Поля» / «Слайдеры» пересобирается из
+        обновлённого Turtle.
       </div>
       <div className="flex items-center gap-2">
         <Button
           variant="primary"
           size="sm"
           icon={<Save size={13} />}
-          onClick={() => buffer && save.mutate(buffer)}
+          onClick={() => buffer !== null && save.mutate(buffer)}
           disabled={!dirty || save.isPending}
           loading={save.isPending}
         >
@@ -1421,15 +1460,22 @@ function SourceView({ sourceId }: { sourceId: string; draft: Regulation }) {
           variant="ghost"
           size="sm"
           icon={<RotateCcw size={13} />}
-          onClick={() => {
-            setBuffer(data ?? '')
-          }}
+          onClick={() => baseline !== null && setBuffer(baseline)}
           disabled={!dirty}
         >
           Сбросить
         </Button>
         <button
-          onClick={() => refetch()}
+          onClick={() => {
+            // Принудительное обновление: чистим baseline, react-query
+            // re-fetch'ит, useEffect инициализации перезапишет buffer.
+            refetch().then((r) => {
+              if (r.data !== undefined) {
+                setBuffer(r.data)
+                setBaseline(r.data)
+              }
+            })
+          }}
           className="ml-2 text-xs text-stone-500 underline hover:text-stone-700"
         >
           Перезагрузить с сервера
