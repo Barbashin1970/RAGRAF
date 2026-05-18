@@ -37,15 +37,20 @@ class Constraint(BaseModel):
     severity: Literal["violation", "warning", "info"] = "violation"
 
 
-class ConditionExpression(BaseModel):
-    operator: str
-    left: str
-    right: float | str | None = None
-
-
 class Recommendation(BaseModel):
+    """Текстовая рекомендация регламента + приоритет (severity).
+
+    После аудита 2026-05-18 поля упрощены:
+      • `condition: ConditionExpression` — было мёртвое поле без UI / DB-
+        колонки / сериализации в Turtle. Удалено: условие срабатывания
+        регламента живёт в Flow Editor (compare/switch/formula ноды),
+        не в текстовом блоке рекомендации.
+      • `linkedParameters` — раньше регенерилось `= [p.id for p in parameters]`
+        на каждом save (UI не давал выбрать подмножество). Оставлено, но
+        с default=[] — клиент может его игнорировать; backend регенерит
+        в save() если пусто.
+    """
     id: str
-    condition: ConditionExpression | None = None
     text: str
     priority: Literal[1, 2, 3] = 2
     linkedParameters: list[str] = Field(default_factory=list)

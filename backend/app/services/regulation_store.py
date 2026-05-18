@@ -648,12 +648,25 @@ def save(
             # Та же история, что и с parameters: DELETE-all + INSERT-all
             # дёргал idx_trig_subtype/event/source_reg + PK index, что давало
             # риск повреждения на abrupt-shutdown.
+            #
+            # Дедуп: сначала по trigger_id (PK защита), затем по param_ref —
+            # в DB не может быть двух триггеров на один и тот же входной
+            # параметр (один параметр = один источник). Раньше когда
+            # _safe_local_name резал дефис из trig.id, Turtle round-trip
+            # создавал «вторую» запись `trigpressure` рядом с `trig-pressure`,
+            # обе на param_ref=`pressure` — дубликат в UI и хаос. Теперь
+            # сначала по id, потом по param_ref оставляем первого, далее
+            # delete-all-not-in.
             seen_trig_ids: set[str] = set()
+            seen_param_refs: set[str] = set()
             unique_triggers = []
             for t in reg.triggers:
                 if t.id in seen_trig_ids:
                     continue
+                if t.param_ref in seen_param_refs:
+                    continue
                 seen_trig_ids.add(t.id)
+                seen_param_refs.add(t.param_ref)
                 unique_triggers.append(t)
             for pos, t in enumerate(unique_triggers):
                 c.execute(
@@ -688,6 +701,22 @@ def save(
                     f"DELETE FROM regulation_triggers WHERE source_id = ? AND trigger_id NOT IN ({placeholders})",
                     [reg.id, *seen_trig_ids],
                 )
+                # Дополнительная зачистка legacy дубликатов: если в БД
+                # осталась запись с тем же param_ref, но другим trigger_id
+                # (последствие BUG-4 — Turtle round-trip создавал `trigfoo`
+                # рядом с `trig-foo`), её тоже сносим. Это гарантирует
+                # «один parameter = максимум один trigger».
+                ph_param = ",".join("?" for _ in seen_param_refs)
+                ph_tid = ",".join("?" for _ in seen_trig_ids)
+                c.execute(
+                    f"""
+                    DELETE FROM regulation_triggers
+                    WHERE source_id = ?
+                      AND param_ref IN ({ph_param})
+                      AND trigger_id NOT IN ({ph_tid})
+                    """,
+                    [reg.id, *seen_param_refs, *seen_trig_ids],
+                )
             else:
                 c.execute("DELETE FROM regulation_triggers WHERE source_id = ?", [reg.id])
             # History snapshot
@@ -716,6 +745,7 @@ def save(
             from app.services.flow_storage import (
                 load_flow,
                 reconcile_flow_with_params,
+                reconcile_flow_with_recommendation,
                 reconcile_flow_with_triggers,
                 save_flow,
             )
@@ -743,6 +773,13 @@ def save(
             # не нашёл бы input и пропустил бы создание sensor.
             reconcile_flow_with_params(reg.id, reg.parameters)
             reconcile_flow_with_triggers(reg.id, reg.triggers)
+            # Sync рекомендации в текст единственной output-ноды (если такая
+            # есть). Закрывает разрыв между Form'овским text/priority и
+            # output.text/priority в Flow Editor — без этого они расходились
+            # на каждом save.
+            if reg.recommendations:
+                rec = reg.recommendations[0]
+                reconcile_flow_with_recommendation(reg.id, rec.text, rec.priority)
         except Exception:
             # Сознательно глотаем: flow можно поправить вручную в Flow Editor,
             # потеря регламента из-за рассинка флоу — недопустима.

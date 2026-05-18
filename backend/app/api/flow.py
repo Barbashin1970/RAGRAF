@@ -113,9 +113,64 @@ def put_flow(regulation_id: str, dsl: RuleDSL) -> dict[str, object]:
                 triggers_diff["added"] or triggers_diff["removed"] or triggers_diff["updated"]
             )
 
+            # Sync Flow output → recommendation. Раньше output-нода Flow и
+            # `Regulation.recommendations[0]` были двумя независимыми
+            # сущностями — текст рекомендации в Form и текст в output
+            # ноде могли расходиться. Теперь: первая output-нода Flow с
+            # непустым text/action диктует recommendation.text (и priority
+            # если задан в ноде). Это даёт единый источник правды для
+            # «что рекомендуем оператору».
+            #
+            # Стратегия — диктатура primary output: берём первый output
+            # node с text. Если в Flow несколько output'ов (например по
+            # severity), мерджим в нумерованный список. Каждая строка
+            # начинается с action как заголовка.
+            rec_changed = False
+            output_nodes = [n for n in dsl.nodes if n.type == "output"]
+            if output_nodes:
+                # Сортируем по позиции для стабильности.
+                output_nodes.sort(key=lambda n: (
+                    n.position.get("y", 0) if n.position else 0,
+                    n.position.get("x", 0) if n.position else 0,
+                ))
+                # Собираем мульти-output в один текст. Если только одна
+                # output-нода — используем её text как есть.
+                if len(output_nodes) == 1:
+                    new_text = output_nodes[0].text or ""
+                    new_priority = output_nodes[0].priority or 2
+                else:
+                    parts = []
+                    for n in output_nodes:
+                        if not n.text:
+                            continue
+                        if n.label and n.label.strip():
+                            parts.append(f"• [{n.label}] {n.text}")
+                        else:
+                            parts.append(f"• {n.text}")
+                    new_text = "\n".join(parts)
+                    # При мульти-output приоритет = max severity (наивысший = 1).
+                    new_priority = min(
+                        (n.priority for n in output_nodes if n.priority),
+                        default=2,
+                    )
+                if new_text:
+                    old_text = reg.recommendations[0].text if reg.recommendations else ""
+                    old_priority = reg.recommendations[0].priority if reg.recommendations else 2
+                    if new_text != old_text or new_priority != old_priority:
+                        from app.schemas.domain import Recommendation
+                        existing_rec = reg.recommendations[0] if reg.recommendations else None
+                        reg.recommendations = [Recommendation(
+                            id=existing_rec.id if existing_rec else f"rec_{regulation_id}",
+                            text=new_text,
+                            priority=new_priority,  # type: ignore[arg-type]
+                            linkedParameters=existing_rec.linkedParameters if existing_rec
+                                else [p.id for p in (new_params if params_changed else reg.parameters)],
+                        )]
+                        rec_changed = True
+
             # Применяем только если есть реальные изменения — иначе не плодим
             # лишних версий в regulation_history на каждый flow-save.
-            if params_changed or triggers_changed:
+            if params_changed or triggers_changed or rec_changed:
                 if params_changed:
                     reg.parameters = new_params
                 reg.triggers = new_triggers
@@ -132,6 +187,8 @@ def put_flow(regulation_id: str, dsl: RuleDSL) -> dict[str, object]:
                             f"{k}={v}" for k, v in triggers_diff.items() if v
                         )
                     )
+                if rec_changed:
+                    comment_parts.append("recommendation: text/priority из output-ноды")
                 regulation_store.save(
                     reg, author="flow-sync",
                     comment="Sync с Flow — " + "; ".join(comment_parts),

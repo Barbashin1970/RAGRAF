@@ -291,17 +291,44 @@ async def update_regulation_raw(source_id: str, request: Request) -> dict[str, A
         reg.source_file_path = existing.source_file_path
     if not reg.source_mime_type:
         reg.source_mime_type = existing.source_mime_type
-    # Перенос bounds — параметры в Turtle не несут sh:minInclusive/maxInclusive,
-    # это поле shapes.ttl. Сохраняем их из существующего store, чтобы
-    # редактирование Turtle не сбрасывало валидацию.
-    existing_bounds = {p.name: (p.minInclusive, p.maxInclusive) for p in existing.parameters}
+    # Перенос bounds + unit + display name + version + recommendation.priority.
+    # Ключ — p.id (стабильный schema-id), а НЕ p.name: после ренейма «Давление
+    # узла» p.name ≠ p.id, и lookup по name терял bounds. Параллельно тащим:
+    #   • unit (PARAM_UNITS словарь в parser'е — хардкод, кастомные ед. изм.
+    #     иначе теряются);
+    #   • display name (если в Turtle парсер прочитал rdfs:label — он уже в
+    #     reg.parameters; иначе fallback на existing.name);
+    #   • version (Turtle не несёт);
+    #   • recommendation.priority (parser хардкодит 1 — восстанавливаем).
+    existing_params_by_id = {p.id: p for p in existing.parameters}
     for p in reg.parameters:
-        if p.name in existing_bounds:
-            mn, mx = existing_bounds[p.name]
-            if p.minInclusive is None:
-                p.minInclusive = mn
-            if p.maxInclusive is None:
-                p.maxInclusive = mx
+        ep = existing_params_by_id.get(p.id)
+        if ep is None:
+            continue
+        if p.minInclusive is None:
+            p.minInclusive = ep.minInclusive
+        if p.maxInclusive is None:
+            p.maxInclusive = ep.maxInclusive
+        # unit: парсер вычитывает из захардкоженного PARAM_UNITS словаря —
+        # для кастомных значений «гПа», «кПа» это не работает. Стратегия:
+        # existing.unit ВСЕГДА побеждает (Turtle не несёт unit как триплет,
+        # значит из Turtle мы его не можем узнать в принципе; редактирование
+        # unit только в Form).
+        if ep.unit is not None:
+            p.unit = ep.unit
+        # name: если в Turtle нет rdfs:label, парсер ставит p.name = schema-id.
+        # В этом случае восстанавливаем displayed name из существующего store.
+        if p.name == p.id and ep.name != ep.id:
+            p.name = ep.name
+    # Version: Turtle не несёт. Без восстановления каждый Turtle save
+    # сбрасывает version в "1.0".
+    if reg.version == "1.0" and existing.version != "1.0":
+        reg.version = existing.version
+    # Recommendation priority: parser хардкодит 1 (см. comment в parser).
+    # Если у пользователя в Form был priority=2, без этой защиты Turtle save
+    # сбрасывал бы её. Триплет приоритета в Turtle не несём (он не SHACL).
+    if reg.recommendations and existing.recommendations:
+        reg.recommendations[0].priority = existing.recommendations[0].priority
     # Триггеры: parse_regulation_turtle уже их распарсит, но если в Turtle
     # их нет (например пользователь стёр), не теряем — оставляем из store.
     if not reg.triggers and existing.triggers:

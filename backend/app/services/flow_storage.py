@@ -289,6 +289,52 @@ def reconcile_flow_with_params(
     return {"removed": removed_params, "added": added_params, "updated": updated_params}
 
 
+def reconcile_flow_with_recommendation(
+    regulation_id: str, rec_text: str | None, rec_priority: int | None
+) -> bool:
+    """Sync Form → Flow: пропихнуть текст рекомендации и приоритет в output-ноду.
+
+    Раньше output-нода Flow и `Regulation.recommendations[0]` были двумя
+    независимыми сущностями: Form редактировал recommendation.text, Flow
+    редактировал output.text — после save'ов они расходились, пользователь
+    путался «какой текст увидит оператор».
+
+    Правила:
+      • Если в flow есть РОВНО ОДНА output-нода — синкаем её text/priority
+        из recommendation. Это единый источник правды для одно-уровневого
+        регламента (большинство кейсов).
+      • Если output-нод НЕСКОЛЬКО — пользователь намеренно сделал
+        мульти-output (warning/elevated/critical и т.п.). Не трогаем,
+        потому что мы не знаем, какому output подсунуть текст. Обратный
+        путь синка в этом случае — Flow → recommendation (см. flow.py
+        endpoint), который мерджит мульти-output в один блочный текст.
+
+    Возвращает True если flow реально изменился.
+    """
+    flow = load_flow(regulation_id)
+    if flow is None:
+        return False
+    output_nodes = [n for n in flow.nodes if n.type == "output"]
+    if len(output_nodes) != 1:
+        return False
+    out = output_nodes[0]
+    changed = False
+    new_text = (rec_text or "").strip()
+    if new_text and out.text != new_text:
+        out.text = new_text
+        changed = True
+    if rec_priority is not None and out.priority != rec_priority:
+        out.priority = rec_priority  # type: ignore[assignment]
+        changed = True
+    if changed:
+        # Напрямую файл, без save_flow + version: чтобы каждый Form-save
+        # не плодил версию flow.json. История регламента уже фиксирует
+        # изменение текста рекомендации.
+        path = _flow_path(regulation_id)
+        path.write_text(flow.model_dump_json(indent=2), encoding="utf-8")
+    return changed
+
+
 def reconcile_flow_with_triggers(
     regulation_id: str, triggers: list[RegulationTrigger]
 ) -> dict[str, list[str]]:

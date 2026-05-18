@@ -28,7 +28,7 @@ from __future__ import annotations
 import uuid
 
 from rdflib import Graph, Literal, Namespace, URIRef
-from rdflib.namespace import OWL, RDF, SH, XSD
+from rdflib.namespace import OWL, RDF, RDFS, SH, XSD
 
 from app.schemas.domain import Constraint, Parameter, Recommendation, Regulation, RegulationTrigger
 
@@ -434,7 +434,14 @@ def _safe_local_name(s: str) -> str:
     # camelCase из «Давление узла» → «ДавлениеУзла», затем фильтр.
     parts = [p for p in s.split() if p]
     camel = "".join(p[:1].upper() + p[1:] for p in parts) if len(parts) > 1 else s
-    ascii_filtered = "".join(ch for ch in camel if ch.isascii() and (ch.isalnum() or ch == "_"))
+    # Дефис РАЗРЕШЁН в Turtle local-names (PN_LOCAL grammar) — rdflib
+    # сериализует `:trig-pressure` корректно. Поэтому держим `-` в whitelist,
+    # чтобы trigger.id вида `trig-<paramId>` round-trip'ился через Turtle
+    # парсер без потери (раньше дефис вырезался → `trigpressure` ≠ `trig-pressure`,
+    # DB накапливала дубли).
+    ascii_filtered = "".join(
+        ch for ch in camel if ch.isascii() and (ch.isalnum() or ch in "_-")
+    )
     if ascii_filtered and (ascii_filtered[0].isalpha() or ascii_filtered[0] == "_"):
         return ascii_filtered
     # Fallback: всё ушло (чистая кириллица/пунктуация) — стабильный slug
@@ -512,6 +519,7 @@ def parse_regulation_turtle(
     # Параметры — все числовые scalar-свойства, кроме метапропертей и кроме *Deviation
     parameters: list[Parameter] = []
     deviation_keys = {k for k in props if k.endswith("Deviation")}
+    REG_NS = Namespace("http://regulations.local/ontology#")
     for key, raw in props.items():
         if key in META_PROPS or key in deviation_keys:
             continue
@@ -520,10 +528,16 @@ def parse_regulation_turtle(
             continue  # не численное — пропускаем
         dev = _to_float(props.get(f"{key}Deviation"))
         b = bounds_by_param.get(key, {})
+        # Display-имя: читаем rdfs:label у свойства (там лежит переименованное
+        # пользовательское имя — см. regulation_to_turtle:226). Fallback на key
+        # (schema-id) — поведение до фикса. Это закрывает баг «после rename
+        # параметра в кириллицу → Turtle save → имя сбрасывается на schema-id».
+        label_lit = g.value(REG_NS[key], RDFS.label)
+        display_name = str(label_lit) if label_lit else key
         parameters.append(
             Parameter(
                 id=key,
-                name=key,
+                name=display_name,
                 datatype="decimal",
                 referenceValue=ref,
                 deviationAllowed=dev,
