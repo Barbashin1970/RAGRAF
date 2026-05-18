@@ -842,7 +842,8 @@ DATA_DIR=./data
 
 См. полный реестр в [`backend/data/fixtures/INDEX.md`](backend/data/fixtures/INDEX.md). Источники реальных регламентов:
 
-- **`Rules-Management.pdf`** (корень проекта) — пример SHACL/OWL онтологии Sigma на основе Apache Jena. Извлечён как `pressure-diameter.*`.
+- **`Rules-Management.pdf`** (корень проекта) — исходное ТЗ Сигмы по управлению регламентами: SHACL/OWL онтология на Apache Jena. Извлечён как `pressure-diameter.*`.
+- **`RULES-MANAGEMENT.md`** (корень проекта) — наша пояснительная записка команде: переписанный Rules-Management с разделами про библиотеку JSON-контрактов событий (Sensor Library) и декларативные триггеры. Объясняет, чем мы дополнили исходную модель Сигмы и зачем это нужно для event-driven архитектуры.
 - **`~/demo-sigma-main/src/config/regulations.yaml`** — 8 сценариев НГУ-кампуса (пожар в серверной, прорыв тепловвода, ночная протечка, СКУД и т.д.). Использованы 3: `thermal-incident`, `heat-inlet-breach`, `dormitory-flood`.
 - **`~/NSK_OpenData_Bot/config/rules/ecology_rules.yaml`** — экологические пороги Новосибирска (5 рисков: smog_trap, pdk, black_ice, temp_shock, extreme_cold). Использован `smog_trap` + `pdk`.
 
