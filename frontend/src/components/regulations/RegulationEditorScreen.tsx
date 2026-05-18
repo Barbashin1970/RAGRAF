@@ -76,7 +76,9 @@ export function RegulationEditorScreen() {
     enabled: !!id,
   })
 
-  // Локальная редактируемая копия.
+  // ───────────── Edit-tab state (Поля / Слайдеры) ─────────────
+  // `draft` — рабочая копия Regulation, редактируется во вкладках «Поля»
+  // и «Слайдеры». Сохраняется через PUT /regulations/{id}.
   const [draft, setDraft] = useState<Regulation | null>(null)
   const [tab, setTab] = useState<Tab>('form')
   const [showHistory, setShowHistory] = useState(false)
@@ -85,9 +87,7 @@ export function RegulationEditorScreen() {
   //   - draft ещё пуст (первичный mount); или
   //   - в URL открыт другой регламент (regulation.id поменялся).
   // Фоновые refetch (window focus, invalidate соседних query) НЕ затирают
-  // local edits — иначе любая правка пропадает. После save mutations
-  // явно обновляют draft через setDraft(fresh) в onSuccess, не через
-  // этот useEffect.
+  // local edits — иначе любая правка пропадает.
   useEffect(() => {
     if (!regulation) return
     setDraft((current) => {
@@ -98,21 +98,11 @@ export function RegulationEditorScreen() {
     })
   }, [regulation])
 
-  const dirty = useMemo(() => {
+  const formDirty = useMemo(() => {
     if (!regulation || !draft) return false
-    // Стабильное сравнение Regulation:
-    //   • ключи объекта сортируются — иначе порядок Pydantic-вывода vs
-    //     порядок добавления в React не совпадает;
-    //   • массивы parameters/triggers сортируются по id перед сравнением —
-    //     backend reconcile_flow_with_triggers может вернуть их в другом
-    //     порядке (по position в flow), что иначе делало бы кнопку
-    //     «Сохранить» вечно активной после save;
-    //   • null/undefined унифицируются в null — Pydantic выводит null,
-    //     React patch'и могут содержать undefined для тех же optional полей.
     const norm = (obj: unknown): string =>
       JSON.stringify(obj, (key, v) => {
         if (Array.isArray(v) && (key === 'parameters' || key === 'triggers')) {
-          // Сортируем по id (стабильный ключ, есть и в parameters, и в triggers).
           return [...v].sort((a, b) => {
             const ai = (a as { id?: string })?.id ?? ''
             const bi = (b as { id?: string })?.id ?? ''
@@ -131,14 +121,42 @@ export function RegulationEditorScreen() {
     return norm(regulation) !== norm(draft)
   }, [regulation, draft])
 
-  // После save/publish/archive — явно тянем свежий regulation с сервера
-  // (await fetchQuery → детерминированный single-source-of-truth) и
-  // переписываем draft. Это решает две проблемы одновременно:
-  //   1) dirty корректно становится false (draft === regulation);
-  //   2) если backend нормализовал данные (например пересобрал триггеры
-  //      через reconcile_triggers_with_flow), пользователь видит результат.
-  // invalidate соседних query — для list/history/flow вью.
-  const syncFromServer = async () => {
+  // ───────────── Turtle-tab state (вербатим-редактор) ─────────────
+  // Поднято на родителя, чтобы верхняя кнопка «Сохранить» решала, что
+  // именно сохранять в зависимости от активной вкладки. Так у юзера ОДИН
+  // понятный canon: «есть несохранённые правки — кнопка тёмно-зелёная;
+  // сохранил — бледная». Без дублирующейся кнопки внутри SourceView.
+  const { data: turtleData } = useQuery({
+    queryKey: ['regulation-raw', id],
+    queryFn: () => api.regulations.raw(id),
+    enabled: !!id,
+    refetchOnWindowFocus: false,
+  })
+  const [turtleBuffer, setTurtleBuffer] = useState<string | null>(null)
+  const [turtleBaseline, setTurtleBaseline] = useState<string | null>(null)
+  useEffect(() => {
+    if (turtleData !== undefined && turtleBaseline === null) {
+      setTurtleBuffer(turtleData)
+      setTurtleBaseline(turtleData)
+    }
+  }, [turtleData, turtleBaseline])
+  const turtleDirty =
+    turtleBuffer !== null && turtleBaseline !== null && turtleBuffer !== turtleBaseline
+
+  // ───────────── Dispatch по активной вкладке ─────────────
+  // dirty — единый флаг для верхней кнопки. На Turtle-вкладке смотрит на
+  // turtleDirty, на остальных — на formDirty. Это устраняет проблему,
+  // когда после Turtle-save верхняя «Сохранить» загоралась как «Form
+  // dirty» (backend перегенерил draft, useQuery refetched, регламент
+  // изменился, но локальный draft остался прежним → norm() расходился).
+  const dirty = tab === 'source' ? turtleDirty : formDirty
+  const onTurtleTab = tab === 'source'
+
+  // После любого save — синкаем regulation с сервера и обновляем draft.
+  // Заодно перетянем raw turtle если правились структурные поля (там
+  // регенерится канон). Если правился Turtle — baseline уже знаем, не
+  // делаем лишний raw-fetch.
+  const syncRegulationFromServer = async (resetTurtleFromServer: boolean) => {
     const fresh = await qc.fetchQuery({
       queryKey: ['regulation', id],
       queryFn: () => api.regulations.get(id),
@@ -147,23 +165,74 @@ export function RegulationEditorScreen() {
     qc.invalidateQueries({ queryKey: ['datasets'] })
     qc.invalidateQueries({ queryKey: ['regulation-history', id] })
     qc.invalidateQueries({ queryKey: ['regulation-triggered-by', id] })
-    // Flow — refetch (а не invalidate): пользователь скоро откроет страницу
-    // Поток и должен сразу видеть только что добавленный sensor из триггера.
     qc.refetchQueries({ queryKey: ['flow', id] })
+    if (resetTurtleFromServer) {
+      // Form-save → backend инвалидировал raw_turtle → GET /raw регенерит
+      // канон. Перетягиваем, обновляем baseline и buffer (если пользователь
+      // не в Turtle-вкладке, его буфер не trump'ируем — но если он там и
+      // не правил, baseline === buffer, замена безопасна).
+      try {
+        const freshRaw = await qc.fetchQuery({
+          queryKey: ['regulation-raw', id],
+          queryFn: () => api.regulations.raw(id),
+        })
+        if (freshRaw !== undefined) {
+          setTurtleBaseline(freshRaw)
+          // Не трогаем буфер если у юзера несохранённые правки в Turtle —
+          // иначе он их потеряет.
+          setTurtleBuffer((cur) =>
+            cur === null || cur === turtleBaseline ? freshRaw : cur,
+          )
+        }
+      } catch {
+        // Не критично — следующий visit вкладки подтянет.
+      }
+    }
   }
 
-  const save = useMutation({
+  const saveForm = useMutation({
     mutationFn: (next: Regulation) => api.regulations.save(id, next),
-    onSuccess: syncFromServer,
+    onSuccess: () => syncRegulationFromServer(true),
   })
+  const saveTurtle = useMutation({
+    mutationFn: async (turtle: string) => {
+      await api.regulations.updateRaw(id, turtle)
+      return turtle
+    },
+    onSuccess: async (savedText) => {
+      setTurtleBaseline(savedText)
+      qc.setQueryData(['regulation-raw', id], savedText)
+      // Backend пересобрал структуру из распарсенного Turtle — обновляем
+      // draft, чтобы вкладки «Поля» / «Слайдеры» видели актуальные
+      // параметры. resetTurtleFromServer=false: мы УЖЕ знаем baseline
+      // (это savedText), не нужно перезапрашивать.
+      await syncRegulationFromServer(false)
+    },
+  })
+  const saving = saveForm.isPending || saveTurtle.isPending
+
+  const handleSave = () => {
+    if (onTurtleTab && turtleDirty && turtleBuffer !== null) {
+      saveTurtle.mutate(turtleBuffer)
+    } else if (!onTurtleTab && formDirty && draft) {
+      saveForm.mutate(draft)
+    }
+  }
+  const handleUndo = () => {
+    if (onTurtleTab && turtleBaseline !== null) {
+      setTurtleBuffer(turtleBaseline)
+    } else if (regulation) {
+      setDraft(structuredClone(regulation) as Regulation)
+    }
+  }
 
   const publish = useMutation({
     mutationFn: () => api.regulations.publish(id),
-    onSuccess: syncFromServer,
+    onSuccess: () => syncRegulationFromServer(true),
   })
   const archive = useMutation({
     mutationFn: () => api.regulations.archive(id),
-    onSuccess: syncFromServer,
+    onSuccess: () => syncRegulationFromServer(true),
   })
 
   const stats = [
@@ -171,11 +240,11 @@ export function RegulationEditorScreen() {
   ]
 
   const currentStatus = regulation?.status ?? 'draft'
+  const saveTitle = onTurtleTab
+    ? (turtleDirty ? 'Сохранить Turtle (вкладка «Turtle»)' : 'Нет несохранённых правок')
+    : (formDirty ? 'Сохранить правки полей' : 'Нет несохранённых правок')
   const actions = (
     <>
-      {/* Approval workflow: Опубликовать → Архивировать (зависит от статуса).
-          Стили через ui Button: 'secondary' с success/neutral иконкой — не делаем
-          их primary, чтобы основная primary-кнопка (Сохранить) визуально доминировала. */}
       {currentStatus !== 'active' && (
         <Button
           size="sm"
@@ -200,10 +269,6 @@ export function RegulationEditorScreen() {
           {archive.isPending ? 'Архивирую…' : 'Архивировать'}
         </Button>
       )}
-      {/* Экспорт регламента в SIGMA-bundle (data.ttl + shapes.ttl + manifest.json).
-          Прямая GET-навигация — браузер сам качает ZIP, не нужен mutation/state.
-          Если на регламенте есть несохранённые правки (dirty) — отдадим
-          закоммиченную в DuckDB версию, не draft. Так что не блокируем по dirty. */}
       <Button
         size="sm"
         variant="ghost"
@@ -229,7 +294,7 @@ export function RegulationEditorScreen() {
         size="sm"
         variant="secondary"
         icon={<CircleSlash size={13} />}
-        onClick={() => regulation && setDraft(structuredClone(regulation) as Regulation)}
+        onClick={handleUndo}
         disabled={!dirty}
       >
         Отменить
@@ -238,17 +303,16 @@ export function RegulationEditorScreen() {
         size="sm"
         variant="primary"
         icon={<Save size={13} />}
-        onClick={() => draft && save.mutate(draft)}
-        loading={save.isPending}
-        disabled={!dirty || save.isPending}
+        onClick={handleSave}
+        loading={saving}
+        disabled={!dirty || saving}
+        title={saveTitle}
       >
-        {save.isPending ? 'Сохраняю…' : 'Сохранить'}
+        {saving ? 'Сохраняю…' : 'Сохранить'}
       </Button>
     </>
   )
 
-  // Sub-табы режима редактора (Поля / Слайдеры / Turtle) — внутри Model Layer
-  // (regulation), поэтому tone='primary'. См. DESIGN_SYSTEM.md §1.
   const editorTabs: TabDef<Tab>[] = TABS.map((t) => ({ id: t.id, label: t.label, icon: t.icon }))
 
   const subHeader = (
@@ -256,14 +320,24 @@ export function RegulationEditorScreen() {
       <div className="border-t border-stone-200 bg-white/60 px-5 py-1.5">
         <Tabs tabs={editorTabs} active={tab} onChange={setTab} tone="primary" />
       </div>
-      {save.data?.upstream_error && (
+      {saveForm.data?.upstream_error && (
         <div className="border-t border-amber-200 bg-amber-50 px-5 py-1.5 text-xs text-amber-800">
-          Сохранено локально, но не получилось отправить в upstream: {save.data.upstream_error}
+          Сохранено локально, но не получилось отправить в upstream: {saveForm.data.upstream_error}
         </div>
       )}
-      {save.isSuccess && !save.data?.upstream_error && (
+      {saveForm.isSuccess && !saveForm.data?.upstream_error && (
         <div className="border-t border-emerald-200 bg-emerald-50 px-5 py-1.5 text-xs text-emerald-700">
-          Сохранено · версия {save.data.version.slice(0, 8)}
+          Сохранено · версия {saveForm.data.version.slice(0, 8)}
+        </div>
+      )}
+      {saveTurtle.isSuccess && (
+        <div className="border-t border-emerald-200 bg-emerald-50 px-5 py-1.5 text-xs text-emerald-700">
+          Turtle сохранён
+        </div>
+      )}
+      {saveTurtle.isError && (
+        <div className="border-t border-rose-200 bg-rose-50 px-5 py-1.5 text-xs text-rose-700">
+          Ошибка сохранения Turtle: {(saveTurtle.error as Error).message}
         </div>
       )}
     </>
@@ -291,11 +365,26 @@ export function RegulationEditorScreen() {
             <SlidersView draft={draft} setDraft={setDraft} />
           )}
           {draft && tab === 'source' && (
-            <SourceView sourceId={id} draft={draft} />
+            <SourceView
+              sourceId={id}
+              buffer={turtleBuffer}
+              setBuffer={setTurtleBuffer}
+              baseline={turtleBaseline}
+              onReloadFromServer={async () => {
+                const fresh = await qc.fetchQuery({
+                  queryKey: ['regulation-raw', id],
+                  queryFn: () => api.regulations.raw(id),
+                })
+                if (fresh !== undefined) {
+                  setTurtleBuffer(fresh)
+                  setTurtleBaseline(fresh)
+                }
+              }}
+            />
           )}
         </div>
         {showHistory && (
-          <HistoryPanel id={id} onRestore={syncFromServer} />
+          <HistoryPanel id={id} onRestore={() => syncRegulationFromServer(true)} />
         )}
       </div>
     </div>
@@ -1353,109 +1442,39 @@ function SliderRow({
 }
 
 // ──────────────────────────────────────────────────────────
-// View 3 — Source Turtle (встроенный текстовый редактор)
+// View 3 — Source Turtle (presentation-only)
 //
-// Прозрачная модель состояния:
-//   • `baseline` — что сейчас на сервере (последний успешный save или
-//     первичная загрузка). Источник правды для dirty-флага.
-//   • `buffer` — то, что пользователь видит и редактирует. Изменяется
-//     только onChange textarea ИЛИ при явных кнопках «Сбросить» /
-//     «Перезагрузить с сервера». Mutation onSuccess его НЕ трогает —
-//     иначе при наборе во время save буква, добавленная между фронт-
-//     send и onSuccess, терялась бы.
-//   • `dirty` = baseline !== buffer.
-//
-// Сохранение → POST text → backend кладёт verbatim → onSuccess: baseline
-// становится отправленным текстом, react-query cache синхронизируется
-// через setQueryData (без re-fetch) и инвалидирует Поля/Поток/Историю.
-// Никаких fetchQuery после save — нечего гонять туда-сюда, мы УЖЕ знаем
-// что было сохранено (то, что отправили).
+// Состояние (buffer/baseline) и save mutation подняты в родителя
+// (RegulationEditorScreen). Это даёт ОДНУ верхнюю кнопку «Сохранить»,
+// которая решает, что именно коммитить (Form/Sliders или Turtle)
+// исходя из активной вкладки. SourceView сам не управляет сохранением —
+// только рендерит textarea и кнопки «Сбросить» / «Перезагрузить».
 // ──────────────────────────────────────────────────────────
 
-function SourceView({ sourceId }: { sourceId: string; draft: Regulation }) {
-  const qc = useQueryClient()
-  const { data: serverData, isLoading, error, refetch } = useQuery({
-    queryKey: ['regulation-raw', sourceId],
-    queryFn: () => api.regulations.raw(sourceId),
-    // Защита от затирания: window focus refetch мог переписать редактор
-    // во время паузы пользователя на «подумать». Только явное действие
-    // («Перезагрузить с сервера») должно обновлять.
-    refetchOnWindowFocus: false,
-  })
-
-  const [buffer, setBuffer] = useState<string | null>(null)
-  const [baseline, setBaseline] = useState<string | null>(null)
-
-  // Первичная инициализация — единожды, когда сервер ответил.
-  useEffect(() => {
-    if (serverData !== undefined && baseline === null) {
-      setBuffer(serverData)
-      setBaseline(serverData)
-    }
-  }, [serverData, baseline])
-
-  // Если пользователь сделал «Перезагрузить с сервера», serverData может
-  // переписаться. Тогда обновляем baseline и сбрасываем buffer на свежее.
-  // Условие: baseline уже инициализирован И serverData отличается, И
-  // buffer === baseline (нет несохранённых правок — иначе НЕ трогаем).
-  useEffect(() => {
-    if (
-      baseline !== null
-      && serverData !== undefined
-      && serverData !== baseline
-      && buffer === baseline
-    ) {
-      setBuffer(serverData)
-      setBaseline(serverData)
-    }
-  }, [serverData, baseline, buffer])
-
+function SourceView({
+  sourceId: _sourceId,
+  buffer,
+  setBuffer,
+  baseline,
+  onReloadFromServer,
+}: {
+  sourceId: string
+  buffer: string | null
+  setBuffer: (v: string) => void
+  baseline: string | null
+  onReloadFromServer: () => Promise<void>
+}) {
   const dirty = buffer !== null && baseline !== null && buffer !== baseline
-
-  const save = useMutation({
-    // mutationFn возвращает ТО, ЧТО ОТПРАВИЛ — это и есть «новый baseline»,
-    // потому что backend кладёт raw_turtle verbatim. Сравнение с
-    // serverData / fetchQuery после save не нужно — нечего разруливать.
-    mutationFn: async (turtle: string) => {
-      await api.regulations.updateRaw(sourceId, turtle)
-      return turtle
-    },
-    onSuccess: (savedText) => {
-      setBaseline(savedText)
-      // Синхронизируем react-query кэш `regulation-raw` без re-fetch:
-      // следующий mount/visit этой вкладки увидит то же, что юзер только
-      // что сохранил. Если ему нужна каноническая версия от backend —
-      // нажмёт «Перезагрузить с сервера».
-      qc.setQueryData(['regulation-raw', sourceId], savedText)
-      // Структурированные представления (Поля/Слайдеры/Поток/История)
-      // должны подхватить новые параметры из backend — там парсер уже
-      // обновил структуру в DuckDB.
-      qc.invalidateQueries({ queryKey: ['regulation', sourceId] })
-      qc.invalidateQueries({ queryKey: ['flow', sourceId] })
-      qc.invalidateQueries({ queryKey: ['regulation-history', sourceId] })
-      qc.invalidateQueries({ queryKey: ['regulation-triggered-by', sourceId] })
-    },
-  })
-
   return (
     <div className="flex h-full flex-col gap-3">
       <div className="rounded-md border border-stone-200 bg-stone-50/60 p-3 text-xs text-stone-600">
         Сырой Turtle регламента из локального DuckDB-store. Правки сохраняются
-        verbatim — комментарии и порядок triplet'ов не теряются. Структурированное
-        представление на вкладках «Поля» / «Слайдеры» пересобирается из
-        обновлённого Turtle.
+        verbatim — комментарии и порядок triplet'ов не теряются. Сохранение
+        — общее: верхняя кнопка <b>«Сохранить»</b> на этой же странице.
+        Структурированное представление на вкладках «Поля» / «Слайдеры»
+        пересобирается из обновлённого Turtle.
       </div>
       <div className="flex items-center gap-2">
-        <Button
-          variant="primary"
-          size="sm"
-          icon={<Save size={13} />}
-          onClick={() => buffer !== null && save.mutate(buffer)}
-          disabled={!dirty || save.isPending}
-          loading={save.isPending}
-        >
-          {save.isPending ? 'Сохраняю…' : 'Сохранить Turtle'}
-        </Button>
         <Button
           variant="ghost"
           size="sm"
@@ -1463,18 +1482,11 @@ function SourceView({ sourceId }: { sourceId: string; draft: Regulation }) {
           onClick={() => baseline !== null && setBuffer(baseline)}
           disabled={!dirty}
         >
-          Сбросить
+          Сбросить правки в этой вкладке
         </Button>
         <button
           onClick={() => {
-            // Принудительное обновление: чистим baseline, react-query
-            // re-fetch'ит, useEffect инициализации перезапишет buffer.
-            refetch().then((r) => {
-              if (r.data !== undefined) {
-                setBuffer(r.data)
-                setBaseline(r.data)
-              }
-            })
+            void onReloadFromServer()
           }}
           className="ml-2 text-xs text-stone-500 underline hover:text-stone-700"
         >
@@ -1482,17 +1494,11 @@ function SourceView({ sourceId }: { sourceId: string; draft: Regulation }) {
         </button>
         {dirty && (
           <span className="ml-auto text-[11px] text-amber-700">
-            Несохранённые правки в Turtle
-          </span>
-        )}
-        {save.isError && (
-          <span className="ml-auto text-[11px] text-rose-700">
-            Ошибка: {(save.error as Error).message}
+            Несохранённые правки в Turtle — нажмите «Сохранить» вверху
           </span>
         )}
       </div>
-      {isLoading && <div className="text-sm text-stone-500">Загрузка…</div>}
-      {error && <div className="text-sm text-rose-700">Ошибка: {(error as Error).message}</div>}
+      {buffer === null && <div className="text-sm text-stone-500">Загрузка…</div>}
       {buffer !== null && (
         <textarea
           value={buffer}
