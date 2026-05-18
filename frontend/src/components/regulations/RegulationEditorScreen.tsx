@@ -87,14 +87,40 @@ export function RegulationEditorScreen() {
 
   const dirty = useMemo(() => {
     if (!regulation || !draft) return false
-    return JSON.stringify(regulation) !== JSON.stringify(draft)
+    // Сравниваем по полям, а не голым JSON.stringify(reg) !== JSON.stringify(draft):
+    //   - JSON.stringify пропускает поля со значением undefined, поэтому
+    //     добавленный триггер с `sensor_subtype: null` vs unset на сервере
+    //     (приходит как `null` через Pydantic JSON) считался разным даже когда
+    //     данные идентичны;
+    //   - стабильный порядок ключей через нормализацию JSON: stringify с
+    //     отсортированными ключами.
+    const norm = (obj: unknown): string => JSON.stringify(obj, (_, v) => {
+      if (v && typeof v === 'object' && !Array.isArray(v)) {
+        return Object.keys(v).sort().reduce<Record<string, unknown>>((acc, k) => {
+          const val = (v as Record<string, unknown>)[k]
+          // Унифицируем null/undefined → null, чтобы патчи фронта
+          // (где optional поле = undefined) сравнивались с серверным null.
+          acc[k] = val === undefined ? null : val
+          return acc
+        }, {})
+      }
+      return v
+    })
+    return norm(regulation) !== norm(draft)
   }, [regulation, draft])
 
   const invalidateAll = () => {
     qc.invalidateQueries({ queryKey: ['regulation', id] })
     qc.invalidateQueries({ queryKey: ['datasets'] })
-    qc.invalidateQueries({ queryKey: ['flow', id] })
     qc.invalidateQueries({ queryKey: ['regulation-history', id] })
+    qc.invalidateQueries({ queryKey: ['regulation-triggered-by', id] })
+    // Flow refetch — форсим, не просто invalidate. После save регламента
+    // бэкенд через reconcile_flow_with_triggers мог обновить flow.json
+    // (новые/изменённые sensor-ноды). Если пользователь сейчас на Edit, а
+    // FlowEditor смонтирован в кэше (например открыт в фоне), invalidate
+    // без refetch оставит stale-данные до следующего mount. refetchQueries
+    // дёрнет /flow прямо сейчас, и при переходе пользователь увидит свежее.
+    qc.refetchQueries({ queryKey: ['flow', id] })
   }
 
   const save = useMutation({
