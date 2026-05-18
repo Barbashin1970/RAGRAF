@@ -138,11 +138,24 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
         )
         """
     )
+    # Идемпотентная миграция: source_regulation + source_output добавились
+    # после первой версии триггеров. Старые БД получают новые колонки без
+    # перезаписи данных (как в основной regulations таблице выше).
+    existing_trig = {
+        row[1] for row in c.execute("PRAGMA table_info('regulation_triggers')").fetchall()
+    }
+    for col in ("source_regulation", "source_output"):
+        if col not in existing_trig:
+            c.execute(f"ALTER TABLE regulation_triggers ADD COLUMN {col} VARCHAR")
     c.execute(
         "CREATE INDEX IF NOT EXISTS idx_trig_subtype ON regulation_triggers(sensor_subtype)"
     )
     c.execute(
         "CREATE INDEX IF NOT EXISTS idx_trig_event ON regulation_triggers(event_type)"
+    )
+    # Индекс для reverse-lookup композиции «какие регламенты слушают этот».
+    c.execute(
+        "CREATE INDEX IF NOT EXISTS idx_trig_source_reg ON regulation_triggers(source_regulation)"
     )
 
     # ── Документы аналитика (загруженные PDF/DOCX как контекст для Q&A) ──
@@ -273,14 +286,18 @@ def _backfill_triggers_if_missing() -> None:
                     """
                     INSERT INTO regulation_triggers (
                         source_id, trigger_id, label, param_ref,
-                        sensor_subtype, event_type, description, position
+                        sensor_subtype, event_type,
+                        source_regulation, source_output,
+                        description, position
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT (source_id, trigger_id) DO NOTHING
                     """,
                     [
                         sid, t.id, t.label, t.param_ref,
-                        t.sensor_subtype, t.event_type, t.description, pos,
+                        t.sensor_subtype, t.event_type,
+                        t.source_regulation, t.source_output,
+                        t.description, pos,
                     ],
                 )
             filled += 1
@@ -362,7 +379,8 @@ def get(source_id: str) -> Regulation | None:
         ).fetchall()
         trig_rows = c.execute(
             """
-            SELECT trigger_id, label, param_ref, sensor_subtype, event_type, description
+            SELECT trigger_id, label, param_ref, sensor_subtype, event_type,
+                   source_regulation, source_output, description
             FROM regulation_triggers WHERE source_id = ?
             ORDER BY position, trigger_id
             """,
@@ -398,7 +416,9 @@ def get(source_id: str) -> Regulation | None:
             param_ref=row[2],
             sensor_subtype=row[3],
             event_type=row[4],
-            description=row[5],
+            source_regulation=row[5],
+            source_output=row[6],
+            description=row[7],
         )
         for row in trig_rows
     ]
@@ -517,9 +537,11 @@ def save(
                     """
                     INSERT INTO regulation_triggers (
                         source_id, trigger_id, label, param_ref,
-                        sensor_subtype, event_type, description, position
+                        sensor_subtype, event_type,
+                        source_regulation, source_output,
+                        description, position
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     [
                         reg.id,
@@ -528,6 +550,8 @@ def save(
                         t.param_ref,
                         t.sensor_subtype,
                         t.event_type,
+                        t.source_regulation,
+                        t.source_output,
                         t.description,
                         pos,
                     ],
@@ -738,6 +762,65 @@ def list_by_sensor_subtype(subtype_id: str) -> list[dict[str, Any]]:
         }
         for r in rows
     ]
+
+
+def list_triggered_by(source_regulation_id: str) -> list[dict[str, Any]]:
+    """Какие регламенты слушают output этого регламента (композиция).
+
+    Reverse-lookup для event-driven композиции: показываем «этот регламент
+    является триггером для N других». O(1) запрос благодаря индексу
+    `idx_trig_source_reg`.
+
+    Один регламент может появиться несколько раз если он держит несколько
+    триггеров на этот источник (например, разные output-actions того же
+    источника); UI группирует сам.
+    """
+    with _LOCK:
+        c = _connection()
+        rows = c.execute(
+            """
+            SELECT t.source_id, r.name, r.domain, t.trigger_id, t.label,
+                   t.param_ref, t.source_output, t.event_type
+            FROM regulation_triggers t
+            JOIN regulations r ON r.source_id = t.source_id
+            WHERE t.source_regulation = ?
+            ORDER BY r.domain, r.source_id, t.position, t.trigger_id
+            """,
+            [source_regulation_id],
+        ).fetchall()
+    return [
+        {
+            "regulation_id": r[0],
+            "regulation_name": r[1],
+            "domain": r[2],
+            "trigger_id": r[3],
+            "trigger_label": r[4],
+            "param_ref": r[5],
+            "source_output": r[6],
+            "event_type": r[7],
+        }
+        for r in rows
+    ]
+
+
+def count_triggered_by() -> dict[str, int]:
+    """Агрегат: source_regulation_id → N регламентов, его слушающих.
+
+    Для UI — бэйдж «триггерит N регламентов» на карточке регламента-источника,
+    без N запросов. Distinct по source_id — если регламент держит два
+    триггера на один источник, считается один раз.
+    """
+    with _LOCK:
+        c = _connection()
+        rows = c.execute(
+            """
+            SELECT source_regulation, COUNT(DISTINCT source_id) AS reg_count
+            FROM regulation_triggers
+            WHERE source_regulation IS NOT NULL
+            GROUP BY source_regulation
+            """
+        ).fetchall()
+    return {r[0]: int(r[1]) for r in rows}
 
 
 def count_by_sensor_subtype() -> dict[str, int]:

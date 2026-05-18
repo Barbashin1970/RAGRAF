@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
@@ -27,6 +27,7 @@ import {
   type LucideIcon,
   ListTodo,
   MessageSquare,
+  Network,
   Paperclip,
   Plus,
   Quote,
@@ -320,6 +321,12 @@ function FormView({
 
   return (
     <div className="space-y-4">
+      {/* Reverse-lookup: «этот регламент — триггер для N других». Видно сразу
+          при открытии Edit/«Поля», чтобы аналитик понимал, что этот регламент
+          участвует в event-driven цепочке. Загружается через отдельный query —
+          инвалидируется одновременно с регламентом. */}
+      <TriggeredByBanner regulationId={draft.id} />
+
       {/* Метаданные */}
       <Section
         title={<SectionTitle icon={Info} label="Метаданные" />}
@@ -493,6 +500,10 @@ function FormView({
                     />
                   </FormRow>
                 </div>
+                <ParamTriggerBadge
+                  paramName={p.name}
+                  triggers={triggers}
+                />
                 <div className="mt-3 grid grid-cols-2 gap-2.5 rounded-md border border-emerald-100 bg-emerald-50/40 p-2">
                   <FormRow label="SHACL min ≥" icon={ShieldCheck} compact>
                     <input
@@ -543,6 +554,7 @@ function FormView({
         <TriggersList
           triggers={triggers}
           parameters={draft.parameters}
+          currentRegulationId={draft.id}
           onPatch={patchTrigger}
           onRemove={removeTrigger}
         />
@@ -617,17 +629,375 @@ function SectionTitle({
 
 
 // ──────────────────────────────────────────────────────────
+// Reverse-lookup плашка: «этот регламент является триггером для N других».
+// Делает event-driven композицию видимой со стороны регламента-источника,
+// аналогично бэйджу подтипа датчика в Sensor Library.
+// ──────────────────────────────────────────────────────────
+
+function TriggeredByBanner({ regulationId }: { regulationId: string }) {
+  const { data } = useQuery({
+    queryKey: ['regulation-triggered-by', regulationId],
+    queryFn: () => api.regulations.triggeredBy(regulationId),
+    enabled: Boolean(regulationId),
+  })
+  if (!data || data.count === 0) return null
+
+  // Группируем триггеры по regulation_id чтобы каждый регламент показать
+  // одной строкой со списком его триггер-action'ов (если у одного потребителя
+  // несколько триггеров на наш output — слипнутся в один пункт).
+  const grouped = new Map<string, {
+    regulation_id: string
+    regulation_name: string
+    domain?: string | null
+    outputs: string[]
+  }>()
+  for (const t of data.triggers) {
+    const key = t.regulation_id
+    const cur = grouped.get(key)
+    if (cur) {
+      if (t.source_output && !cur.outputs.includes(t.source_output)) {
+        cur.outputs.push(t.source_output)
+      }
+    } else {
+      grouped.set(key, {
+        regulation_id: t.regulation_id,
+        regulation_name: t.regulation_name,
+        domain: t.domain,
+        outputs: t.source_output ? [t.source_output] : [],
+      })
+    }
+  }
+  const consumers = Array.from(grouped.values())
+
+  return (
+    <div className="rounded-md border border-violet-200 bg-violet-50/60 p-3 text-violet-900">
+      <div className="mb-1.5 flex items-center gap-2 text-[12px] font-semibold">
+        <Network size={13} className="text-violet-600" />
+        <span>
+          Этот регламент является триггером для{' '}
+          <span className="font-mono">{consumers.length}</span>{' '}
+          {consumers.length === 1 ? 'регламента' : 'регламентов'}
+        </span>
+      </div>
+      <ul className="ml-5 list-disc space-y-0.5 text-[11px]">
+        {consumers.map((c) => (
+          <li key={c.regulation_id}>
+            <Link
+              to={`/regulations/${encodeURIComponent(c.regulation_id)}/edit`}
+              className="font-medium underline-offset-2 hover:underline"
+            >
+              {c.regulation_name}
+            </Link>
+            <span className="ml-1 font-mono text-[10px] text-violet-700/70">
+              ({c.regulation_id})
+            </span>
+            {c.outputs.length > 0 && (
+              <span className="ml-1.5 text-violet-700/80">
+                — слушает: {c.outputs.map((o) => (
+                  <span key={o} className="ml-0.5 rounded bg-white/70 px-1 py-px font-mono text-[10px]">
+                    {o}
+                  </span>
+                ))}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+
+// ──────────────────────────────────────────────────────────
+// Плашка «датчик + событие» под карточкой параметра.
+// Делает связь Param ↔ Trigger ↔ Sensor видимой без переключения вкладок.
+// ──────────────────────────────────────────────────────────
+
+function ParamTriggerBadge({
+  paramName,
+  triggers,
+}: {
+  paramName: string
+  triggers: RegulationTrigger[]
+}) {
+  // Те же sensor-subtypes что в TriggersList — react-query закэширует один
+  // запрос на оба компонента (key 'sensor-subtypes' общий).
+  const { data: classes = [] } = useQuery({
+    queryKey: ['sensor-subtypes'],
+    queryFn: () => api.sensorSubtypes.list(),
+  })
+  const allSubtypes = useMemo(
+    () => classes.flatMap((c) => c.subtypes),
+    [classes],
+  )
+
+  // Триггер для этого параметра (берём первый — UI не позволяет нескольких).
+  const trigger = triggers.find((t) => t.param_ref === paramName)
+  if (!trigger) {
+    // Триггера нет вообще — мягкая подсказка только если у параметра уже есть
+    // имя (свежий placeholder param_N не подсвечиваем — лишний шум).
+    if (!paramName || paramName.startsWith('param_')) return null
+    return (
+      <div className="mt-2 flex items-center gap-1.5 text-[11px] text-stone-400">
+        <Zap size={11} className="opacity-60" />
+        <span>Триггер не создан — добавьте в секции ниже.</span>
+      </div>
+    )
+  }
+
+  const subtype = trigger.sensor_subtype
+    ? allSubtypes.find((s) => s.subtype_id === trigger.sensor_subtype)
+    : null
+  const hasSensor = Boolean(trigger.sensor_subtype)
+  const hasSourceReg = Boolean(trigger.source_regulation)
+  const hasEvent = Boolean(trigger.event_type)
+  const hasAnySource = hasSensor || hasSourceReg
+
+  // Цвета: жёлтый — датчик, фиолетовый — композиция (другой регламент),
+  // серый — нет источника. Цвет разный чтобы аналитик с одного взгляда
+  // отличал «event_driven by sensor» от «event-driven by regulation».
+  const styles = hasSourceReg
+    ? 'border-violet-200 bg-violet-50/60 text-violet-900'
+    : hasSensor
+      ? 'border-amber-200 bg-amber-50/60 text-amber-900'
+      : 'border-stone-200 bg-stone-50 text-stone-500'
+
+  return (
+    <div
+      className={cn(
+        'mt-2 flex flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5 text-[11px]',
+        styles,
+      )}
+      title={
+        hasSourceReg
+          ? `Output регламента «${trigger.source_regulation}»${trigger.source_output ? ` / ${trigger.source_output}` : ''} наполняет этот параметр`
+          : hasSensor
+            ? `Событие от датчика «${subtype?.label ?? trigger.sensor_subtype}» наполняет этот параметр`
+            : 'Триггер существует, но источник к нему не привязан'
+      }
+    >
+      {hasSourceReg ? (
+        <>
+          <Network size={11} className="text-violet-600" />
+          <span className="font-medium">Регламент:</span>
+          <span className="rounded bg-white/70 px-1 py-px font-mono">
+            {trigger.source_regulation}
+          </span>
+          {trigger.source_output && (
+            <>
+              <span className="mx-0.5 text-violet-400">/</span>
+              <span className="rounded bg-white/70 px-1 py-px font-mono">
+                {trigger.source_output}
+              </span>
+            </>
+          )}
+        </>
+      ) : hasSensor ? (
+        <>
+          <Zap size={11} className="text-amber-600" />
+          <span className="font-medium">Датчик:</span>
+          <span className="rounded bg-white/70 px-1 py-px font-mono">
+            {trigger.sensor_subtype}
+          </span>
+          {subtype?.label && (
+            <span className="text-stone-600">— {subtype.label}</span>
+          )}
+        </>
+      ) : (
+        <>
+          <Zap size={11} className="text-stone-400" />
+          <span>Триггер «{trigger.id}» — источник не привязан</span>
+        </>
+      )}
+      {hasEvent && (
+        <>
+          <span className="mx-1 text-stone-300">·</span>
+          <Send size={10} className={hasAnySource ? 'text-stone-500' : 'text-stone-400'} />
+          <span className="rounded bg-white/70 px-1 py-px font-mono">
+            {trigger.event_type}
+          </span>
+        </>
+      )}
+    </div>
+  )
+}
+
+
+// ──────────────────────────────────────────────────────────
+// Источник триггера — сегмент «Датчик / Регламент / —» + соответствующие селекты.
+// Реализует event-driven композицию: триггер может слушать либо физический
+// датчик из Sensor Library (sensor_subtype), либо output другого регламента
+// (source_regulation + source_output). Взаимоисключающие источники — при
+// переключении сбрасываем поля прошлого режима.
+// ──────────────────────────────────────────────────────────
+
+type TriggerSourceMode = 'sensor' | 'regulation' | 'none'
+
+function inferSourceMode(t: RegulationTrigger): TriggerSourceMode {
+  if (t.source_regulation) return 'regulation'
+  if (t.sensor_subtype) return 'sensor'
+  return 'none'
+}
+
+function TriggerSourcePicker({
+  trigger,
+  classes,
+  allRegulations,
+  onPatch,
+}: {
+  trigger: RegulationTrigger
+  classes: Array<{ class_id: string; subtypes: Array<{ subtype_id: string; label: string }> }>
+  allRegulations: Array<{ id: string; name: string; domain?: string | null }>
+  onPatch: (p: Partial<RegulationTrigger>) => void
+}) {
+  const mode = inferSourceMode(trigger)
+  // Output-actions выбранного source_regulation — для второго селекта.
+  const { data: outputData } = useQuery({
+    queryKey: ['regulation-output-actions', trigger.source_regulation],
+    queryFn: () => api.regulations.outputActions(trigger.source_regulation as string),
+    enabled: mode === 'regulation' && !!trigger.source_regulation,
+  })
+  const outputActions = outputData?.actions ?? []
+
+  const setMode = (next: TriggerSourceMode) => {
+    if (next === 'sensor') {
+      onPatch({ source_regulation: null, source_output: null })
+    } else if (next === 'regulation') {
+      onPatch({ sensor_subtype: null })
+    } else {
+      onPatch({ sensor_subtype: null, source_regulation: null, source_output: null })
+    }
+  }
+
+  const segmentOption = (
+    label: string,
+    icon: typeof Radio,
+    value: TriggerSourceMode,
+  ) => {
+    const Icon = icon
+    const active = mode === value
+    return (
+      <button
+        key={value}
+        type="button"
+        onClick={() => setMode(value)}
+        className={cn(
+          'inline-flex items-center gap-1 px-2 py-1 text-[11px] transition',
+          active
+            ? 'bg-white font-semibold text-stone-800 shadow-sm'
+            : 'text-stone-500 hover:bg-stone-50',
+        )}
+      >
+        <Icon size={11} />
+        {label}
+      </button>
+    )
+  }
+
+  return (
+    <div className="mt-2.5 rounded-md border border-stone-200 bg-stone-50/60 p-2">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-500">
+          Источник
+        </span>
+        <div className="inline-flex overflow-hidden rounded border border-stone-200 bg-stone-100">
+          {segmentOption('Датчик', Radio, 'sensor')}
+          {segmentOption('Регламент', Network, 'regulation')}
+          {segmentOption('—', CircleSlash, 'none')}
+        </div>
+      </div>
+
+      {mode === 'sensor' && (
+        <div>
+          <select
+            value={trigger.sensor_subtype ?? ''}
+            onChange={(e) => onPatch({ sensor_subtype: e.target.value || null })}
+            className={cn(tx, 'pr-7')}
+          >
+            <option value="">— выберите подтип датчика —</option>
+            {classes.map((c) => (
+              <optgroup key={c.class_id} label={c.class_id}>
+                {c.subtypes.map((s) => (
+                  <option key={s.subtype_id} value={s.subtype_id}>
+                    {s.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {mode === 'regulation' && (
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <FormRow label="Регламент-источник" icon={Network} compact>
+            <select
+              value={trigger.source_regulation ?? ''}
+              onChange={(e) => onPatch({
+                source_regulation: e.target.value || null,
+                // При смене источника сбрасываем выбранный action — он мог быть
+                // у прошлого регламента, у нового его может не быть.
+                source_output: null,
+              })}
+              className={cn(tx, 'pr-7')}
+            >
+              <option value="">— выберите регламент —</option>
+              {allRegulations.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name} ({r.id})
+                </option>
+              ))}
+            </select>
+          </FormRow>
+          <FormRow label="Output (action)" icon={Send} compact>
+            <select
+              value={trigger.source_output ?? ''}
+              onChange={(e) => onPatch({ source_output: e.target.value || null })}
+              className={cn(tx, 'pr-7')}
+              disabled={!trigger.source_regulation}
+              title={
+                !trigger.source_regulation
+                  ? 'Сначала выберите регламент-источник'
+                  : outputActions.length === 0
+                    ? 'У выбранного регламента нет output-action`ов в flow.json'
+                    : undefined
+              }
+            >
+              <option value="">— любой вердикт —</option>
+              {outputActions.map((a) => (
+                <option key={a.action} value={a.action}>
+                  {a.label} ({a.action})
+                </option>
+              ))}
+            </select>
+          </FormRow>
+        </div>
+      )}
+
+      {mode === 'none' && (
+        <p className="text-[11px] text-stone-500">
+          Триггер без источника — может быть наполнен вручную оператором или ETL'ом по `event_type`.
+        </p>
+      )}
+    </div>
+  )
+}
+
+
+// ──────────────────────────────────────────────────────────
 // Триггеры — список с привязкой к параметру и подтипу датчика
 // ──────────────────────────────────────────────────────────
 
 function TriggersList({
   triggers,
   parameters,
+  currentRegulationId,
   onPatch,
   onRemove,
 }: {
   triggers: RegulationTrigger[]
   parameters: Parameter[]
+  currentRegulationId: string
   onPatch: (idx: number, p: Partial<RegulationTrigger>) => void
   onRemove: (idx: number) => void
 }) {
@@ -642,6 +1012,28 @@ function TriggersList({
     () => classes.flatMap((c) => c.subtypes),
     [classes],
   )
+  // Все регламенты для селекта source_regulation. Исключаем текущий, чтобы
+  // нельзя было сделать self-loop. Кросс-цикл (A→B→A) пока не детектим —
+  // оставим на будущее (нужен топологический обход регламентов).
+  const { data: datasetsRaw } = useQuery({
+    queryKey: ['datasets'],
+    queryFn: () => api.datasets.list(),
+  })
+  const allRegulations = useMemo<Array<{ id: string; name: string; domain?: string | null }>>(() => {
+    if (!datasetsRaw) return []
+    const items: Array<{ id: string; name?: string; domain?: string | null }> =
+      Array.isArray(datasetsRaw)
+        ? datasetsRaw
+        : ('items' in datasetsRaw && Array.isArray(datasetsRaw.items) ? datasetsRaw.items : [])
+    return items
+      .filter((r) => r.id !== currentRegulationId)
+      .map((r) => ({ id: r.id, name: r.name ?? r.id, domain: r.domain }))
+      .sort(
+        (a, b) =>
+          (a.domain ?? '').localeCompare(b.domain ?? '') ||
+          a.name.localeCompare(b.name),
+      )
+  }, [datasetsRaw, currentRegulationId])
 
   if (triggers.length === 0) {
     return (
@@ -692,7 +1084,7 @@ function TriggersList({
                   <Trash2 size={13} />
                 </button>
               </div>
-              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[1.2fr_1.2fr_1.6fr_1.4fr]">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-[1.2fr_1.2fr_1.4fr]">
                 <FormRow label="Метка" icon={Tag} compact>
                   <input
                     value={t.label ?? ''}
@@ -718,24 +1110,6 @@ function TriggersList({
                     )}
                   </select>
                 </FormRow>
-                <FormRow label="Датчик" icon={Radio} compact>
-                  <select
-                    value={t.sensor_subtype ?? ''}
-                    onChange={(e) => onPatch(idx, { sensor_subtype: e.target.value || null })}
-                    className={cn(tx, 'pr-7')}
-                  >
-                    <option value="">— не привязан —</option>
-                    {classes.map((c) => (
-                      <optgroup key={c.class_id} label={c.class_id}>
-                        {c.subtypes.map((s) => (
-                          <option key={s.subtype_id} value={s.subtype_id}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                </FormRow>
                 <FormRow label="Тип события" icon={Send} compact>
                   <input
                     value={t.event_type ?? ''}
@@ -745,6 +1119,12 @@ function TriggersList({
                   />
                 </FormRow>
               </div>
+              <TriggerSourcePicker
+                trigger={t}
+                classes={classes}
+                allRegulations={allRegulations}
+                onPatch={(p) => onPatch(idx, p)}
+              />
               {subtype?.description && (
                 <p className="mt-2 text-[11px] leading-relaxed text-stone-500">
                   {subtype.description}

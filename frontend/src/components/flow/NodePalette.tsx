@@ -34,7 +34,12 @@ const SECTIONS: PaletteSection[] = [
 
 export function NodePalette() {
   return (
-    <aside className="flex w-48 shrink-0 flex-col gap-3 border-r border-stone-200 bg-stone-50 p-3 text-sm">
+    // h-full + min-h-0 нужны чтобы flex-родитель ограничил высоту палитры
+    // высотой экрана; иначе блоки рендерятся «вниз» и нижние (SHACL,
+    // ограничения, подсказка) уходят под viewport на низких разрешениях
+    // или при браузерном zoom=100%. `overflow-y-auto` включает скролл,
+    // overscroll-contain — не даёт скроллу провалиться в canvas.
+    <aside className="flex h-full min-h-0 w-48 shrink-0 flex-col gap-3 overflow-y-auto overscroll-contain border-r border-stone-200 bg-stone-50 p-3 text-sm">
       {SECTIONS.map((section) => (
         <div key={section.title} className="flex flex-col gap-1.5">
           <div className="px-1 text-[10px] font-semibold uppercase tracking-wide text-stone-500">

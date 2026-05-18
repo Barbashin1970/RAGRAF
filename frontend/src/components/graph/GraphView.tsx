@@ -214,6 +214,23 @@ export function GraphView() {
             'text-rotation': 'autorotate',
           },
         },
+        // Композиционные рёбра «output регламента A → trigger регламента B»
+        // — отдельная стилизация: фиолетовая жирная линия с пунктиром.
+        // Селектор по префиксу label, который backend проставляет как
+        // `triggers_regulation:<action>` в `graph_builder.py`.
+        {
+          selector: 'edge[label ^= "triggers_regulation"]',
+          style: {
+            width: 2,
+            'line-color': '#7C3AED',
+            'line-style': 'dashed',
+            'target-arrow-color': '#7C3AED',
+            'target-arrow-shape': 'triangle',
+            color: '#5B21B6',
+            'font-size': 9,
+            'font-weight': 600,
+          },
+        },
         {
           selector: 'node:selected',
           style: { 'border-color': '#1A202C', 'border-width': 2 },

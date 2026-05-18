@@ -1,5 +1,6 @@
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { Activity, Beaker, BookOpen, ExternalLink, FileJson, ListTree, PlayCircle, Radar } from 'lucide-react'
+import { Activity, Beaker, BookOpen, ExternalLink, FileJson, ListTree, Maximize2, Minimize2, PlayCircle, Radar } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { GraphView } from '@/components/graph/GraphView'
 import { LandingScreen } from '@/components/landing/LandingScreen'
 import { RegulationList } from '@/components/regulations/RegulationList'
@@ -79,10 +80,51 @@ function ExecutionNavLink() {
  * Docs-меню в шапке справа: ведёт на FastAPI Swagger UI (/docs), ReDoc (/redoc)
  * и сырой OpenAPI JSON. Пробрасывается через vite proxy на backend :8000.
  *
- * Аналог http://109.202.1.153:8958/docs# для нашего бэкенда — чтобы можно было
- * визуально проверять API: какие эндпоинты доступны, схемы запросов/ответов,
- * пробовать «Try it out» прямо из браузера.
+ * Назначение — визуально проверять собственное API RAGRAF: какие эндпоинты
+ * доступны, схемы запросов/ответов, пробовать «Try it out» прямо из браузера.
  */
+/**
+ * Кнопка перехода в Fullscreen режим браузера — скрывает строку браузера
+ * (URL bar, табы) и даёт максимум места под канвас/таблицы. Особенно полезно
+ * для Flow Editor: при 100% масштабе нижние блоки палитры и SHACL уходят
+ * под viewport, fullscreen возвращает им место.
+ *
+ * Использует стандартный Fullscreen API. `document.documentElement.requestFullscreen()`
+ * охватывает всю страницу — не только текущий компонент.
+ */
+function FullscreenToggle() {
+  const [isFs, setIsFs] = useState<boolean>(
+    typeof document !== 'undefined' && Boolean(document.fullscreenElement),
+  )
+  useEffect(() => {
+    const onChange = () => setIsFs(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onChange)
+    return () => document.removeEventListener('fullscreenchange', onChange)
+  }, [])
+  const toggle = () => {
+    if (document.fullscreenElement) {
+      void document.exitFullscreen()
+    } else {
+      // Если браузер не поддерживает (Safari < 16.4 webkit-only) — тихо игнорим;
+      // shimming через webkitRequestFullscreen не делаем, чтобы не разрастаться.
+      void document.documentElement.requestFullscreen?.()
+    }
+  }
+  const Icon = isFs ? Minimize2 : Maximize2
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      title={isFs ? 'Выйти из полноэкранного режима' : 'На весь экран (скрыть строку браузера)'}
+      aria-label={isFs ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 hover:bg-stone-50 hover:text-stone-800"
+    >
+      <Icon size={14} />
+    </button>
+  )
+}
+
+
 function DocsMenu() {
   const items: Array<{ href: string; icon: typeof BookOpen; label: string; hint: string }> = [
     { href: '/docs',         icon: BookOpen,    label: 'Swagger UI', hint: 'Интерактивная документация с Try-it-out' },
@@ -120,12 +162,13 @@ function DocsMenu() {
           )
         })}
         <div className="mt-1 border-t border-stone-100 px-2 py-1.5 text-[10px] text-stone-400">
-          Для сравнения: upstream Sigma docs —{' '}
+          Референс модели данных (прототип Sigma) —{' '}
           <a
             href="http://109.202.1.153:8958/docs"
             target="_blank"
             rel="noreferrer"
             className="underline hover:text-stone-600"
+            title="Исходный API-референс, с которого списан контракт; RAGRAF на проде к нему не обращается"
           >
             109.202.1.153:8958/docs
           </a>
@@ -174,6 +217,7 @@ export default function App() {
             <span className="hidden text-xs text-stone-500 lg:inline">
               визуализатор и редактор регламентов
             </span>
+            <FullscreenToggle />
             <DocsMenu />
           </div>
         </header>

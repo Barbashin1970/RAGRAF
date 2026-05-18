@@ -425,6 +425,48 @@ async def import_sigma_bundle(file: UploadFile = File(...)) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=f"Импорт не удался: {e}") from e
 
 
+@router.get("/regulations/{source_id}/triggered-by")
+def list_triggered_by(source_id: str) -> dict[str, Any]:
+    """Какие регламенты слушают output этого регламента (композиция).
+
+    Reverse-lookup для event-driven цепочки. UI рисует плашку
+    «этот регламент является триггером для N других» в Edit/«Поля».
+    """
+    triggers = regulation_store.list_triggered_by(source_id)
+    return {
+        "regulation_id": source_id,
+        "count": len({t["regulation_id"] for t in triggers}),
+        "triggers": triggers,
+    }
+
+
+@router.get("/regulations/{source_id}/output-actions")
+def list_output_actions(source_id: str) -> dict[str, Any]:
+    """Список output-actions регламента — для селекта при настройке композиции.
+
+    Читает flow.json регламента, возвращает уникальные action-ноды
+    (output type='output' с непустым `action`). UI секции «Триггеры»:
+    когда пользователь выбрал source_regulation = X, селект `source_output`
+    подгружается этим endpoint'ом.
+    """
+    from app.services.flow_storage import load_flow
+
+    flow = load_flow(source_id)
+    actions: list[dict[str, str]] = []
+    seen: set[str] = set()
+    if flow is not None:
+        for node in flow.nodes:
+            if node.type == "output" and node.action and node.action not in seen:
+                actions.append({
+                    "action": node.action,
+                    "label": node.label or node.action,
+                    "text": (node.text or "")[:200],
+                    "priority": node.priority or 2,
+                })
+                seen.add(node.action)
+    return {"regulation_id": source_id, "actions": actions}
+
+
 @router.delete("/regulations/{source_id}")
 async def delete_regulation(source_id: str, confirm: bool = False) -> dict[str, Any]:
     """Безопасное удаление регламента.

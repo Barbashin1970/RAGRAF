@@ -313,6 +313,14 @@ def regulation_to_turtle(reg: Regulation) -> str:
                 g.add((trig_uri, REG_NS["sensorSubtype"], Literal(t.sensor_subtype)))
             if t.event_type:
                 g.add((trig_uri, REG_NS["eventType"], Literal(t.event_type)))
+            # Композиция: триггер слушает output ДРУГОГО регламента. Это
+            # декларация event-driven цепочки между регламентами без необходи-
+            # мости передавать данные через flow.json. SIGMA при импорте видит
+            # эту связь и может построить runtime-маршрутизацию vert.→vert.
+            if t.source_regulation:
+                g.add((trig_uri, REG_NS["sourceRegulation"], Literal(t.source_regulation)))
+            if t.source_output:
+                g.add((trig_uri, REG_NS["sourceOutput"], Literal(t.source_output)))
             if t.description:
                 g.add((trig_uri, REG_NS["description"], Literal(t.description, lang="ru")))
 
@@ -534,6 +542,8 @@ def parse_regulation_turtle(
                 param_ref=param_ref,
                 sensor_subtype=trig_props.get("sensorSubtype"),
                 event_type=trig_props.get("eventType"),
+                source_regulation=trig_props.get("sourceRegulation"),
+                source_output=trig_props.get("sourceOutput"),
                 description=trig_props.get("description"),
             )
         )

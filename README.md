@@ -1,6 +1,6 @@
 # RAGRAF
 
-**RAGRAF** — web-сервис визуализации и редактирования регламентов промышленных и городских систем. Работает поверх REST-API управления регламентами Sigma (`http://109.202.1.153:8958`), подмешивает GraphRAG-движок [RAGU](https://github.com/RaguTeam/RAGU) для семантического обогащения и предоставляет три взаимосвязанные рабочие среды:
+**RAGRAF** — web-сервис визуализации и редактирования регламентов промышленных и городских систем. В качестве исходного **референса модели данных** (SHACL/OWL Turtle, контракт `/api/v1/regulations/{id}/{data,shapes}`) брался прототип Sigma по адресу `http://109.202.1.153:8958` — но это именно референс; на проде RAGRAF самодостаточен: source of truth — локальный DuckDB-store, фикстуры — seed, апстрим в коде остался как опциональная интеграция (выключена флагом `USE_FIXTURES=true` + `WRITEBACK_UPSTREAM=false`). Подмешивает GraphRAG-движок [RAGU](https://github.com/RaguTeam/RAGU) для семантического обогащения и предоставляет три взаимосвязанные рабочие среды:
 
 - **Graph View** — обзорная карта знаний всех регламентов на Cytoscape.js (force-directed layout, фильтрация по доменам).
 - **Rule Flow Editor** — визуальный node-based редактор правил реагирования на React Flow (7 типов узлов, DnD-палитра, валидация, версионирование).
@@ -166,32 +166,33 @@ Tree-CRUD по двухуровневой модели **класс → подт
             ▼                    ▼                    ▼
 ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
 │  DuckDB store    │  │  JSON snapshots  │  │ regulation_client │
-│ regulations.duck │  │ data/flows/      │  │  (httpx → 8958)   │
-│ + parameters     │  │ data/versions/   │  │                   │
-│ + history        │  │                  │  │                   │
+│ regulations.duck │  │ data/flows/      │  │  (опционально)    │
+│ + parameters     │  │ data/versions/   │  │  httpx, выключен  │
+│ + history        │  │                  │  │  по умолчанию     │
 └──────────────────┘  └──────────────────┘  └──────────────────┘
-   authoritative         flow drafts            upstream proxy
-   for editable           + immutable        (used when fixtures
-   regulation data           snapshots         are disabled)
-            │                                          ▲
-            │                                          │
-            ▼                              ┌───────────┴───────┐
-   ┌─────────────────┐                     │ Upstream Sigma    │
-   │ data/fixtures/  │ ── seed at init ──► │ Apache Jena       │
-   │ *.ttl (Rules-   │                     │ 109.202.1.153:    │
-   │ Management.pdf, │                     │ 8958              │
-   │ demo-sigma,     │                     └───────────────────┘
-   │ NSK ecology)    │                              ▲
-   └─────────────────┘                              │
-   golden seed files                  WRITEBACK_UPSTREAM=true →
-   (never mutated)                  PUT /data + PUT /shapes
+   authoritative         flow drafts            optional upstream
+   source of truth       + immutable         (на проде выключено;
+   для всех данных          snapshots         референс-API Sigma)
+            │
+            │
+            ▼
+   ┌─────────────────┐
+   │ data/fixtures/  │ ── seed at init ──► DuckDB store
+   │ *.ttl           │
+   │ (Rules-Mgmt PDF,│        Контракт референса (для совместимости):
+   │  demo-sigma,    │        /api/v1/regulations/{id}/{data,shapes}
+   │  NSK ecology,   │        Включить интеграцию: REGULATION_API_URL=…
+   │  Koltsovo EDDS) │                       + USE_FIXTURES=false
+   └─────────────────┘                       + WRITEBACK_UPSTREAM=true
+   golden seed files
+   (never mutated)
 ```
 
 **Источники и приоритеты при чтении `GET /api/regulations/{id}`:**
 
-1. DuckDB store (если регламент редактировался — `regulations.duckdb` создаётся автоматически при первом старте)
-2. Локальная фикстура (для не-редактировавшихся регламентов или при `USE_FIXTURES=true`)
-3. Upstream Sigma API (когда `USE_FIXTURES=false` и в store пусто)
+1. DuckDB store (authoritative — `regulations.duckdb` создаётся автоматически при первом старте, сидится из фикстур)
+2. Локальная фикстура (для не-редактировавшихся регламентов при `USE_FIXTURES=true` — дефолт)
+3. Upstream Sigma API (**опционально**; срабатывает только если `USE_FIXTURES=false` и в store пусто — по умолчанию выключено, в проде не используется. Оставлен как путь обратной интеграции с прототипом-референсом).
 
 **Запись `PUT /api/regulations/{id}`:**
 - Всегда пишем в DuckDB (создаётся snapshot в `regulation_history`)
@@ -804,22 +805,28 @@ npm run test:watch      # watch-mode
 | `GET` | `/api/graph/regulation/{id}` | Подграф одного регламента |
 | `POST` | `/api/search` | Семантический поиск через RAGU (`{query, mode}`) |
 
-Upstream проксируется: `109.202.1.153:8958/api/v1/regulations/{source_id}/{data,shapes}` + `/admin/datasets/`.
+Опциональная интеграция с референсным прототипом Sigma — пути `/api/v1/regulations/{source_id}/{data,shapes}` + `/admin/datasets/` (контракт взят как образец для собственной модели, на проде RAGRAF к нему не обращается; включается явным `USE_FIXTURES=false`).
 
 ---
 
 ## Конфигурация (`.env`)
 
 ```env
-# Upstream
+# Upstream — ОПЦИОНАЛЬНО. Историческая ссылка на референс-прототип Sigma,
+# с которого мы списали контракт /api/v1/regulations/{id}/{data,shapes}.
+# На production-инстансах RAGRAF к этому хосту НЕ обращается — все данные
+# берутся из локального DuckDB-store + фикстур. Эти переменные нужны только
+# тем, кто хочет включить round-trip с реальным upstream'ом.
 REGULATION_API_URL=http://109.202.1.153:8958
 REGULATION_API_TIMEOUT=15
 
 # Источник данных при GET (если в DuckDB нет правок)
-USE_FIXTURES=true               # true = только локальные фикстуры; false = пробовать upstream
+USE_FIXTURES=true               # дефолт: только локальные фикстуры/DuckDB; upstream НЕ дёргается
+                                # false = пробовать опциональный upstream (см. выше)
 
 # Запись наверх в upstream при сохранении регламента (PUT /regulations/{id})
-WRITEBACK_UPSTREAM=false        # true = после DuckDB-сохранения публикуем Turtle в upstream PUT /data
+WRITEBACK_UPSTREAM=false        # дефолт: запись только в локальный DuckDB
+                                # true = после save() публикуем Turtle в upstream PUT /data
 
 # RAGU (опционально)
 RAGU_ENABLED=false

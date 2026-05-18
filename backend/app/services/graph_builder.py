@@ -118,6 +118,30 @@ def regulation_to_subgraph(reg: Regulation) -> GraphPayload:
             )
         )
 
+    # Event-driven композиция: если у регламента есть триггер с source_regulation,
+    # добавляем ребро от регламента-источника к этому. На merge_graphs обе ноды
+    # склеятся через id `reg:{...}`, узел source-регламента уже будет добавлен
+    # его собственным subgraph'ом. label несёт имя action'а (или 'any output')
+    # для подсветки конкретного канала.
+    for t in reg.triggers:
+        if not t.source_regulation:
+            continue
+        source_reg_node_id = f"reg:{t.source_regulation}"
+        edges.append(
+            CyEdge(
+                data=CyEdgeData(
+                    id=f"{source_reg_node_id}__triggers_regulation__{reg_id}__{t.id}",
+                    source=source_reg_node_id,
+                    target=reg_id,
+                    # «triggers_regulation» — отдельный тип ребра для frontend
+                    # GraphView, чтобы он стилизовал такие связи иначе (другой
+                    # цвет/стрелка) — это композиционная зависимость, не
+                    # структурная (parameter / constraint / recommendation).
+                    label=f"triggers_regulation:{t.source_output or 'any'}",
+                )
+            )
+        )
+
     for r in reg.recommendations:
         rid = f"rec:{reg.id}:{r.id}"
         # На холсте — короткий человечный заголовок; полный текст идёт в description,

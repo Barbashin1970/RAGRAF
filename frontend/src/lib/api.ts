@@ -99,6 +99,11 @@ export interface RegulationTrigger {
   param_ref: string
   sensor_subtype?: string | null
   event_type?: string | null
+  // Композиция регламентов: триггер слушает output другого регламента.
+  // source_regulation взаимоисключен с sensor_subtype (логически — UI делает
+  // переключатель «датчик / другой регламент»), но обе пары необязательны.
+  source_regulation?: string | null
+  source_output?: string | null
   description?: string | null
 }
 
@@ -376,6 +381,35 @@ export const api = {
       request(`/api/regulations/${encodeURIComponent(id)}/publish`, { method: 'POST' }, regulationSchema),
     archive: (id: string) =>
       request(`/api/regulations/${encodeURIComponent(id)}/archive`, { method: 'POST' }, regulationSchema),
+    // Композиция регламентов: какие регламенты слушают output этого.
+    triggeredBy: (id: string) =>
+      request<{
+        regulation_id: string
+        count: number
+        triggers: Array<{
+          regulation_id: string
+          regulation_name: string
+          domain?: string | null
+          trigger_id: string
+          trigger_label?: string | null
+          param_ref: string
+          source_output?: string | null
+          event_type?: string | null
+        }>
+      }>(`/api/regulations/${encodeURIComponent(id)}/triggered-by`),
+    // Output-action'ы этого регламента — для селекта source_output в секции
+    // «Триггеры» при настройке композиции (выбрали source_regulation = X →
+    // подгружаются доступные action'ы X из его flow.json).
+    outputActions: (id: string) =>
+      request<{
+        regulation_id: string
+        actions: Array<{
+          action: string
+          label: string
+          text: string
+          priority: number
+        }>
+      }>(`/api/regulations/${encodeURIComponent(id)}/output-actions`),
     /**
      * Загрузить документ-основание (PDF / DOCX / etc.) для регламента.
      * Backend сохранит файл в `data/source_documents/{id}/`, посчитает SHA-256

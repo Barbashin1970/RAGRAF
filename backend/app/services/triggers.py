@@ -138,6 +138,136 @@ def derive_triggers_from_flow(
     return triggers
 
 
+def reconcile_triggers_with_flow(
+    existing: list[RegulationTrigger],
+    dsl: RuleDSL,
+    parameters: list[Parameter],
+) -> list[RegulationTrigger]:
+    """Sync Flow → Triggers: согласовать триггеры регламента с актуальным flow.
+
+    Вызывается из PUT /regulations/{id}/flow после save_flow + derive_params.
+    Закрывает дыру: пользователь перетащил sensor-ноду в Flow Editor — но
+    декларация триггера в регламенте оставалась прежней, виден разрыв в
+    Turtle / Edit / Sensor Library reverse-lookup.
+
+    Стратегия (приоритет — НЕ затирать ручной ввод пользователя):
+      1) Если в flow появилась ЯВНАЯ привязка sensor → input (через
+         sensor.bindsTo), обновляем sensor_subtype триггера соответствующего
+         input.paramRef. Это «пользователь нарисовал sensor на канвасе —
+         хочу чтобы это попало в декларацию».
+      2) Если в flow привязки нет, но триггер уже есть (был отредактирован
+         руками в Edit/«Триггеры»), оставляем sensor_subtype как есть —
+         ручной ввод приоритетен. Меняем только label если он раньше был
+         равен param_ref (auto-сгенерирован).
+      3) Если в flow есть input.paramRef, но триггера для него нет — создаём
+         новый триггер (sensor_subtype из flow если есть, иначе None;
+         event_type — по эвристике PARAM_TO_EVENT_TYPE).
+      4) Orphan-триггеры (param_ref которого нет ни в parameters, ни в input-
+         нодах flow) — удаляем. Это нормальная зачистка после рефакторинга
+         регламента; если триггер был кустарным (без параметра), он удалится
+         когда пользователь удалит соответствующий параметр.
+
+    Параметры передаём отдельно (`parameters`) потому что после save_flow
+    они уже синхронизированы с flow через derive_params_from_flow — это
+    источник правды о том, что есть в регламенте сейчас.
+    """
+    # Индекс существующих триггеров по param_ref. param_ref уникален в рамках
+    # регламента de facto (UI не позволяет два триггера на один параметр),
+    # хотя SHACL это пока не enforces. Если дубли есть — берём первый.
+    existing_by_param: dict[str, RegulationTrigger] = {}
+    for t in existing:
+        existing_by_param.setdefault(t.param_ref, t)
+
+    # Индекс flow: input_id → (paramRef, label)
+    input_params: dict[str, tuple[str, str | None]] = {}
+    for node in dsl.nodes:
+        if node.type == "input" and node.paramRef:
+            input_params[node.id] = (node.paramRef, node.label)
+    # Индекс sensor: input_id → sensor_subtype
+    sensor_by_input: dict[str, str] = {}
+    for node in dsl.nodes:
+        if node.type == "sensor" and node.bindsTo and node.sensorSubtype:
+            sensor_by_input[node.bindsTo] = node.sensorSubtype
+
+    # Множество допустимых param_ref'ов: всё что есть в parameters + всё что
+    # есть в flow inputs. Триггеры с param_ref вне этого множества — orphans,
+    # вычистим.
+    valid_param_refs = {p.name for p in parameters} | {
+        pr for (pr, _) in input_params.values()
+    }
+
+    out: list[RegulationTrigger] = []
+
+    # Первый проход: триггеры для input-нод flow (порядок берём из flow,
+    # это даёт стабильный визуальный порядок в UI).
+    handled_param_refs: set[str] = set()
+    for input_id, (param_ref, label) in input_params.items():
+        handled_param_refs.add(param_ref)
+        explicit_subtype = sensor_by_input.get(input_id)
+        prior = existing_by_param.get(param_ref)
+        if prior is not None:
+            # Обновляем существующий триггер. Не затираем ручной ввод:
+            #   - sensor_subtype: если flow дал явный sensor → обновляем;
+            #     иначе оставляем как было (мог быть выбран в секции «Триггеры»).
+            #   - event_type / description: оставляем как было (пользователь
+            #     мог дописать руками).
+            #   - label: обновляем только если был auto-сгенерирован (== param_ref);
+            #     если пользователь дал свой — оставляем.
+            new_label = prior.label
+            if new_label in (None, "", prior.param_ref) and label:
+                new_label = label
+            new_subtype = (
+                explicit_subtype
+                if explicit_subtype is not None
+                else prior.sensor_subtype
+            )
+            out.append(
+                RegulationTrigger(
+                    id=prior.id,
+                    label=new_label,
+                    param_ref=param_ref,
+                    sensor_subtype=new_subtype,
+                    event_type=prior.event_type,
+                    description=prior.description,
+                )
+            )
+        else:
+            # Новый триггер — создаём с подсказками PARAM_TO_*.
+            inferred_subtype = (
+                explicit_subtype
+                if explicit_subtype is not None
+                else PARAM_TO_SUBTYPE_HINT.get(param_ref)
+            )
+            inferred_event = PARAM_TO_EVENT_TYPE.get(param_ref)
+            out.append(
+                RegulationTrigger(
+                    id=f"trig-{param_ref}",
+                    label=label or param_ref,
+                    param_ref=param_ref,
+                    sensor_subtype=inferred_subtype,
+                    event_type=inferred_event,
+                    description=(
+                        "Создан из flow: sensor привязан явно"
+                        if explicit_subtype
+                        else "Создан из flow: sensor выведен эвристикой"
+                    ),
+                )
+            )
+
+    # Второй проход: триггеры, которых нет в input-нодах flow, но которые
+    # ссылаются на существующие параметры. Сохраняем (пользователь мог
+    # создать триггер вручную в Edit, не заводя input-ноду в flow). Те,
+    # что ссылаются на удалённые параметры (orphan), пропускаем.
+    for param_ref, t in existing_by_param.items():
+        if param_ref in handled_param_refs:
+            continue
+        if param_ref in valid_param_refs:
+            out.append(t)
+        # else: orphan → удаляем
+
+    return out
+
+
 def derive_triggers_from_parameters(
     parameters: list[Parameter],
     *,

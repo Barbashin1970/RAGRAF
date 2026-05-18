@@ -117,18 +117,22 @@ TAGS_METADATA = [
 app = FastAPI(
     title="RAGRAF API",
     version="0.1.0",
-    summary="Визуализатор и редактор регламентов поверх Regulation Management API (Sigma)",
+    summary="Визуализатор и редактор регламентов (event-driven, с триггерами и Sensor Library)",
     description=(
-        "REST API сервиса **RAGRAF** — слой над upstream Sigma "
-        "([109.202.1.153:8958](http://109.202.1.153:8958/docs)) с собственным "
-        "хранилищем правок (DuckDB) и слоем сериализации Regulation ↔ Turtle / SHACL.\n\n"
+        "REST API сервиса **RAGRAF** — самостоятельный сервис управления регламентами "
+        "со своим хранилищем (DuckDB), декларативными триггерами и библиотекой "
+        "JSON-контрактов событий. Контракт `/api/v1/regulations/{id}/{data,shapes}` "
+        "(SHACL/OWL Turtle) исторически взят как **референс** с прототипа Sigma "
+        "([109.202.1.153:8958](http://109.202.1.153:8958/docs)) — на проде RAGRAF "
+        "к нему не обращается, путь оставлен как опциональная интеграция.\n\n"
         "**Архитектура источников при чтении `/regulations/{id}`:**\n"
-        "1. DuckDB store (если регламент редактировался)\n"
-        "2. Локальная фикстура (golden seed из `Rules-Management.pdf`)\n"
-        "3. Upstream Sigma API (когда `USE_FIXTURES=false`)\n\n"
+        "1. DuckDB store — authoritative source of truth\n"
+        "2. Локальная фикстура (golden seed из `Rules-Management.pdf` + ЕДДС Кольцово и др.)\n"
+        "3. Upstream Sigma API — **опционально**, только при `USE_FIXTURES=false`\n\n"
         "**Запись через PUT:** всегда DuckDB + версия в `regulation_history`. "
-        "При `WRITEBACK_UPSTREAM=true` дополнительно публикуется в upstream `/data`.\n\n"
-        "Полная спецификация: [`regulation-viz-skill.md`](https://github.com/RaguTeam/RAGU). "
+        "При `WRITEBACK_UPSTREAM=true` (по дефолту выключено) дополнительно "
+        "публикуется в opt-in upstream `/data`.\n\n"
+        "Пояснительная записка по докрутке модели: [`RULES-MANAGEMENT.md`](../RULES-MANAGEMENT.md). "
         "Каталог фикстур: [`backend/data/fixtures/INDEX.md`](../backend/data/fixtures/INDEX.md)."
     ),
     contact={

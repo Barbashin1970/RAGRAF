@@ -74,6 +74,15 @@ class RegulationTrigger(BaseModel):
         не привязан к конкретному датчику (например, ручной ввод оператором).
       - `event_type` — тип события в ETL-шине ('telemetry.pressure',
         'video.intrusion'). None если фид сырой.
+      - `source_regulation` — FK на Regulation.id ДРУГОГО регламента, чей
+        output служит триггером. Используется для композиции регламентов:
+        регламент B активируется при срабатывании output'а регламента A.
+        Взаимоисключающее с sensor_subtype (триггер либо «слушаю датчик»,
+        либо «слушаю выход регламента»), но обоюдно опциональны.
+      - `source_output` — action из output-ноды другого регламента
+        (например 'smart_valve_close', 'request_walker_confirm'). Имеет
+        смысл только когда задан source_regulation. None = слушаем любой
+        вердикт регламента-источника.
       - `description` — дополнительное пояснение.
 
     Сериализация в data.ttl (см. turtle_bridge.py):
@@ -92,6 +101,8 @@ class RegulationTrigger(BaseModel):
     param_ref: str
     sensor_subtype: str | None = None
     event_type: str | None = None
+    source_regulation: str | None = None
+    source_output: str | None = None
     description: str | None = None
 
 
