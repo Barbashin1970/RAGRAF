@@ -341,9 +341,17 @@ def reconcile_flow_with_triggers(
             sensor_by_input[n.bindsTo] = n
 
     changed = False
+    # Индекс «какой sensor_subtype ожидает trigger для каждого input_id».
+    # None = «триггер очищен, sensor надо удалить из flow».
+    expected_subtype_by_input: dict[str, str | None] = {}
+    for t in triggers:
+        input_id = input_by_param.get(t.param_ref)
+        if input_id:
+            expected_subtype_by_input[input_id] = t.sensor_subtype
+
     for t in triggers:
         if not t.sensor_subtype:
-            continue  # триггеры без датчика flow не трогают
+            continue  # триггеры без датчика flow не трогают (создание/апдейт)
         input_id = input_by_param.get(t.param_ref)
         if not input_id:
             # input для этого param_ref ещё не существует в flow.json —
@@ -408,6 +416,49 @@ def reconcile_flow_with_triggers(
             if mutated:
                 diff["updated"].append(t.param_ref)
                 changed = True
+
+    # ── Удаление sensor-нод когда триггер очищен ─────────────────────────
+    # Юзер снял sensor в Edit/«Триггеры» (выбрал «—» или удалил триггер) →
+    # ожидает что pill-датчик исчезнет с канваса. Раньше reconcile_flow_with
+    # _triggers только ДОБАВЛЯЛ sensor'ы, никогда не удалял, считая что
+    # удаление — обратный синк через reconcile_triggers_with_flow. Это
+    # путало пользователя: «удалил трактор в Edit → в Поток он остался,
+    # источник правды разный».
+    #
+    # Правило: удаляем только sensor-ноды, которые БЫЛИ созданы trigger-
+    # sync'ом — opt-in признак — id начинается с `n_sensor_` (генератор
+    # выше использует именно этот префикс). Это защищает от случайного
+    # сноса sensor-нод, нарисованных юзером вручную с произвольным id.
+    nodes_to_remove: list[str] = []
+    for sensor_node in [n for n in flow.nodes if n.type == "sensor" and n.bindsTo]:
+        input_id = sensor_node.bindsTo
+        if input_id is None:
+            continue
+        if input_id not in expected_subtype_by_input:
+            # input есть в flow, но триггера на него нет — это значит юзер
+            # удалил триггер целиком. Sensor тоже снести.
+            should_remove = True
+        else:
+            expected = expected_subtype_by_input[input_id]
+            should_remove = (expected is None)
+        if should_remove and sensor_node.id.startswith("n_sensor_"):
+            nodes_to_remove.append(sensor_node.id)
+            # diff payload — для UI/тостов
+            param_ref = next(
+                (
+                    pr for pr, iid in input_by_param.items() if iid == input_id
+                ),
+                "",
+            )
+            if param_ref:
+                diff["removed"].append(param_ref)
+    if nodes_to_remove:
+        flow.nodes = [n for n in flow.nodes if n.id not in nodes_to_remove]
+        flow.edges = [
+            e for e in flow.edges
+            if e.source not in nodes_to_remove and e.target not in nodes_to_remove
+        ]
+        changed = True
 
     if changed:
         # Сохраняем напрямую через файл, минуя save_flow + создание
