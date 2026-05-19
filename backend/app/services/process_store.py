@@ -11,6 +11,11 @@ Process объединяет N регламентов в одну операци
 типичном размере процесса в 2-10 регламентов; при росте до 100+ — стоит
 выделить `process_regulations` с position.
 
+Connection sharing: используем regulation_store._connection() и
+regulation_store._LOCK — один DuckDB-singleton на файл `regulations.duckdb`.
+Вторая независимая связь с тем же файлом приводила к гонке WAL-flush'а —
+цифровые двойники терялись после рестарта (фикс 051).
+
 См. также:
   - app/schemas/domain.py:Process — Pydantic-модель;
   - app/api/processes.py — REST.
@@ -18,62 +23,20 @@ Process объединяет N регламентов в одну операци
 from __future__ import annotations
 
 import json
-import threading
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
-import duckdb
-
-from app.config import settings
 from app.schemas.domain import Process
-
-_LOCK = threading.RLock()
-_conn: duckdb.DuckDBPyConnection | None = None
-
-
-def _db_path() -> Path:
-    root = Path(settings.data_dir)
-    root.mkdir(parents=True, exist_ok=True)
-    return root / "regulations.duckdb"
-
-
-def _connection() -> duckdb.DuckDBPyConnection:
-    global _conn  # sigma:allow P3 — singleton lazy-init, не рекурсия; защищён _LOCK.
-    if _conn is None:
-        _conn = duckdb.connect(str(_db_path()))
-        _init_schema(_conn)
-    return _conn
-
-
-def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
-    c.execute(
-        """
-        CREATE TABLE IF NOT EXISTS processes (
-            id              VARCHAR PRIMARY KEY,
-            name            VARCHAR NOT NULL,
-            description     VARCHAR,
-            regulation_ids  JSON NOT NULL DEFAULT '[]',
-            created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
-
-
-def init_db() -> None:
-    """Вызывается из app/main.py lifespan."""
-    with _LOCK:
-        _connection()
+from app.services import regulation_store
 
 
 # ── CRUD ───────────────────────────────────────────────────────────────
 
 
 def list_all() -> list[Process]:
-    with _LOCK:
-        c = _connection()
+    with regulation_store._LOCK:
+        c = regulation_store._connection()
         rows = c.execute(
             """
             SELECT id, name, description, regulation_ids, created_at, updated_at
@@ -95,8 +58,8 @@ def list_all() -> list[Process]:
 
 
 def get(process_id: str) -> Process | None:
-    with _LOCK:
-        c = _connection()
+    with regulation_store._LOCK:
+        c = regulation_store._connection()
         row = c.execute(
             """
             SELECT id, name, description, regulation_ids, created_at, updated_at
@@ -124,8 +87,8 @@ def save(p: Process) -> Process:
     now = datetime.now(timezone.utc)
     new_id = p.id or uuid.uuid4().hex[:12]
     ids_json = json.dumps(p.regulation_ids or [], ensure_ascii=False)
-    with _LOCK:
-        c = _connection()
+    with regulation_store._LOCK:
+        c = regulation_store._connection()
         c.execute(
             """
             INSERT INTO processes (id, name, description, regulation_ids, created_at, updated_at)
@@ -138,14 +101,13 @@ def save(p: Process) -> Process:
             """,
             [new_id, p.name, p.description, ids_json, now, now],
         )
-        # Возвращаем актуальную запись (с серверным created_at / updated_at).
     return get(new_id) or Process(id=new_id, name=p.name, description=p.description,
                                   regulation_ids=list(p.regulation_ids))
 
 
 def delete(process_id: str) -> bool:
-    with _LOCK:
-        c = _connection()
+    with regulation_store._LOCK:
+        c = regulation_store._connection()
         existed = c.execute(
             "SELECT 1 FROM processes WHERE id = ?", [process_id],
         ).fetchone() is not None

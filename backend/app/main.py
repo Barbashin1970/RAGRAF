@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import audit_log, datasets, extraction_terms, flow, graph, modules, processes, ragu, regulations, sandbox, sensor_schemas, shacl, search, validate, versions
 from app.config import settings
-from app.services import process_store, regulation_store, sensor_schema_store
+from app.services import regulation_store, sensor_schema_store
 
 
 @asynccontextmanager
@@ -29,12 +29,10 @@ async def lifespan(_: FastAPI):
         extraction_term_store.init_db()
     except Exception as e:
         print(f"[lifespan] extraction_term_store.init_db failed: {e}")
-    # Цифровые двойники (Process) — DuckDB-таблица, пустая по умолчанию;
-    # пользователь создаёт их сам на странице /twins.
-    try:
-        process_store.init_db()
-    except Exception as e:
-        print(f"[lifespan] process_store.init_db failed: {e}")
+    # Цифровые двойники (Process) — таблица `processes` теперь создаётся
+    # вместе с остальной схемой в regulation_store._init_schema(). Отдельный
+    # init_db не нужен — это была вторая независимая DuckDB-связь, которая
+    # ломала WAL-flush на рестарте (фикс 051).
     # Демо-документы (ТЗ, ARC, ARC-SIGMA) — для онбординга в Студии аналитика.
     # Работает и без эмбеддингов: keyword-fallback в retrieve_relevant_chunks
     # обеспечивает осмысленный retrieval по словам из вопроса.

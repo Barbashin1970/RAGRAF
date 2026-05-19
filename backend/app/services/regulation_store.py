@@ -351,6 +351,29 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
         """
     )
 
+    # ── Processes (цифровые двойники процессов управления) ──────────────
+    # Process объединяет N регламентов в одну операционную картину для
+    # визуализации (Cytoscape-подграф), симуляции цепочек и экспорта.
+    # regulation_ids хранятся JSON-массивом — denormalized listing терпим
+    # при типичном размере процесса (2-10 регламентов).
+    #
+    # Схема создаётся ЗДЕСЬ (а не в process_store), чтобы все таблицы
+    # `regulations.duckdb` шарили один _connection() singleton. Иначе
+    # вторая DuckDB-связь с тем же файлом ловит race с WAL-flush'ем —
+    # цифровые двойники терялись после рестарта uvicorn.
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS processes (
+            id              VARCHAR PRIMARY KEY,
+            name            VARCHAR NOT NULL,
+            description     VARCHAR,
+            regulation_ids  JSON NOT NULL DEFAULT '[]',
+            created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
     # ── Миграции (одноразовые data-migrations) ───────────────────────────
     # Лёгкий tracker: имя миграции + applied_at. Используется для апгрейдов
     # данных, которые не выражаются ALTER TABLE — например «удалить триггеры
