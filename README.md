@@ -86,25 +86,30 @@
 
 ---
 
-## 💾 Установка на ноутбук аналитика (Windows)
+## 💾 Установка на ноутбук аналитика (Windows / macOS)
 
 RAGRAF — это **локальное self-contained ПО**. Никаких облачных зависимостей,
 никакие данные не уходят за пределы машины. Сценарий внедрения у заказчика:
 
-1. Аналитик мэрии / университета скачивает [`installer/start-ragraf.bat`](installer/start-ragraf.bat) с GitHub.
+1. Аналитик мэрии / университета скачивает 1-2 файла с GitHub.
 2. Запускает двойным кликом → откроется консольное окно.
 3. Скрипт проверяет 3 бесплатные программы (Git, Python 3.11+, Node 18+),
-   качает свежий код с GitHub в `%USERPROFILE%\RAGRAF\`, ставит зависимости,
-   собирает фронтенд, запускает backend, открывает браузер.
-4. Все данные пишутся в `%USERPROFILE%\RAGRAF\data\` — этим единственным
-   каталогом аналитик владеет.
+   качает свежий код с GitHub в `~/RAGRAF/` (или `%USERPROFILE%\RAGRAF\` на
+   Windows), ставит зависимости, собирает фронтенд, запускает backend,
+   открывает браузер.
+4. Все данные пишутся локально в `~/RAGRAF/data/` — этим каталогом аналитик
+   единолично владеет.
 
 **Каждый последующий запуск** скрипт сам проверяет обновления на GitHub и
 предлагает обновиться (Y/N) с показом списка коммитов. Данные не затрагиваются
 при обновлении кода — изменения регламентов и аудит-журнал переживают
 переустановки.
 
-Подробная инструкция: **[`installer/INSTALL-WINDOWS.md`](installer/INSTALL-WINDOWS.md)**.
+| Платформа | Файл для скачивания | Инструкция |
+|---|---|---|
+| **Windows 10/11** | [`installer/start-ragraf.bat`](installer/start-ragraf.bat) | [`installer/INSTALL-WINDOWS.md`](installer/INSTALL-WINDOWS.md) |
+| **macOS** (Intel/Apple Silicon) | [`installer/start-ragraf.command`](installer/start-ragraf.command) + [`installer/ragraf-mac.sh`](installer/ragraf-mac.sh) | [`installer/INSTALL-MACOS.md`](installer/INSTALL-MACOS.md) |
+| **Linux** | `git clone && cd backend && python3 -m venv .venv && ...` | см. ARC.md или используйте `installer/ragraf-mac.sh` как образец |
 
 ---
 
