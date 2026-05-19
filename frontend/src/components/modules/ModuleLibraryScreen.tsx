@@ -1,13 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
-  Boxes,
   CheckCircle2,
   Clock,
   Mail,
   Network,
   Pause,
+  Pencil,
   Plug,
+  Plus,
   Settings,
   XCircle,
   type LucideIcon,
@@ -15,6 +16,8 @@ import {
 import { api } from '@/lib/api'
 import { DOMAIN_ICONS_BY_ID, buildUserDomainVisual, getDomainVisual } from '@/lib/domains'
 import { cn } from '@/lib/cn'
+import { Button } from '@/components/ui'
+import { ModuleEditorDialog, type ModuleDraft } from './ModuleEditorDialog'
 
 interface ModuleData {
   id: string
@@ -70,6 +73,11 @@ export function ModuleLibraryScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [domainFilter, setDomainFilter] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  const [editor, setEditor] = useState<
+    | { open: false }
+    | { open: true; mode: 'create' }
+    | { open: true; mode: 'edit'; initial: Partial<ModuleDraft> & { id: string } }
+  >({ open: false })
 
   const filtered = useMemo(() => {
     if (!modules) return []
@@ -98,6 +106,16 @@ export function ModuleLibraryScreen() {
           <span className="text-xs text-stone-500">
             СИГМА § 7 — паспорта подключаемых модулей-источников событий
           </span>
+          <div className="ml-auto">
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Plus size={14} />}
+              onClick={() => setEditor({ open: true, mode: 'create' })}
+            >
+              Создать модуль
+            </Button>
+          </div>
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
           <span className="text-stone-500">Домен:</span>
@@ -150,8 +168,30 @@ export function ModuleLibraryScreen() {
             ))}
           </div>
         </div>
-        {selected && <ModuleDetailPanel module={selected} onClose={() => setSelectedId(null)} />}
+        {selected && (
+          <ModuleDetailPanel
+            module={selected}
+            onClose={() => setSelectedId(null)}
+            onEdit={() =>
+              setEditor({
+                open: true,
+                mode: 'edit',
+                initial: selected as unknown as Partial<ModuleDraft> & { id: string },
+              })
+            }
+          />
+        )}
       </div>
+      <ModuleEditorDialog
+        open={editor.open}
+        mode={editor.open ? editor.mode : 'create'}
+        initial={editor.open && editor.mode === 'edit' ? editor.initial : undefined}
+        onClose={() => setEditor({ open: false })}
+        onSaved={(m) => {
+          // После save сразу подсветим карточку, если открыт detail.
+          setSelectedId(m.id)
+        }}
+      />
     </div>
   )
 }
@@ -229,7 +269,15 @@ function ModuleCard({ module, selected, onClick }: { module: ModuleData; selecte
   )
 }
 
-function ModuleDetailPanel({ module, onClose }: { module: ModuleData; onClose: () => void }) {
+function ModuleDetailPanel({
+  module,
+  onClose,
+  onEdit,
+}: {
+  module: ModuleData
+  onClose: () => void
+  onEdit: () => void
+}) {
   const v = visualFor(module)
   const Icon = (module.icon && DOMAIN_ICONS_BY_ID[module.icon]) || v.icon
   const status = STATUS_BADGE[module.status || 'draft'] || STATUS_BADGE.draft
@@ -254,9 +302,14 @@ function ModuleDetailPanel({ module, onClose }: { module: ModuleData; onClose: (
               )}
             </div>
           </div>
-          <button onClick={onClose} className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700">
-            <XCircle size={14} />
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            <button onClick={onClose} className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700">
+              <XCircle size={14} />
+            </button>
+            <Button variant="secondary" size="sm" icon={<Pencil size={12} />} onClick={onEdit}>
+              Изменить
+            </Button>
+          </div>
         </div>
       </header>
       <div className="space-y-3 px-4 py-3 text-xs leading-snug">
