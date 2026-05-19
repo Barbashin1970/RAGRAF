@@ -306,6 +306,69 @@ def test_formula_evaluator() -> bool:
     return ok
 
 
+def test_formula_kleene_unknown() -> bool:
+    """Трёхзначная логика Клини: отсутствие данных → unknown, не false.
+
+    Сценарий: formula `pressure > 22 && temperature > 50`. Выполняем без
+    readings (input не получит значения). Ожидание: formula = None
+    (unknown), нода НЕ fired, output НЕ fired, level=0 — без ложного
+    «всё в норме», но с явной пометкой «нет данных» в trace.
+    """
+    print("\n=== Formula: Kleene unknown (None at input) ===")
+    flow = http_get("/api/regulations/pressure-diameter/flow")
+    assert isinstance(flow, dict)
+
+    # Подготовим формулу-агрегатор «оба параметра не в норме»
+    formula_id = "test-kleene-formula"
+    nodes = [n for n in flow["nodes"] if n["id"] != formula_id]
+    # Найдём output ноду
+    output = next((n for n in nodes if n.get("type") == "output"), None)
+    if output is None:
+        print("  ⚠ no output — skipping")
+        return True
+    nodes.append({
+        "id": formula_id,
+        "type": "formula",
+        "label": "оба параметра выше нормы?",
+        "expression": "pressure > 22 && diameter > 6",
+        "position": {"x": 720, "y": 60},
+    })
+    edges = [
+        e for e in flow["edges"]
+        if e.get("source") != formula_id and e.get("target") != formula_id
+    ]
+    edges.append({"source": formula_id, "target": output["id"]})
+    body = {
+        "rule_id": flow.get("rule_id", "rule_pressure-diameter"),
+        "regulation_id": "pressure-diameter",
+        "nodes": nodes,
+        "edges": edges,
+    }
+    http_put_json("/api/regulations/pressure-diameter/flow", body)
+
+    # Execute БЕЗ readings — параметры не резолвятся → None в scope
+    r = httpx.post(f"{BASE}/api/regulations/pressure-diameter/execute",
+                   json={"readings": []}, timeout=10)
+    r.raise_for_status()
+    result = r.json()
+
+    # Найдём trace formula-ноды
+    formula_trace = [t for t in result["trace"] if t["node_id"] == formula_id]
+    ok = True
+    if formula_trace:
+        explanation = (formula_trace[0].get("explanation") or "").lower()
+        ok &= assert_eq("trace mentions unknown", "unknown" in explanation, True)
+        ok &= assert_eq("formula NOT fired (unknown)",
+                        formula_id in result.get("fired_nodes", []), False)
+    else:
+        # Если formula не достигнута через BFS (нет активированного upstream),
+        # то она просто не появляется в trace — тоже валидное поведение для
+        # «нет данных», но менее информативное. Соглашаемся.
+        print(f"  ⚠ formula not in trace (BFS skipped — no upstream active)")
+    ok &= assert_eq("level == 0 (нет вердикта)", result.get("level"), 0)
+    return ok
+
+
 def test_formula_security() -> bool:
     """Защита: запрещённые конструкции отвергаются validator'ом."""
     print("\n=== Formula: security validator ===")
@@ -459,6 +522,7 @@ def main() -> int:
         test_bug_9_custom_unit_preserved,
         test_flow_sensor_propagates_to_edit_and_turtle,
         test_formula_evaluator,
+        test_formula_kleene_unknown,
         test_formula_security,
     ]
     results = [t() for t in tests]

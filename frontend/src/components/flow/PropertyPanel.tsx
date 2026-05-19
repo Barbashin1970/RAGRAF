@@ -718,9 +718,29 @@ function FormulaEditor({
             <li>rate("temp", "1h") &gt; 5  // потепление {'>'} 5°/час</li>
             <li>is_night(22, 6) and waterLevel &gt; 3</li>
           </ul>
+          <div className="mt-2 mb-1 font-semibold uppercase tracking-wide text-stone-500">
+            Трёхзначная логика Клини (None = unknown)
+          </div>
+          <div className="text-[10px] leading-snug text-stone-700">
+            Если у параметра нет данных (sensor offline, ETL не прислал
+            сэмпл) — переменная = None. Логика Клини:
+            <ul className="mt-1 ml-3 list-disc font-mono text-[10px] text-stone-800">
+              <li>None and True = None · None and False = False</li>
+              <li>None or True = True · None or False = None</li>
+              <li>not None = None</li>
+              <li>None + 1 = None  (любая арифметика прозрачно)</li>
+              <li>None &gt; 5 = None  (числовое сравнение)</li>
+              <li>None == None = True  (явный тест «нет данных»)</li>
+            </ul>
+            <div className="mt-1 italic">
+              Если результат формулы = None → нода <b>не fired</b>, downstream
+              не активируется. Trace показывает «unknown (нет данных: ...)».
+              Это защищает от ложного «всё ок» при offline-датчиках.
+            </div>
+          </div>
           <div className="mt-1.5 text-[9px] italic text-stone-500">
             Backend: исполнитель через изолированный AST-walker (без eval).
-            Синтаксис проверяется при сохранении flow.
+            Синтаксис проверяется при сохранении flow. SKILL-D0SL.md §8.1.
           </div>
         </div>
       )}

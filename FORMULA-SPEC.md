@@ -3,9 +3,11 @@
 Версия: 2026-05-18 (commit фикс 036).
 
 Формула — выражение, которое executor вычисляет при исполнении регламента
-(`POST /regulations/{id}/execute`). Результат — bool или число:
+(`POST /regulations/{id}/execute`). Результат — bool, число или `None`:
 - **truthy** → нода `formula` «срабатывает», сигнал идёт дальше по DAG;
 - **falsy** → не срабатывает, downstream-узлы не активируются;
+- **None (unknown)** → не срабатывает, в trace «unknown (нет данных)».
+  Семантика трёхзначной логики Клини — см. § «Kleene unknown» ниже.
 - число — может быть подхвачено downstream'ом (threshold/output).
 
 ## Грамматика
@@ -116,6 +118,60 @@ sin   cos   tan   asin   acos   atan   atan2(y, x)
 list/set/dict comprehensions именованные аргументы (`fn(a=1)`)
 
 Эти конструкции отвергаются на parse-time с понятным сообщением.
+
+## Kleene unknown (трёхзначная логика)
+
+Идея заимствована из D0SL (см. [SKILL-D0SL.md § 8.1](SKILL-D0SL.md)):
+помимо `true`/`false` есть **третье значение `unknown`** — отсутствие данных.
+В RAGRAF unknown = Python `None`.
+
+**Когда переменная = None?**
+- ETL не прислал сэмпл к моменту исполнения (sensor offline).
+- Параметр регламента не имеет дефолта и пользователь не задал значение.
+- Time-series функция вернула None (история короче окна, см. § «Временные ряды»).
+- Деление на ноль / sqrt отрицательного / другая ошибка вычисления →
+  `FormulaValueError` (а не None — это «совсем плохо», не «не знаю»).
+
+**Операции по правилам Клини:**
+
+| Операция | Результат |
+|---|---|
+| `None and True` | `None` |
+| `None and False` | `False` (short-circuit, известно) |
+| `None or True` | `True` (short-circuit, известно) |
+| `None or False` | `None` |
+| `not None` | `None` |
+| `None + 1` (любая арифметика) | `None` |
+| `None > 5` (числовое сравнение) | `None` |
+| `None == None` (явный тест) | `True` |
+| `None != value` | зависит от value (Python `!=` с None даёт True для всего ≠ None) |
+| `None in [1, 2, None]` | `True` (Python in-test работает) |
+
+**Влияние на executor:**
+
+- `result is None` → formula-нода **не fired** (downstream не активируется);
+- в trace: `"<expr> → unknown (нет данных: pressure, temperature)"` —
+  явный список переменных без данных, оператор СЦ видит конкретику;
+- регламент **не зависает** на ожидании — выдаёт уровень 0 с
+  отметкой «недостоверно» в trace.
+
+**Зачем это:** защита от «уверенного false». Без unknown semantics,
+formula `pressure > 20 && temperature > 50` при offline pressure-датчике
+вернула бы `False` (потому что `None > 20` ≈ TypeError → fallback false).
+СЦ видел бы «всё ок», а на деле — потеря сигнала. С Kleene этот случай
+сразу подсвечивается как «unknown», и оператор инициирует диагностику.
+
+**Идиомы для разработчика регламентов:**
+```
+# Если хочешь явно учесть offline как «не срабатывает»:
+(pressure > 20 if pressure != None else False)
+
+# Если хочешь явно учесть offline как «срабатывает» (paranoia mode):
+(pressure > 20 if pressure != None else True)
+
+# Если хочешь дефолт для time-series:
+rate("temp", "1h") or 0
+```
 
 ## Безопасность
 

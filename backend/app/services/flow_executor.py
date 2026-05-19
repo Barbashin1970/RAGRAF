@@ -474,12 +474,17 @@ def _eval_formula_node(
     scope: dict[str, float | bool | None],
     history: dict[str, SampleHistory],
 ) -> tuple[bool, float | bool | None, str]:
-    """Вычислить formula-ноду.
+    """Вычислить formula-ноду через AST-evaluator.
 
     Возвращает:
-      fired       — true если результат truthy (зажигает downstream)
+      fired       — true если результат **строго** truthy (зажигает downstream)
       value       — само значение (число/bool/None)
       explanation — человекочитаемое объяснение для trace
+
+    Трёхзначная логика Клини (см. SKILL-D0SL.md § 8.1, formula_eval.py):
+      result is None → unknown — НЕ fired, чтобы downstream не активировались
+      при отсутствии данных. Это даёт честный «не выдаём вердикт» вместо
+      ложного false. В trace explicit-ная пометка «нет данных».
     """
     expr = (node.expression or "").strip()
     if not expr:
@@ -491,6 +496,16 @@ def _eval_formula_node(
         return False, None, f"ошибка формулы: {e}"
     except Exception as e:
         return False, None, f"ошибка вычисления: {type(e).__name__}: {e}"
+    # Kleene unknown: явный путь без срабатывания.
+    if result is None:
+        # Найдём какие переменные были None в scope — для explanation.
+        # Это даёт оператору СЦ конкретику «pressure offline», не «что-то не так».
+        unknown_vars = [k for k, v in scope.items() if v is None]
+        if unknown_vars:
+            return False, None, (
+                f"{expr} → unknown (нет данных: {', '.join(sorted(unknown_vars))})"
+            )
+        return False, None, f"{expr} → unknown (трёхзначная Kleene)"
     fired = bool(result)
     short = repr(result)
     if len(short) > 60:

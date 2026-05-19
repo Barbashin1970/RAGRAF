@@ -433,6 +433,11 @@ def _eval_node(node: ast.AST, ctx: FormulaContext) -> Any:
     if isinstance(node, ast.BinOp):
         left = _eval_node(node.left, ctx)
         right = _eval_node(node.right, ctx)
+        # Арифметика с None → None (Kleene). Например `pressure + 1` где
+        # pressure отсутствует → None, не TypeError. Это даёт executor'у
+        # явный сигнал «нет данных» вместо краша.
+        if left is None or right is None:
+            return None
         op = node.op
         try:
             if isinstance(op, ast.Add):
@@ -465,52 +470,76 @@ def _eval_node(node: ast.AST, ctx: FormulaContext) -> Any:
     if isinstance(node, ast.UnaryOp):
         operand = _eval_node(node.operand, ctx)
         if isinstance(node.op, ast.USub):
-            return -operand
+            return None if operand is None else -operand
         if isinstance(node.op, ast.UAdd):
-            return +operand
+            return None if operand is None else +operand
         if isinstance(node.op, ast.Not):
-            return not operand
+            # Kleene NOT: not unknown = unknown
+            return None if operand is None else not operand
         raise FormulaSyntaxError(f"Неизвестный UnaryOp: {type(node.op).__name__}")
     if isinstance(node, ast.BoolOp):
-        # Short-circuit: and возвращает первый falsy ИЛИ последний; or
-        # возвращает первый truthy ИЛИ последний — точно как Python.
+        # Трёхзначная логика Клини (см. SKILL-D0SL.md § 8.1).
+        # Семантика:
+        #   None AND True  = None      None AND False = False
+        #   None OR  True  = True      None OR  False = None
+        #   NOT None       = None
+        # Это даёт честный «unknown» когда у параметра нет данных (sensor offline,
+        # ETL не прислал сэмпл). Без этого False-fallback маскировал бы пропуски
+        # — флоу-исполнитель уверенно говорил бы «всё ок», хотя по факту он
+        # просто ничего не знает.
         if isinstance(node.op, ast.And):
-            result = True
+            seen_none = False
             for v in node.values:
                 result = _eval_node(v, ctx)
+                if result is None:
+                    seen_none = True
+                    continue
                 if not result:
-                    return result
-            return result
+                    return result  # явный False/falsy — short-circuit
+            return None if seen_none else True
         if isinstance(node.op, ast.Or):
-            result = False
+            seen_none = False
             for v in node.values:
                 result = _eval_node(v, ctx)
+                if result is None:
+                    seen_none = True
+                    continue
                 if result:
-                    return result
-            return result
+                    return result  # явный True/truthy — short-circuit
+            return None if seen_none else False
         raise FormulaSyntaxError(f"Неизвестный BoolOp: {type(node.op).__name__}")
     if isinstance(node, ast.Compare):
         left = _eval_node(node.left, ctx)
+        # Сравнение с None в Kleene-логике даёт `unknown` (None).
+        # Исключение: явное `x == None` / `x != None` / `x in [...]` —
+        # это семантически валидный тест «есть ли значение», должен работать.
         for op, comp in zip(node.ops, node.comparators):
             right = _eval_node(comp, ctx)
-            if isinstance(op, ast.Eq):
-                ok = left == right
-            elif isinstance(op, ast.NotEq):
-                ok = left != right
-            elif isinstance(op, ast.Lt):
-                ok = left < right
-            elif isinstance(op, ast.LtE):
-                ok = left <= right
-            elif isinstance(op, ast.Gt):
-                ok = left > right
-            elif isinstance(op, ast.GtE):
-                ok = left >= right
-            elif isinstance(op, ast.In):
-                ok = left in right
-            elif isinstance(op, ast.NotIn):
-                ok = left not in right
-            else:
-                raise FormulaSyntaxError(f"Неизвестный Compare: {type(op).__name__}")
+            try:
+                if isinstance(op, ast.Eq):
+                    ok = left == right
+                elif isinstance(op, ast.NotEq):
+                    ok = left != right
+                elif isinstance(op, ast.In):
+                    ok = left in right
+                elif isinstance(op, ast.NotIn):
+                    ok = left not in right
+                elif left is None or right is None:
+                    # Числовые сравнения с None → unknown (Kleene).
+                    return None
+                elif isinstance(op, ast.Lt):
+                    ok = left < right
+                elif isinstance(op, ast.LtE):
+                    ok = left <= right
+                elif isinstance(op, ast.Gt):
+                    ok = left > right
+                elif isinstance(op, ast.GtE):
+                    ok = left >= right
+                else:
+                    raise FormulaSyntaxError(f"Неизвестный Compare: {type(op).__name__}")
+            except TypeError as e:
+                # Type-mismatch (например `int < str`) — это unknown, не False.
+                raise FormulaValueError(f"Compare: {e}") from e
             if not ok:
                 return False
             left = right
