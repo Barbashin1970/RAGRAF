@@ -43,9 +43,44 @@ def _db_path() -> Path:
 def _connection() -> duckdb.DuckDBPyConnection:
     global _conn  # sigma:allow P3 — singleton lazy-init, не рекурсия; защищён _LOCK выше.
     if _conn is None:
-        _conn = duckdb.connect(str(_db_path()))
+        _conn = _open_with_wal_recovery(_db_path())
         _init_schema(_conn)
     return _conn
+
+
+def _open_with_wal_recovery(path: Path) -> duckdb.DuckDBPyConnection:
+    """Открыть DuckDB-файл, при WAL-corruption — ротировать WAL и попробовать снова.
+
+    Контракт: dev и prod должны самостоятельно восстанавливаться из «битого»
+    WAL после abrupt-shutdown (SIGKILL во время ALTER, OOM, Railway restart).
+    Раньше это делал только `start.sh` в prod; dev (uvicorn --reload) падал
+    в `_duckdb.InternalException: Failure while replaying WAL file`.
+
+    Стратегия (мягкий путь, см. фикс 2026-05-18 на Railway):
+      1) Пробуем открыть как есть.
+      2) Если исключение упоминает WAL — переименовываем `<db>.wal` в
+         `<db>.wal.corrupted-<timestamp>` и пробуем снова. DuckDB пересоберёт
+         состояние из main-файла без WAL'а; теряются только незакоммиченные
+         с момента последнего CHECKPOINT правки (обычно — секунды работы).
+      3) Если и это не помогло — пробрасываем исключение наверх, пусть
+         lifespan-handler в `main.py` решает (там есть отдельная стратегия
+         «ротировать главный файл», но она destructive — оставляем последним
+         шагом).
+    """
+    try:
+        return duckdb.connect(str(path))
+    except (duckdb.InternalException, duckdb.IOException) as e:
+        msg = str(e)
+        if "wal" not in msg.lower():
+            raise  # не WAL-проблема — не трогаем файлы.
+        wal = path.with_suffix(path.suffix + ".wal")
+        if not wal.exists():
+            raise  # WAL'а нет, а ошибка про WAL — странно; не маскируем.
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+        bak = wal.with_name(f"{wal.name}.corrupted-{ts}")
+        print(f"[regulation_store] WAL corruption detected; rotating {wal.name} → {bak.name}")
+        wal.rename(bak)
+        return duckdb.connect(str(path))
 
 
 def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
@@ -378,14 +413,19 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
         )
         """
     )
-    # Идемпотентный ALTER для существующих БД, где колонки `wiring` ещё нет:
-    # PRAGMA table_info + ADD COLUMN. Без этого старые установки падают на
-    # INSERT INTO processes (..., wiring, ...) — DuckDB ругается «no column wiring».
+    # Идемпотентный ALTER для существующих БД, где колонки `wiring` ещё нет.
+    # ВАЖНО: DuckDB не поддерживает `ADD COLUMN ... NOT NULL DEFAULT '...'`
+    # в ALTER (только в CREATE TABLE). Поэтому добавляем nullable-колонку
+    # и тут же `UPDATE` заполняем существующие строки пустым JSON-массивом;
+    # _decode_wiring всё равно толерантен к NULL (возвращает []), но
+    # уровнем выше save() пишет '[]' явно — поэтому семантика идентична
+    # «NOT NULL DEFAULT '[]'» в свежесозданной таблице.
     proc_cols = {
         row[1] for row in c.execute("PRAGMA table_info('processes')").fetchall()
     }
     if "wiring" not in proc_cols:
-        c.execute("ALTER TABLE processes ADD COLUMN wiring JSON NOT NULL DEFAULT '[]'")
+        c.execute("ALTER TABLE processes ADD COLUMN wiring JSON")
+        c.execute("UPDATE processes SET wiring = '[]' WHERE wiring IS NULL")
 
     # ── Миграции (одноразовые data-migrations) ───────────────────────────
     # Лёгкий tracker: имя миграции + applied_at. Используется для апгрейдов

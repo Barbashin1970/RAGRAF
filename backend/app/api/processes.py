@@ -230,21 +230,132 @@ async def export_process_bundle(process_id: str):
 
 @router.get("/processes/{process_id}/turtle", response_class=PlainTextResponse)
 def export_process_turtle(process_id: str) -> str:
-    """Объединённый Turtle всех регламентов двойника — одним текстовым файлом.
+    """Объединённый Turtle всех регламентов двойника + Twin-блок с wiring.
 
-    Удобно для копирования в Apache Jena / Protégé / online OWL-инструменты,
-    где ZIP неудобен. Каждый регламент идёт со своим префиксным разделителем-
-    комментарием для читаемости.
+    Структура файла:
+      1. Twin-header block — `:Twin_<id> a :DigitalTwin` с метаданными
+         (название, описание, regulation_ids) и явными wiring-триплами:
+         `:wiring_N a :Wiring ; :sourceRegulation … ; :targetRegulation …`.
+         Это закрывает критический gap: раньше Turtle двойника был просто
+         «3 регламента подряд» без какой-либо связи — потребитель (SIGMA-
+         ядро, Apache Jena, аналитик) не мог отличить артефакт двойника
+         от случайного дампа.
+      2. Каждый регламент-член — через `regulation_to_turtle`, с разделителем-
+         комментарием для читаемости.
+
+    Все IRI совпадают с теми, что генерит `regulation_to_turtle` —
+    `_instance_local_name(reg.id)` гарантирует round-trip и SPARQL-доступ
+    «найти все wiring, чей source = X» через стандартные `?wiring :sourceRegulation X`.
     """
+    from app.services.turtle_bridge import _instance_local_name
+
     p = process_store.get(process_id)
     if p is None:
         raise HTTPException(status_code=404, detail=f"Двойник '{process_id}' не найден")
+
     chunks: list[str] = []
     chunks.append(f"# Twin: {p.name}")
     if p.description:
         chunks.append(f"# {p.description}")
     chunks.append(f"# Регламентов: {len(p.regulation_ids)}")
+    if p.wiring:
+        chunks.append(f"# Связей: {len(p.wiring)}")
+    chunks.append("#")
+    chunks.append("# Этот Turtle-файл содержит ТОЛЬКО RDF-данные двойника + регламентов.")
+    chunks.append("# Логика потоков (Rule DSL) выгружается отдельно — в bundle.zip есть")
+    chunks.append("# flow.json для каждого регламента + regulation.json (Pydantic-дамп).")
+    chunks.append("#")
+    chunks.append("# Где проверить структуру:")
+    chunks.append("#   • https://www.ldf.fi/service/rdf-grapher  — визуализация графа (paste & go).")
+    chunks.append("#   • https://rdfshape.weso.es/                — валидатор Turtle + SPARQL.")
+    chunks.append("#   • https://webprotege.stanford.edu/         — полноценный OWL-редактор.")
     chunks.append("")
+
+    # ── Twin-header block ────────────────────────────────────────────────
+    chunks.append("# ──────────── Цифровой двойник (Twin) ────────────")
+    chunks.append("@prefix : <http://regulations.local/ontology#> .")
+    chunks.append("@prefix owl: <http://www.w3.org/2002/07/owl#> .")
+    chunks.append("@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .")
+    chunks.append("@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .")
+    chunks.append("")
+
+    twin_iri = f":Twin_{p.id}"
+    twin_block_lines: list[str] = []
+    twin_block_lines.append(f"{twin_iri} a :DigitalTwin ;")
+    twin_block_lines.append(f'    rdfs:label {_turtle_string(p.name)} ;')
+    if p.description:
+        twin_block_lines.append(f'    rdfs:comment {_turtle_string(p.description)} ;')
+    twin_block_lines.append(
+        f'    :memberCount "{len(p.regulation_ids)}"^^xsd:integer ;'
+    )
+    if p.created_at:
+        twin_block_lines.append(
+            f'    :createdAt "{p.created_at}"^^xsd:dateTime ;'
+        )
+    if p.updated_at:
+        twin_block_lines.append(
+            f'    :updatedAt "{p.updated_at}"^^xsd:dateTime ;'
+        )
+    # hasMember — список регламентов-членов как комбинированный triple-pattern.
+    if p.regulation_ids:
+        members_iris = [f":{_instance_local_name(rid)}" for rid in p.regulation_ids]
+        twin_block_lines.append(
+            "    :hasMember " + ", ".join(members_iris)
+            + (" ;" if p.wiring else " .")
+        )
+    # hasWiring — список wiring-блоков. Сами блоки определим ниже.
+    if p.wiring:
+        wiring_iris = [f":wiring_{p.id}_{i}" for i in range(len(p.wiring))]
+        twin_block_lines.append(
+            "    :hasWiring " + ", ".join(wiring_iris) + " ."
+        )
+    if not p.regulation_ids and not p.wiring:
+        # Пустой Twin — закрываем точкой.
+        twin_block_lines[-1] = twin_block_lines[-1].rstrip(";").rstrip() + " ."
+    chunks.append("\n".join(twin_block_lines))
+    chunks.append("")
+
+    # ── Wiring-блоки ─────────────────────────────────────────────────────
+    if p.wiring:
+        chunks.append("# ──────────── Связи (Wiring) ────────────")
+        for i, w in enumerate(p.wiring):
+            w_iri = f":wiring_{p.id}_{i}"
+            src_iri = f":{_instance_local_name(w.source_regulation)}"
+            tgt_iri = f":{_instance_local_name(w.target_regulation)}"
+            block = [
+                f"{w_iri} a :Wiring ;",
+                f"    :sourceRegulation {src_iri} ;",
+            ]
+            if w.source_output:
+                block.append(f'    :sourceOutput {_turtle_string(w.source_output)} ;')
+            block.append(f"    :targetRegulation {tgt_iri} ;")
+            block.append(f'    :targetInput {_turtle_string(w.target_param_ref)} .')
+            chunks.append("\n".join(block))
+        chunks.append("")
+        # Класс :Wiring + properties — декларация типов для OWL-парсера.
+        chunks.append(":DigitalTwin a owl:Class .")
+        chunks.append(":Wiring a owl:Class .")
+        chunks.append(":hasMember a owl:ObjectProperty ;")
+        chunks.append("    rdfs:domain :DigitalTwin ;")
+        chunks.append("    rdfs:range :Regulation .")
+        chunks.append(":hasWiring a owl:ObjectProperty ;")
+        chunks.append("    rdfs:domain :DigitalTwin ;")
+        chunks.append("    rdfs:range :Wiring .")
+        chunks.append(":sourceRegulation a owl:ObjectProperty ;")
+        chunks.append("    rdfs:domain :Wiring ;")
+        chunks.append("    rdfs:range :Regulation .")
+        chunks.append(":targetRegulation a owl:ObjectProperty ;")
+        chunks.append("    rdfs:domain :Wiring ;")
+        chunks.append("    rdfs:range :Regulation .")
+        chunks.append(":sourceOutput a owl:DatatypeProperty ;")
+        chunks.append("    rdfs:domain :Wiring ;")
+        chunks.append("    rdfs:range xsd:string .")
+        chunks.append(":targetInput a owl:DatatypeProperty ;")
+        chunks.append("    rdfs:domain :Wiring ;")
+        chunks.append("    rdfs:range xsd:string .")
+        chunks.append("")
+
+    # ── Регламенты-члены ─────────────────────────────────────────────────
     for rid in p.regulation_ids:
         reg = regulation_store.get(rid)
         if reg is None:
@@ -254,3 +365,14 @@ def export_process_turtle(process_id: str) -> str:
         chunks.append(regulation_to_turtle(reg))
         chunks.append("")
     return "\n".join(chunks)
+
+
+def _turtle_string(s: str) -> str:
+    """Сериализовать строку для Turtle как quoted-literal.
+
+    Возвращает строку в формате `"..."` с экранированными `\\` и `"`,
+    плюс заменой переноса строки на `\\n` (multi-line литералы в Turtle
+    требуют тройных кавычек — здесь используем одинарные для простоты).
+    """
+    escaped = s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n").replace("\r", "")
+    return f'"{escaped}"'

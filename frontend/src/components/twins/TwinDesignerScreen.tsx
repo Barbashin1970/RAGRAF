@@ -458,11 +458,26 @@ function TwinEditor({
       {/* Экспорт */}
       <div className="rounded-md border border-violet-200 bg-violet-50/40 p-4 shadow-sm">
         <h2 className="mb-1 text-sm font-semibold text-violet-900">Экспорт артефакта</h2>
-        <p className="mb-3 text-[11px] text-violet-800/80">
+        <p className="mb-2 text-[11px] text-violet-800/80">
           Готовый двойник можно выгрузить для передачи в исполнительный движок или
           для аудита нормативного основания. Артефакты не зависят от RAGRAF и
           читаются стандартными OWL/SHACL-инструментами (Apache Jena, Protégé).
         </p>
+        <div className="mb-3 rounded border border-violet-200 bg-white/60 p-2 text-[10px] leading-relaxed text-violet-900">
+          <div className="mb-0.5 font-semibold uppercase tracking-wide text-violet-700">Что внутри</div>
+          <ul className="ml-4 list-disc space-y-0.5">
+            <li><b>.ttl</b> — RDF-данные двойника (`:DigitalTwin` + `:hasMember` + `:Wiring`) и каждого регламента.</li>
+            <li><b>.zip</b> — то же самое плюс <code>flow.json</code> (Rule DSL),
+              <code>regulation.json</code> (Pydantic-дамп), <code>shapes.ttl</code> (SHACL),
+              <code>manifest.json</code> на каждый регламент. Полный артефакт для SIGMA.</li>
+          </ul>
+          <div className="mt-1 font-semibold uppercase tracking-wide text-violet-700">Где проверить .ttl онлайн</div>
+          <ul className="ml-4 list-disc space-y-0.5">
+            <li><a href="https://www.ldf.fi/service/rdf-grapher" target="_blank" rel="noreferrer" className="underline hover:text-violet-700">RDF Grapher</a> — paste &amp; visualize (быстрая визуализация графа).</li>
+            <li><a href="https://rdfshape.weso.es/" target="_blank" rel="noreferrer" className="underline hover:text-violet-700">RDFShape</a> — валидатор + SPARQL-консоль.</li>
+            <li><a href="https://webprotege.stanford.edu/" target="_blank" rel="noreferrer" className="underline hover:text-violet-700">WebProtégé</a> — полноценный OWL-редактор (нужна регистрация).</li>
+          </ul>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <a
             href={api.processes.bundleUrl(draft.id)}

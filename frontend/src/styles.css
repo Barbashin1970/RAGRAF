@@ -136,6 +136,21 @@ body { font-family: 'Inter', system-ui, sans-serif; }
   100% { box-shadow: 0 0 0 18px rgba(99, 102, 241, 0); }
 }
 
+/* Постоянная подсветка event-узла, в который Twin.wiring «приземляет»
+   выход другого регламента. Аналитик сразу видит точку стыка на канвасе
+   двойника. Класс держится пока узел действительно wired (в отличие от
+   flow-jump-focused, который снимается через 2.5s после клика).
+   Тон — индиго; круговое сияние ~2 секунды повторно. */
+.react-flow__node.flow-wired-input > .rf-node {
+  @apply ring-2 ring-indigo-400 ring-offset-2 shadow-md;
+  animation: flow-wired-pulse 2s ease-in-out infinite;
+}
+@keyframes flow-wired-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.5); }
+  50%  { box-shadow: 0 0 0 14px rgba(99, 102, 241, 0.08); }
+  100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+}
+
 /* Sensor-нода со «сломанной» ссылкой (source_output удалён в источнике) —
    красная обводка, чтобы аналитик сразу видел проблему. */
 .rf-node--regsource.rf-node--broken { @apply border-rose-500 bg-rose-100; }
