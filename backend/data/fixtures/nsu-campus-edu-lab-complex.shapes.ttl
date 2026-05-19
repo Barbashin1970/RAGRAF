@@ -1,0 +1,106 @@
+@prefix :    <http://regulations.local/ontology#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:NsuCampusEduLabComplexShape
+    a sh:NodeShape ;
+    sh:targetClass :Regulation ;
+
+    sh:property [ sh:path :name ; sh:datatype xsd:string ; sh:minCount 1 ] ;
+    sh:property [ sh:path :date ; sh:datatype xsd:date ; sh:minCount 1 ] ;
+
+    sh:property [
+        sh:path         :wifiCoverage ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 95.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Покрытие Wi-Fi в учебных аудиториях"@ru
+    ] ;
+    sh:property [
+        sh:path         :wifiCoverageDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :libraryHoursPerDay ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 12.0 ;
+        sh:maxInclusive 24.0 ;
+        sh:message      "Доступность библиотеки"@ru
+    ] ;
+    sh:property [
+        sh:path         :libraryHoursPerDayDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 12.0
+    ] ;
+
+    sh:property [
+        sh:path         :centralizedAcCoverage ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 80.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Централизованное кондиционирование"@ru
+    ] ;
+    sh:property [
+        sh:path         :centralizedAcCoverageDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :studentSatisfaction ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 75.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Удовлетворённость качеством услуг УЛК"@ru
+    ] ;
+    sh:property [
+        sh:path         :studentSatisfactionDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :computerClassesCurrent ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 80.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Компьютерных классов с актуальным ПО"@ru
+    ] ;
+    sh:property [
+        sh:path         :computerClassesCurrentDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :multimediaUptime ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 90.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Доступность мультимедийного оборудования"@ru
+    ] ;
+    sh:property [
+        sh:path         :multimediaUptimeDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] .

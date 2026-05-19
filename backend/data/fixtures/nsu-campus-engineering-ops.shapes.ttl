@@ -1,0 +1,106 @@
+@prefix :    <http://regulations.local/ontology#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:NsuCampusEngineeringOpsShape
+    a sh:NodeShape ;
+    sh:targetClass :Regulation ;
+
+    sh:property [ sh:path :name ; sh:datatype xsd:string ; sh:minCount 1 ] ;
+    sh:property [ sh:path :date ; sh:datatype xsd:date ; sh:minCount 1 ] ;
+
+    sh:property [
+        sh:path         :cimAvailability ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 98.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Доступность ЦИМ здания"@ru
+    ] ;
+    sh:property [
+        sh:path         :cimAvailabilityDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :leakDetectionTime ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 30.0 ;
+        sh:message      "Время обнаружения утечки воды/теплоносителя"@ru
+    ] ;
+    sh:property [
+        sh:path         :leakDetectionTimeDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 15.0
+    ] ;
+
+    sh:property [
+        sh:path         :ventReactionTime ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 60.0 ;
+        sh:message      "Реакция на отказ вентиляции"@ru
+    ] ;
+    sh:property [
+        sh:path         :ventReactionTimeDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :ivcLoad ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 10.0 ;
+        sh:maxInclusive 90.0 ;
+        sh:message      "Загрузка ИВЦ (CPU/память)"@ru
+    ] ;
+    sh:property [
+        sh:path         :ivcLoadDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 75.0
+    ] ;
+
+    sh:property [
+        sh:path         :coolingEnergyConsumption ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0 ;
+        sh:message      "Расход на охлаждение"@ru
+    ] ;
+    sh:property [
+        sh:path         :coolingEnergyConsumptionDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 25.0
+    ] ;
+
+    sh:property [
+        sh:path         :unplannedDowntimeMonthly ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 24.0 ;
+        sh:message      "Внеплановые простои инженерных систем в месяц"@ru
+    ] ;
+    sh:property [
+        sh:path         :unplannedDowntimeMonthlyDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 12.0
+    ] .

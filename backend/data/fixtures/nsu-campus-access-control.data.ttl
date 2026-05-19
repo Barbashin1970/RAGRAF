@@ -1,0 +1,46 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент контроля доступа и пропускной системы кампуса НГУ
+# Роль: Служба безопасности / Бюро пропусков
+# Источник: Стандарт Минобрнауки, разд. II п. 14, 25; разд. V п. 8, 10, 11.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:identificationTime          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:identificationTimeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:recognitionAccuracy          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:recognitionAccuracyDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:unauthorizedAccessReaction          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:unauthorizedAccessReactionDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:videoCoverage          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:videoCoverageDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:biometricDataRetention          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:biometricDataRetentionDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:cameraUptimeAvg          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:cameraUptimeAvgDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:NsuCampusAccessControlRegulation
+    a                      :Regulation ;
+    :name                  "Регламент контроля доступа и пропускной системы кампуса НГУ" ;
+    :date                  "2024-02-28"^^xsd:date ;
+    :identificationTime              1.5 ;
+    :identificationTimeDeviation     0.5 ;
+    :recognitionAccuracy              98.0 ;
+    :recognitionAccuracyDeviation     1.0 ;
+    :unauthorizedAccessReaction              20.0 ;
+    :unauthorizedAccessReactionDeviation     10.0 ;
+    :videoCoverage              100.0 ;
+    :videoCoverageDeviation     0.0 ;
+    :biometricDataRetention              30.0 ;
+    :biometricDataRetentionDeviation     0.0 ;
+    :cameraUptimeAvg              99.5 ;
+    :cameraUptimeAvgDeviation     0.5 ;
+    :recommendation        "Регламент СКД и пропускной системы кампуса НГУ (разд. II п. 14 + разд. V п. 8-11 Стандарта 28.02.2024): 1. ИДЕНТИФИКАЦИЯ — биометрия (лицо) + резерв (карта-пропуск). Норматив времени идентификации ≤ 2 секунды, точность распознавания ≥ 98%. 2. ОТКАЗ РАСПОЗНАВАНИЯ — при двух подряд неудачных попытках → ручная проверка консьержем / охранником с ID в течение 2 минут. 3. НЕСАНКЦИОНИРОВАННЫЙ ДОСТУП — попытка прохода без активного пропуска или с истёкшим/заблокированным → блокировка турникета + оповещение СЦ в течение 30 секунд + сохранение видеозаписи 90 дней. 4. ВИДЕОНАБЛЮДЕНИЕ — 100% покрытие общественных зон, доступность камер ≥ 99% за месяц. Запись хранится 90 дней с криптографической подписью (защита от подмены). 5. БИОМЕТРИЯ — хранение не более 30 дней, не передаётся за периметр ИВЦ кампуса (152-ФЗ о ПДн). 6. ИНТЕГРАЦИЯ — все события СКД и видеоаналитики идут в СЦ через интеграционную платформу для агрегированного мониторинга." .

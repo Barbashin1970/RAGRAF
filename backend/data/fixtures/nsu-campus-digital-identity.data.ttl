@@ -1,0 +1,46 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент единого профиля кампуса (SSO) НГУ
+# Роль: ИТ-отдел / Информационно-вычислительный центр (ИВЦ)
+# Источник: Стандарт Минобрнауки, разд. II п. 7-9 — единый профиль кампуса.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:ssoCoverage          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:ssoCoverageDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:firstAuthLatency          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:firstAuthLatencyDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:activeProfiles          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:activeProfilesDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:accountCompromiseAlerts          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:accountCompromiseAlertsDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:deprovisioningLatency          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:deprovisioningLatencyDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:mfaPenetration          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:mfaPenetrationDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:NsuCampusDigitalIdentityRegulation
+    a                      :Regulation ;
+    :name                  "Регламент единого профиля кампуса (SSO) НГУ" ;
+    :date                  "2024-02-28"^^xsd:date ;
+    :ssoCoverage              95.0 ;
+    :ssoCoverageDeviation     5.0 ;
+    :firstAuthLatency              3.0 ;
+    :firstAuthLatencyDeviation     2.0 ;
+    :activeProfiles              92.0 ;
+    :activeProfilesDeviation     5.0 ;
+    :accountCompromiseAlerts              0.0 ;
+    :accountCompromiseAlertsDeviation     0.0 ;
+    :deprovisioningLatency              8.0 ;
+    :deprovisioningLatencyDeviation     8.0 ;
+    :mfaPenetration              80.0 ;
+    :mfaPenetrationDeviation     10.0 ;
+    :recommendation        "Регламент единого профиля кампуса НГУ (разд. II п. 7-9 Стандарта 28.02.2024): 1. SSO ОБЯЗАТЕЛЕН для всех ключевых сервисов кампуса — ЭБС, LMS, СКД, СЭД, бронирование, мобильное приложение. Покрытие SSO ≥ 95% сервисов. 2. ПРОФИЛЬ РЕЗИДЕНТА — создаётся при зачислении / приёме на работу. Содержит ID, биометрический шаблон, роли, разрешённые объекты. 3. 2FA — обязательна для админов, преподавателей с доступом к ПДн, сотрудников ИБ. Целевое покрытие — ≥ 80% профилей. 4. КОМПРОМЕТАЦИЯ — при выявлении немедленная блокировка + смена пароля в течение 30 минут. Audit-log админ-операций — 1 год. 5. DEPROVISIONING — при отчислении / увольнении автоматическая блокировка ≤ 24 часа, удаление ПДн через 30 дней (если нет других оснований по 152-ФЗ). 6. РЕВИЗИЯ — раз в полгода отзыв «забытых» профилей, проверка соответствия ролей." .

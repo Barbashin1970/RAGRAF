@@ -238,6 +238,19 @@ export const DOMAIN_VISUALS: Record<string, DomainVisual> = {
     cardBorder: 'border-amber-100 hover:border-amber-300',
     sectionBg: 'bg-gradient-to-r from-amber-50/80 to-transparent',
   },
+  // Кампус НГУ — индиго тон. SmartCity-domain, синтез всех ролей кампуса:
+  // СЦ, ИТ-отдел, СКД, эксплуатация, комендантская, технопарк, ФОК, МФК.
+  // GraduationCap — символ образовательной среды (Стандарт Минобрнауки).
+  campus: {
+    icon: GraduationCap,
+    iconBg: 'bg-indigo-100',
+    iconFg: 'text-indigo-700',
+    accent: 'bg-indigo-500',
+    chipBg: 'bg-indigo-50',
+    chipFg: 'text-indigo-700',
+    cardBorder: 'border-indigo-100 hover:border-indigo-300',
+    sectionBg: 'bg-gradient-to-r from-indigo-50/80 to-transparent',
+  },
 }
 
 export const FALLBACK_VISUAL: DomainVisual = {

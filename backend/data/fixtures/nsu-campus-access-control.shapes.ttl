@@ -1,0 +1,106 @@
+@prefix :    <http://regulations.local/ontology#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:NsuCampusAccessControlShape
+    a sh:NodeShape ;
+    sh:targetClass :Regulation ;
+
+    sh:property [ sh:path :name ; sh:datatype xsd:string ; sh:minCount 1 ] ;
+    sh:property [ sh:path :date ; sh:datatype xsd:date ; sh:minCount 1 ] ;
+
+    sh:property [
+        sh:path         :identificationTime ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.5 ;
+        sh:maxInclusive 5.0 ;
+        sh:message      "Время идентификации в проходной"@ru
+    ] ;
+    sh:property [
+        sh:path         :identificationTimeDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 2.5
+    ] ;
+
+    sh:property [
+        sh:path         :recognitionAccuracy ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 90.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Точность распознавания лиц"@ru
+    ] ;
+    sh:property [
+        sh:path         :recognitionAccuracyDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :unauthorizedAccessReaction ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 120.0 ;
+        sh:message      "Реакция на несанкционированный доступ"@ru
+    ] ;
+    sh:property [
+        sh:path         :unauthorizedAccessReactionDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 60.0
+    ] ;
+
+    sh:property [
+        sh:path         :videoCoverage ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 95.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Покрытие видеонаблюдением общественных зон"@ru
+    ] ;
+    sh:property [
+        sh:path         :videoCoverageDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :biometricDataRetention ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 90.0 ;
+        sh:message      "Срок хранения биометрических данных"@ru
+    ] ;
+    sh:property [
+        sh:path         :biometricDataRetentionDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 45.0
+    ] ;
+
+    sh:property [
+        sh:path         :cameraUptimeAvg ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 98.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Средняя доступность камер видеонаблюдения"@ru
+    ] ;
+    sh:property [
+        sh:path         :cameraUptimeAvgDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] .

@@ -1,0 +1,46 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент общежития кампуса НГУ (стандарт проживания)
+# Роль: Управление общежитиями / Комендантская служба
+# Источник: Стандарт Минобрнауки, разд. V «Требования к общежитиям», п. 11-14.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:areaPerStudent          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:areaPerStudentDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:studentsPerRoom          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:studentsPerRoomDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:socketsPerPerson          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:socketsPerPersonDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:userSatisfaction          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:userSatisfactionDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:maintenanceRequestTime          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:maintenanceRequestTimeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:bikeStorageCapacity          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:bikeStorageCapacityDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:NsuCampusDormitoryStandardRegulation
+    a                      :Regulation ;
+    :name                  "Регламент общежития кампуса НГУ (стандарт проживания)" ;
+    :date                  "2024-02-28"^^xsd:date ;
+    :areaPerStudent              22.0 ;
+    :areaPerStudentDeviation     2.0 ;
+    :studentsPerRoom              1.5 ;
+    :studentsPerRoomDeviation     0.5 ;
+    :socketsPerPerson              7.0 ;
+    :socketsPerPersonDeviation     1.0 ;
+    :userSatisfaction              82.0 ;
+    :userSatisfactionDeviation     7.0 ;
+    :maintenanceRequestTime              18.0 ;
+    :maintenanceRequestTimeDeviation     6.0 ;
+    :bikeStorageCapacity              12.0 ;
+    :bikeStorageCapacityDeviation     2.0 ;
+    :recommendation        "Регламент общежития кампуса НГУ (разд. V п. 11-14 Стандарта 28.02.2024): 1. ПЛАНИРОВКА — ≥ 20 м² общей площади на студента, ≤ 2 чел в комнате, ≥ 6 розеток на блок на чел, кондиционер в общем пространстве. 2. ОБЯЗАТЕЛЬНЫЕ СЕРВИСЫ — Wi-Fi во всех блоках, общая кухня на этаж, медиаэкран на двух языках, банкомат в холле, прачечная (самообслуживание), не менее 10 мест для велосипедов / самокатов на 50 студентов. 3. ЗАЯВКИ НА РЕМОНТ — критичные (нет воды/тепла/электричества) — ≤ 4 часов. Обычные — ≤ 24 часов. Запись через цифровой сервис комендатуры. 4. УДОВЛЕТВОРЁННОСТЬ — раз в семестр опрос. < 75% → план улучшений к следующему семестру + отчёт ректору. 5. КОНСЬЕРЖ — круглосуточно. Семейные блоки и комнаты матери и ребёнка (п. 11 Стандарта)." .

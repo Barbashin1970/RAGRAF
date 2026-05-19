@@ -1,0 +1,46 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент эксплуатации инженерных сетей и ЦИМ кампуса НГУ
+# Роль: Сервисная управляющая компания (служба эксплуатации)
+# Источник: Стандарт Минобрнауки, разд. II п. 23-24 — ЦИМ, цифровой двойник, умная эксплуатация.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:cimAvailability          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:cimAvailabilityDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:leakDetectionTime          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:leakDetectionTimeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:ventReactionTime          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:ventReactionTimeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:ivcLoad          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:ivcLoadDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:coolingEnergyConsumption          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:coolingEnergyConsumptionDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:unplannedDowntimeMonthly          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:unplannedDowntimeMonthlyDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:NsuCampusEngineeringOpsRegulation
+    a                      :Regulation ;
+    :name                  "Регламент эксплуатации инженерных сетей и ЦИМ кампуса НГУ" ;
+    :date                  "2024-02-28"^^xsd:date ;
+    :cimAvailability              99.5 ;
+    :cimAvailabilityDeviation     0.5 ;
+    :leakDetectionTime              3.0 ;
+    :leakDetectionTimeDeviation     2.0 ;
+    :ventReactionTime              20.0 ;
+    :ventReactionTimeDeviation     10.0 ;
+    :ivcLoad              55.0 ;
+    :ivcLoadDeviation     15.0 ;
+    :coolingEnergyConsumption              18.0 ;
+    :coolingEnergyConsumptionDeviation     5.0 ;
+    :unplannedDowntimeMonthly              2.0 ;
+    :unplannedDowntimeMonthlyDeviation     2.0 ;
+    :recommendation        "Регламент эксплуатации инженерных сетей и ЦИМ кампуса НГУ (разд. II п. 23-24 Стандарта 28.02.2024): 1. ЦИМ ЗДАНИЯ — центральная цифровая информационная модель, доступность ≥ 99.5%. Содержит данные обо всех элементах конструкций, инженерных систем, технической документации. 2. УТЕЧКИ — датчики давления + расхода. При detection > 5 минут → автоматическое перекрытие стояка smart-valve + оповещение диспетчера в СЦ за ≤ 60 секунд. 3. ВЕНТИЛЯЦИЯ — при отказе → переключение на резервный контур + выезд дежурного инженера за ≤ 30 минут. 4. ИВЦ — загрузка 50-70% (норма). > 80% — план апгрейда. < 30% за месяц — возможна оптимизация. 5. ЭНЕРГОЭФФЕКТИВНОСТЬ — расход на охлаждение целевой ≤ 20 кВт·ч/м². Месячный отчёт энергоменеджера. 6. ПРОСТОИ — внеплановые ≤ 4 часов/месяц. Если больше — разбор + корректировка регламента ТО." .

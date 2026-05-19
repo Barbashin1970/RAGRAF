@@ -1,0 +1,46 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент учебно-лабораторного комплекса кампуса НГУ
+# Роль: Учебно-методический отдел / Деканат факультета
+# Источник: Стандарт Минобрнауки, разд. V «Требования к учебно-лабораторному комплексу», п. 1-11.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:wifiCoverage          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:wifiCoverageDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:libraryHoursPerDay          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:libraryHoursPerDayDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:centralizedAcCoverage          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:centralizedAcCoverageDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:studentSatisfaction          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:studentSatisfactionDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:computerClassesCurrent          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:computerClassesCurrentDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:multimediaUptime          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:multimediaUptimeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:NsuCampusEduLabComplexRegulation
+    a                      :Regulation ;
+    :name                  "Регламент учебно-лабораторного комплекса кампуса НГУ" ;
+    :date                  "2024-02-28"^^xsd:date ;
+    :wifiCoverage              100.0 ;
+    :wifiCoverageDeviation     0.0 ;
+    :libraryHoursPerDay              24.0 ;
+    :libraryHoursPerDayDeviation     0.0 ;
+    :centralizedAcCoverage              100.0 ;
+    :centralizedAcCoverageDeviation     0.0 ;
+    :studentSatisfaction              80.0 ;
+    :studentSatisfactionDeviation     5.0 ;
+    :computerClassesCurrent              92.0 ;
+    :computerClassesCurrentDeviation     5.0 ;
+    :multimediaUptime              98.0 ;
+    :multimediaUptimeDeviation     2.0 ;
+    :recommendation        "Регламент учебно-лабораторного комплекса (УЛК) кампуса НГУ (разд. V «Требования к УЛК» п. 1-11 Стандарта 28.02.2024): 1. ИНФРАСТРУКТУРА — Wi-Fi 100%, библиотека 24/7 с компьютерным и читальным залом, централизованное кондиционирование, мультимедийное оборудование с лицензиями. 2. ЛАБОРАТОРИИ — оснащены по Стандарту оснащения кампуса (приказ Минобрнауки). Учитывают специфику технологических процессов и повышенную влажность (если применимо). 3. ОБЩЕСТВЕННОЕ ПИТАНИЕ — столовая / кафетерий / мини-кафе в шаговой доступности. 4. КОНТРОЛЬ КАЧЕСТВА — раз в семестр опрос студентов и преподавателей. Целевая удовлетворённость ≥ 75%. 5. CO₂ В АУДИТОРИЯХ — датчик air-quality, при > 1000 ppm → усиление вентиляции, > 1500 ppm → оповещение в СЦ. 6. ОБОРУДОВАНИЕ — отказ проектора/экрана → выезд ИТ-администратора ≤ 15 минут в рабочее время. Ежеквартально — обновление ПО." .

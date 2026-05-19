@@ -1,0 +1,302 @@
+{
+  "rule_id": "rule_nsu-campus-edu-lab-complex",
+  "regulation_id": "nsu-campus-edu-lab-complex",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "action": "recommendation",
+      "text": "Регламент учебно-лабораторного комплекса (УЛК) кампуса НГУ (разд. V «Требования к УЛК» п. 1-11 Стандарта 28.02.2024): 1. ИНФРАСТРУКТУРА — Wi-Fi 100%, библиотека 24/7 с компьютерным и читальным залом, централизованное кондиционирование, мультимедийное оборудование с лицензиями. 2. ЛАБОРАТОРИИ — оснащены по Стандарту оснащения кампуса (приказ Минобрнауки). Учитывают специфику технологических процессов и повышенную влажность (если применимо). 3. ОБЩЕСТВЕННОЕ ПИТАНИЕ — столовая / кафетерий / мини-кафе в шаговой доступности. 4. КОНТРОЛЬ КАЧЕСТВА — раз в семестр опрос студентов и преподавателей. Целевая удовлетворённость ≥ 75%. 5. CO₂ В АУДИТОРИЯХ — датчик air-quality, при > 1000 ppm → усиление вентиляции, > 1500 ppm → оповещение в СЦ. 6. ОБОРУДОВАНИЕ — отказ проектора/экрана → выезд ИТ-администратора ≤ 15 минут в рабочее время. Ежеквартально — обновление ПО.",
+      "priority": 3,
+      "position": {
+        "x": 880,
+        "y": 60
+      }
+    },
+    {
+      "id": "n_in_wifiCoverage",
+      "type": "input",
+      "label": "wifiCoverage",
+      "paramRef": "wifiCoverage",
+      "position": {
+        "x": 60,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_thr_wifiCoverage",
+      "type": "threshold",
+      "label": "100.0 ± 0.0 %",
+      "refValue": 100.0,
+      "deviation": 0.0,
+      "unit": "%",
+      "position": {
+        "x": 320,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_cmp_wifiCoverage",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_in_libraryHoursPerDay",
+      "type": "input",
+      "label": "libraryHoursPerDay",
+      "paramRef": "libraryHoursPerDay",
+      "position": {
+        "x": 60,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_thr_libraryHoursPerDay",
+      "type": "threshold",
+      "label": "24.0 ± 0.0 часы",
+      "refValue": 24.0,
+      "deviation": 0.0,
+      "unit": "часы",
+      "position": {
+        "x": 320,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_cmp_libraryHoursPerDay",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_in_centralizedAcCoverage",
+      "type": "input",
+      "label": "centralizedAcCoverage",
+      "paramRef": "centralizedAcCoverage",
+      "position": {
+        "x": 60,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_thr_centralizedAcCoverage",
+      "type": "threshold",
+      "label": "100.0 ± 0.0 %",
+      "refValue": 100.0,
+      "deviation": 0.0,
+      "unit": "%",
+      "position": {
+        "x": 320,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_cmp_centralizedAcCoverage",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_in_studentSatisfaction",
+      "type": "input",
+      "label": "studentSatisfaction",
+      "paramRef": "studentSatisfaction",
+      "position": {
+        "x": 60,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_thr_studentSatisfaction",
+      "type": "threshold",
+      "label": "80.0 ± 5.0 %",
+      "refValue": 80.0,
+      "deviation": 5.0,
+      "unit": "%",
+      "position": {
+        "x": 320,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_cmp_studentSatisfaction",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_in_computerClassesCurrent",
+      "type": "input",
+      "label": "computerClassesCurrent",
+      "paramRef": "computerClassesCurrent",
+      "position": {
+        "x": 60,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_thr_computerClassesCurrent",
+      "type": "threshold",
+      "label": "92.0 ± 5.0 %",
+      "refValue": 92.0,
+      "deviation": 5.0,
+      "unit": "%",
+      "position": {
+        "x": 320,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_cmp_computerClassesCurrent",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_in_multimediaUptime",
+      "type": "input",
+      "label": "multimediaUptime",
+      "paramRef": "multimediaUptime",
+      "position": {
+        "x": 60,
+        "y": 780
+      }
+    },
+    {
+      "id": "n_thr_multimediaUptime",
+      "type": "threshold",
+      "label": "98.0 ± 2.0 %",
+      "refValue": 98.0,
+      "deviation": 2.0,
+      "unit": "%",
+      "position": {
+        "x": 320,
+        "y": 780
+      }
+    },
+    {
+      "id": "n_cmp_multimediaUptime",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 780
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_wifiCoverage",
+      "target": "n_thr_wifiCoverage",
+      "condition": null
+    },
+    {
+      "source": "n_thr_wifiCoverage",
+      "target": "n_cmp_wifiCoverage",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_wifiCoverage",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_libraryHoursPerDay",
+      "target": "n_thr_libraryHoursPerDay",
+      "condition": null
+    },
+    {
+      "source": "n_thr_libraryHoursPerDay",
+      "target": "n_cmp_libraryHoursPerDay",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_libraryHoursPerDay",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_centralizedAcCoverage",
+      "target": "n_thr_centralizedAcCoverage",
+      "condition": null
+    },
+    {
+      "source": "n_thr_centralizedAcCoverage",
+      "target": "n_cmp_centralizedAcCoverage",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_centralizedAcCoverage",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_studentSatisfaction",
+      "target": "n_thr_studentSatisfaction",
+      "condition": null
+    },
+    {
+      "source": "n_thr_studentSatisfaction",
+      "target": "n_cmp_studentSatisfaction",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_studentSatisfaction",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_computerClassesCurrent",
+      "target": "n_thr_computerClassesCurrent",
+      "condition": null
+    },
+    {
+      "source": "n_thr_computerClassesCurrent",
+      "target": "n_cmp_computerClassesCurrent",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_computerClassesCurrent",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_multimediaUptime",
+      "target": "n_thr_multimediaUptime",
+      "condition": null
+    },
+    {
+      "source": "n_thr_multimediaUptime",
+      "target": "n_cmp_multimediaUptime",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_multimediaUptime",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

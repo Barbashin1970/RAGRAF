@@ -1,0 +1,106 @@
+@prefix :    <http://regulations.local/ontology#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:NsuCampusDigitalIdentityShape
+    a sh:NodeShape ;
+    sh:targetClass :Regulation ;
+
+    sh:property [ sh:path :name ; sh:datatype xsd:string ; sh:minCount 1 ] ;
+    sh:property [ sh:path :date ; sh:datatype xsd:date ; sh:minCount 1 ] ;
+
+    sh:property [
+        sh:path         :ssoCoverage ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 70.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Покрытие SSO от общего числа сервисов кампуса"@ru
+    ] ;
+    sh:property [
+        sh:path         :ssoCoverageDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :firstAuthLatency ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 30.0 ;
+        sh:message      "Время первой авторизации в SSO"@ru
+    ] ;
+    sh:property [
+        sh:path         :firstAuthLatencyDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 15.0
+    ] ;
+
+    sh:property [
+        sh:path         :activeProfiles ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 50.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Доля активированных профилей резидентов"@ru
+    ] ;
+    sh:property [
+        sh:path         :activeProfilesDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :accountCompromiseAlerts ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 10.0 ;
+        sh:message      "Компрометаций аккаунтов в месяц"@ru
+    ] ;
+    sh:property [
+        sh:path         :accountCompromiseAlertsDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 5.0
+    ] ;
+
+    sh:property [
+        sh:path         :deprovisioningLatency ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 72.0 ;
+        sh:message      "Блокировка профиля после отчисления/увольнения"@ru
+    ] ;
+    sh:property [
+        sh:path         :deprovisioningLatencyDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 40.0
+    ] ;
+
+    sh:property [
+        sh:path         :mfaPenetration ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 50.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Доля профилей с включенной 2FA"@ru
+    ] ;
+    sh:property [
+        sh:path         :mfaPenetrationDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] .

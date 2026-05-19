@@ -1,0 +1,302 @@
+{
+  "rule_id": "rule_nsu-campus-antiterrorism",
+  "regulation_id": "nsu-campus-antiterrorism",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "action": "recommendation",
+      "text": "Регламент антитеррористической защищённости кампуса НГУ (разд. II п. 23 Стандарта 28.02.2024 + Постановление Правительства РФ от 02.08.2019 № 1006 «Об утверждении требований к АТЗ»): 1. ПЕРИМЕТР — 100% покрытие охраной зон массового пребывания (учебные корпуса, библиотека, ФОК, общежития, МФК). СКД + видеонаблюдение с распознаванием лиц. 2. ТРЕВОГА — автоматическое оповещение через РАСЦО за 5 ± 2 минут. Прибытие группы быстрого реагирования ≤ 5 минут. 3. УЧЕНИЯ — не менее 4 в год по эвакуации; не менее 2 проверок систем оповещения в месяц. 4. ОПЕРШТАБ — сбор ≤ 30 минут (аналог koltsovo-edds-mode-escalation). Состав: ректор, заместитель по безопасности, начальник СЦ, представитель ФСБ/МВД. 5. ВЗАИМОДЕЙСТВИЕ С УФСБ/МВД — доклад по протоколу в течение 10 минут с момента подтверждения угрозы. 6. ПОСТАНАЛИЗ — разбор инцидента, корректировка плана учений, доклад ректору и в Минобрнауки.",
+      "priority": 1,
+      "position": {
+        "x": 880,
+        "y": 60
+      }
+    },
+    {
+      "id": "n_in_massGuardCoverage",
+      "type": "input",
+      "label": "massGuardCoverage",
+      "paramRef": "massGuardCoverage",
+      "position": {
+        "x": 60,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_thr_massGuardCoverage",
+      "type": "threshold",
+      "label": "100.0 ± 0.0 %",
+      "refValue": 100.0,
+      "deviation": 0.0,
+      "unit": "%",
+      "position": {
+        "x": 320,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_cmp_massGuardCoverage",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_in_drillsPerYear",
+      "type": "input",
+      "label": "drillsPerYear",
+      "paramRef": "drillsPerYear",
+      "position": {
+        "x": 60,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_thr_drillsPerYear",
+      "type": "threshold",
+      "label": "4.0 ± 1.0 шт",
+      "refValue": 4.0,
+      "deviation": 1.0,
+      "unit": "шт",
+      "position": {
+        "x": 320,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_cmp_drillsPerYear",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_in_emergencyNotificationTime",
+      "type": "input",
+      "label": "emergencyNotificationTime",
+      "paramRef": "emergencyNotificationTime",
+      "position": {
+        "x": 60,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_thr_emergencyNotificationTime",
+      "type": "threshold",
+      "label": "3.0 ± 2.0 мин",
+      "refValue": 3.0,
+      "deviation": 2.0,
+      "unit": "мин",
+      "position": {
+        "x": 320,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_cmp_emergencyNotificationTime",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_in_notificationSystemChecks",
+      "type": "input",
+      "label": "notificationSystemChecks",
+      "paramRef": "notificationSystemChecks",
+      "position": {
+        "x": 60,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_thr_notificationSystemChecks",
+      "type": "threshold",
+      "label": "2.0 ± 1.0 шт/мес",
+      "refValue": 2.0,
+      "deviation": 1.0,
+      "unit": "шт/мес",
+      "position": {
+        "x": 320,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_cmp_notificationSystemChecks",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_in_responseTeamArrival",
+      "type": "input",
+      "label": "responseTeamArrival",
+      "paramRef": "responseTeamArrival",
+      "position": {
+        "x": 60,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_thr_responseTeamArrival",
+      "type": "threshold",
+      "label": "4.0 ± 2.0 мин",
+      "refValue": 4.0,
+      "deviation": 2.0,
+      "unit": "мин",
+      "position": {
+        "x": 320,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_cmp_responseTeamArrival",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_in_perimeterIncidentReports",
+      "type": "input",
+      "label": "perimeterIncidentReports",
+      "paramRef": "perimeterIncidentReports",
+      "position": {
+        "x": 60,
+        "y": 780
+      }
+    },
+    {
+      "id": "n_thr_perimeterIncidentReports",
+      "type": "threshold",
+      "label": "0.0 ± 2.0 шт/мес",
+      "refValue": 0.0,
+      "deviation": 2.0,
+      "unit": "шт/мес",
+      "position": {
+        "x": 320,
+        "y": 780
+      }
+    },
+    {
+      "id": "n_cmp_perimeterIncidentReports",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 780
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_massGuardCoverage",
+      "target": "n_thr_massGuardCoverage",
+      "condition": null
+    },
+    {
+      "source": "n_thr_massGuardCoverage",
+      "target": "n_cmp_massGuardCoverage",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_massGuardCoverage",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_drillsPerYear",
+      "target": "n_thr_drillsPerYear",
+      "condition": null
+    },
+    {
+      "source": "n_thr_drillsPerYear",
+      "target": "n_cmp_drillsPerYear",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_drillsPerYear",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_emergencyNotificationTime",
+      "target": "n_thr_emergencyNotificationTime",
+      "condition": null
+    },
+    {
+      "source": "n_thr_emergencyNotificationTime",
+      "target": "n_cmp_emergencyNotificationTime",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_emergencyNotificationTime",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_notificationSystemChecks",
+      "target": "n_thr_notificationSystemChecks",
+      "condition": null
+    },
+    {
+      "source": "n_thr_notificationSystemChecks",
+      "target": "n_cmp_notificationSystemChecks",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_notificationSystemChecks",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_responseTeamArrival",
+      "target": "n_thr_responseTeamArrival",
+      "condition": null
+    },
+    {
+      "source": "n_thr_responseTeamArrival",
+      "target": "n_cmp_responseTeamArrival",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_responseTeamArrival",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_perimeterIncidentReports",
+      "target": "n_thr_perimeterIncidentReports",
+      "condition": null
+    },
+    {
+      "source": "n_thr_perimeterIncidentReports",
+      "target": "n_cmp_perimeterIncidentReports",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_perimeterIncidentReports",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

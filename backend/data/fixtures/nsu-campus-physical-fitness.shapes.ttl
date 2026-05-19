@@ -1,0 +1,106 @@
+@prefix :    <http://regulations.local/ontology#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:NsuCampusPhysicalFitnessShape
+    a sh:NodeShape ;
+    sh:targetClass :Regulation ;
+
+    sh:property [ sh:path :name ; sh:datatype xsd:string ; sh:minCount 1 ] ;
+    sh:property [ sh:path :date ; sh:datatype xsd:date ; sh:minCount 1 ] ;
+
+    sh:property [
+        sh:path         :smartBraceletCoverage ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 90.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Покрытие сервисов ФОК через умный браслет"@ru
+    ] ;
+    sh:property [
+        sh:path         :smartBraceletCoverageDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :medicalPointHoursPerDay ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 8.0 ;
+        sh:maxInclusive 24.0 ;
+        sh:message      "Доступность медпункта"@ru
+    ] ;
+    sh:property [
+        sh:path         :medicalPointHoursPerDayDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 12.0
+    ] ;
+
+    sh:property [
+        sh:path         :peakOccupancy ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 50.0 ;
+        sh:maxInclusive 95.0 ;
+        sh:message      "Загрузка спортзалов в пиковое время"@ru
+    ] ;
+    sh:property [
+        sh:path         :peakOccupancyDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :userSatisfaction ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 75.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Удовлетворённость качеством услуг ФОК"@ru
+    ] ;
+    sh:property [
+        sh:path         :userSatisfactionDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :equipmentRentalAvailability ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 85.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Наличие исправного инвентаря для проката"@ru
+    ] ;
+    sh:property [
+        sh:path         :equipmentRentalAvailabilityDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :alarmButtonResponseTime ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 10.0 ;
+        sh:message      "Время реагирования на тревожную кнопку медпункта"@ru
+    ] ;
+    sh:property [
+        sh:path         :alarmButtonResponseTimeDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 5.0
+    ] .

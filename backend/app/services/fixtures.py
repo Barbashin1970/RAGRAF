@@ -37,6 +37,10 @@ DOMAINS: dict[str, dict[str, str]] = {
         "label": "Ситуационный центр",
         "hint":  "ЕДДС, приём 112, эскалация в ЦУКС, режимы повседневной/повышенной/ЧС",
     },
+    "campus": {
+        "label": "Кампус НГУ",
+        "hint":  "Регламенты по Стандарту инновационной образовательной среды (Минобрнауки 28.02.2024) — СЦ, ИТ-отдел, СКД, эксплуатация, общежития, технопарк, ФОК, МФК",
+    },
 }
 
 
@@ -91,6 +95,50 @@ REGISTRY: dict[str, dict[str, str]] = {
     "koltsovo-edds-adpi-monitoring": {
         "name":   "Регламент мониторинга автономных дымовых пожарных извещателей АДПИ GSM (ЕДДС р.п. Кольцово)",
         "domain": "emergency_response",
+    },
+
+    # ── Кампус НГУ (Стандарт Минобрнауки 28.02.2024) ────────────────────
+    # 10 регламентов сгенерированы скриптом scripts/gen_campus_fixtures.py
+    # из CAMPUS-NSU-REGULATIONS.md. Каждый = роль → ответственная служба.
+    "nsu-campus-situational-center": {
+        "name":   "Регламент работы ситуационного центра кампуса НГУ",
+        "domain": "campus",
+    },
+    "nsu-campus-access-control": {
+        "name":   "Регламент контроля доступа и пропускной системы кампуса НГУ",
+        "domain": "campus",
+    },
+    "nsu-campus-digital-identity": {
+        "name":   "Регламент единого профиля кампуса (SSO) НГУ",
+        "domain": "campus",
+    },
+    "nsu-campus-engineering-ops": {
+        "name":   "Регламент эксплуатации инженерных сетей и ЦИМ кампуса НГУ",
+        "domain": "campus",
+    },
+    "nsu-campus-dormitory-standard": {
+        "name":   "Регламент общежития кампуса НГУ (стандарт проживания)",
+        "domain": "campus",
+    },
+    "nsu-campus-edu-lab-complex": {
+        "name":   "Регламент учебно-лабораторного комплекса кампуса НГУ",
+        "domain": "campus",
+    },
+    "nsu-campus-technopark": {
+        "name":   "Регламент технопарка кампуса НГУ",
+        "domain": "campus",
+    },
+    "nsu-campus-physical-fitness": {
+        "name":   "Регламент физкультурно-оздоровительного корпуса (ФОК) кампуса НГУ",
+        "domain": "campus",
+    },
+    "nsu-campus-multifunctional": {
+        "name":   "Регламент многофункционального комплекса (МФК) кампуса НГУ",
+        "domain": "campus",
+    },
+    "nsu-campus-antiterrorism": {
+        "name":   "Регламент антитеррористической защищённости кампуса НГУ",
+        "domain": "campus",
     },
 }
 

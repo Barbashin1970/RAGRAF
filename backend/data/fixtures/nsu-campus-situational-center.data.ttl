@@ -1,0 +1,46 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент работы ситуационного центра кампуса НГУ
+# Роль: Дежурный оператор ситуационного центра (СЦ) / Сменный инженер ИВЦ
+# Источник: Стандарт Минобрнауки 28.02.2024, разд. II п. 7, 13, 24; разд. V п. 3, 10.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:platformUptime          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:platformUptimeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:sensorDataLatency          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:sensorDataLatencyDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:securityEventReactionTime          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:securityEventReactionTimeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:subsystemsCoverage          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:subsystemsCoverageDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:simultaneousEventCapacity          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:simultaneousEventCapacityDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:operatorShiftSize          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:operatorShiftSizeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:NsuCampusSituationalCenterRegulation
+    a                      :Regulation ;
+    :name                  "Регламент работы ситуационного центра кампуса НГУ" ;
+    :date                  "2024-02-28"^^xsd:date ;
+    :platformUptime              99.7 ;
+    :platformUptimeDeviation     0.3 ;
+    :sensorDataLatency              30.0 ;
+    :sensorDataLatencyDeviation     30.0 ;
+    :securityEventReactionTime              3.0 ;
+    :securityEventReactionTimeDeviation     2.0 ;
+    :subsystemsCoverage              97.0 ;
+    :subsystemsCoverageDeviation     3.0 ;
+    :simultaneousEventCapacity              50.0 ;
+    :simultaneousEventCapacityDeviation     25.0 ;
+    :operatorShiftSize              3.0 ;
+    :operatorShiftSizeDeviation     1.0 ;
+    :recommendation        "Регламент работы ситуационного центра кампуса НГУ (основан на разд. II п. 7-24 и разд. V п. 3-11 Стандарта Минобрнауки 28.02.2024): 1. ФИКСАЦИЯ СОБЫТИЯ — все события от инженерных датчиков, СКД, ИБ-систем, видеоаналитики поступают в единую интеграционную платформу СЦ. Задержка передачи ≤ 60 секунд, доступность платформы ≥ 99.5% за месяц. 2. КЛАССИФИКАЦИЯ ПО УРОВНЯМ — info / warning / critical. Critical — угроза жизни, отказ ключевой системы, ИБ-инцидент. 3. РЕАГИРОВАНИЕ — оператор СЦ обязан реагировать на critical-событие в течение 3 ± 2 минут: оповестить начальника СЦ, профильную службу (ИТ-отдел / Служба безопасности / Эксплуатация), при необходимости — дежурного по университету. 4. ЭСКАЛАЦИЯ — события класса «множественные одновременные», ИБ-инциденты, пожарные тревоги, попытки взлома физических периметров — на руководство университета в течение 15 минут. 5. КАНАЛЫ — основной канал интеграционной платформы + резервный (переключение автоматическое при отказе ≤ 30 сек). 6. ОТЧЁТНОСТЬ — журнал инцидентов ведётся в КСА, после закрытия инцидента — отчёт о реагировании в течение 24 часов. Месячная сводка ректору и в Минобрнауки (через Прокампус.рф)." .

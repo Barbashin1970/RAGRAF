@@ -1,0 +1,46 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент многофункционального комплекса (МФК) кампуса НГУ
+# Роль: Сервис студенческой жизни / Администрация конференц-зон
+# Источник: Стандарт Минобрнауки, разд. V «Требования к МФК», п. 1-6.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:coworking24h          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:coworking24hDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:concertHallEventsMonthly          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:concertHallEventsMonthlyDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:mfcSatisfaction          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:mfcSatisfactionDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:libraryDigitalRequestsDaily          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:libraryDigitalRequestsDailyDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:bookingDeskLatency          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:bookingDeskLatencyDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:itResponseTime          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:itResponseTimeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:NsuCampusMultifunctionalRegulation
+    a                      :Regulation ;
+    :name                  "Регламент многофункционального комплекса (МФК) кампуса НГУ" ;
+    :date                  "2024-02-28"^^xsd:date ;
+    :coworking24h              1.0 ;
+    :coworking24hDeviation     0.0 ;
+    :concertHallEventsMonthly              15.0 ;
+    :concertHallEventsMonthlyDeviation     5.0 ;
+    :mfcSatisfaction              80.0 ;
+    :mfcSatisfactionDeviation     5.0 ;
+    :libraryDigitalRequestsDaily              200.0 ;
+    :libraryDigitalRequestsDailyDeviation     50.0 ;
+    :bookingDeskLatency              60.0 ;
+    :bookingDeskLatencyDeviation     30.0 ;
+    :itResponseTime              15.0 ;
+    :itResponseTimeDeviation     5.0 ;
+    :recommendation        "Регламент МФК кампуса НГУ (разд. V «Требования к МФК» п. 1-6 Стандарта 28.02.2024): 1. БИБЛИОТЕКА — выставочное пространство + цифровая библиотека с учётом выдачи/хранения цифровых материалов. Целевая нагрузка — ≥ 200 цифровых обращений/сутки. 2. КОВОРКИНГ 24/7 — без подтверждения, по карте резидента. Wi-Fi, экраны для подключения гаджетов, мягкий инвентарь, отдельный санузел. 3. КОНЦЕРТНЫЙ ЗАЛ — мультимедийное оборудование + системы безопасности по современным требованиям. Целевая загрузка — ≥ 15 мероприятий/мес. 4. БРОНИРОВАНИЕ — цифровой сервис, время бронирования ≤ 60 секунд. 5. ОТКАЗ ОБОРУДОВАНИЯ — выезд ИТ-инженера ≤ 15 минут в рабочее время. 6. ОТЧЁТНОСТЬ — месячная статистика по загрузке на портал Прокампус.рф." .

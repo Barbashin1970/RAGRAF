@@ -1,0 +1,302 @@
+{
+  "rule_id": "rule_nsu-campus-dormitory-standard",
+  "regulation_id": "nsu-campus-dormitory-standard",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "action": "recommendation",
+      "text": "Регламент общежития кампуса НГУ (разд. V п. 11-14 Стандарта 28.02.2024): 1. ПЛАНИРОВКА — ≥ 20 м² общей площади на студента, ≤ 2 чел в комнате, ≥ 6 розеток на блок на чел, кондиционер в общем пространстве. 2. ОБЯЗАТЕЛЬНЫЕ СЕРВИСЫ — Wi-Fi во всех блоках, общая кухня на этаж, медиаэкран на двух языках, банкомат в холле, прачечная (самообслуживание), не менее 10 мест для велосипедов / самокатов на 50 студентов. 3. ЗАЯВКИ НА РЕМОНТ — критичные (нет воды/тепла/электричества) — ≤ 4 часов. Обычные — ≤ 24 часов. Запись через цифровой сервис комендатуры. 4. УДОВЛЕТВОРЁННОСТЬ — раз в семестр опрос. < 75% → план улучшений к следующему семестру + отчёт ректору. 5. КОНСЬЕРЖ — круглосуточно. Семейные блоки и комнаты матери и ребёнка (п. 11 Стандарта).",
+      "priority": 2,
+      "position": {
+        "x": 880,
+        "y": 60
+      }
+    },
+    {
+      "id": "n_in_areaPerStudent",
+      "type": "input",
+      "label": "areaPerStudent",
+      "paramRef": "areaPerStudent",
+      "position": {
+        "x": 60,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_thr_areaPerStudent",
+      "type": "threshold",
+      "label": "22.0 ± 2.0 м²",
+      "refValue": 22.0,
+      "deviation": 2.0,
+      "unit": "м²",
+      "position": {
+        "x": 320,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_cmp_areaPerStudent",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_in_studentsPerRoom",
+      "type": "input",
+      "label": "studentsPerRoom",
+      "paramRef": "studentsPerRoom",
+      "position": {
+        "x": 60,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_thr_studentsPerRoom",
+      "type": "threshold",
+      "label": "1.5 ± 0.5 чел",
+      "refValue": 1.5,
+      "deviation": 0.5,
+      "unit": "чел",
+      "position": {
+        "x": 320,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_cmp_studentsPerRoom",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_in_socketsPerPerson",
+      "type": "input",
+      "label": "socketsPerPerson",
+      "paramRef": "socketsPerPerson",
+      "position": {
+        "x": 60,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_thr_socketsPerPerson",
+      "type": "threshold",
+      "label": "7.0 ± 1.0 шт",
+      "refValue": 7.0,
+      "deviation": 1.0,
+      "unit": "шт",
+      "position": {
+        "x": 320,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_cmp_socketsPerPerson",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_in_userSatisfaction",
+      "type": "input",
+      "label": "userSatisfaction",
+      "paramRef": "userSatisfaction",
+      "position": {
+        "x": 60,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_thr_userSatisfaction",
+      "type": "threshold",
+      "label": "82.0 ± 7.0 %",
+      "refValue": 82.0,
+      "deviation": 7.0,
+      "unit": "%",
+      "position": {
+        "x": 320,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_cmp_userSatisfaction",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_in_maintenanceRequestTime",
+      "type": "input",
+      "label": "maintenanceRequestTime",
+      "paramRef": "maintenanceRequestTime",
+      "position": {
+        "x": 60,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_thr_maintenanceRequestTime",
+      "type": "threshold",
+      "label": "18.0 ± 6.0 часы",
+      "refValue": 18.0,
+      "deviation": 6.0,
+      "unit": "часы",
+      "position": {
+        "x": 320,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_cmp_maintenanceRequestTime",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_in_bikeStorageCapacity",
+      "type": "input",
+      "label": "bikeStorageCapacity",
+      "paramRef": "bikeStorageCapacity",
+      "position": {
+        "x": 60,
+        "y": 780
+      }
+    },
+    {
+      "id": "n_thr_bikeStorageCapacity",
+      "type": "threshold",
+      "label": "12.0 ± 2.0 шт/50 студентов",
+      "refValue": 12.0,
+      "deviation": 2.0,
+      "unit": "шт/50 студентов",
+      "position": {
+        "x": 320,
+        "y": 780
+      }
+    },
+    {
+      "id": "n_cmp_bikeStorageCapacity",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 780
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_areaPerStudent",
+      "target": "n_thr_areaPerStudent",
+      "condition": null
+    },
+    {
+      "source": "n_thr_areaPerStudent",
+      "target": "n_cmp_areaPerStudent",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_areaPerStudent",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_studentsPerRoom",
+      "target": "n_thr_studentsPerRoom",
+      "condition": null
+    },
+    {
+      "source": "n_thr_studentsPerRoom",
+      "target": "n_cmp_studentsPerRoom",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_studentsPerRoom",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_socketsPerPerson",
+      "target": "n_thr_socketsPerPerson",
+      "condition": null
+    },
+    {
+      "source": "n_thr_socketsPerPerson",
+      "target": "n_cmp_socketsPerPerson",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_socketsPerPerson",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_userSatisfaction",
+      "target": "n_thr_userSatisfaction",
+      "condition": null
+    },
+    {
+      "source": "n_thr_userSatisfaction",
+      "target": "n_cmp_userSatisfaction",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_userSatisfaction",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_maintenanceRequestTime",
+      "target": "n_thr_maintenanceRequestTime",
+      "condition": null
+    },
+    {
+      "source": "n_thr_maintenanceRequestTime",
+      "target": "n_cmp_maintenanceRequestTime",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_maintenanceRequestTime",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_bikeStorageCapacity",
+      "target": "n_thr_bikeStorageCapacity",
+      "condition": null
+    },
+    {
+      "source": "n_thr_bikeStorageCapacity",
+      "target": "n_cmp_bikeStorageCapacity",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_bikeStorageCapacity",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

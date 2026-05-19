@@ -1,0 +1,106 @@
+@prefix :    <http://regulations.local/ontology#> .
+@prefix sh:  <http://www.w3.org/ns/shacl#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+:NsuCampusTechnoparkShape
+    a sh:NodeShape ;
+    sh:targetClass :Regulation ;
+
+    sh:property [ sh:path :name ; sh:datatype xsd:string ; sh:minCount 1 ] ;
+    sh:property [ sh:path :date ; sh:datatype xsd:date ; sh:minCount 1 ] ;
+
+    sh:property [
+        sh:path         :subsidizedAreaShare ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 10.0 ;
+        sh:maxInclusive 60.0 ;
+        sh:message      "Доля площадей под льготную аренду резидентам"@ru
+    ] ;
+    sh:property [
+        sh:path         :subsidizedAreaShareDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :residentSatisfaction ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 75.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Удовлетворённость резидентов"@ru
+    ] ;
+    sh:property [
+        sh:path         :residentSatisfactionDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :newStartupsPerYear ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 200.0 ;
+        sh:message      "Новых университетских стартапов в год"@ru
+    ] ;
+    sh:property [
+        sh:path         :newStartupsPerYearDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 100.0
+    ] ;
+
+    sh:property [
+        sh:path         :incubatorOccupancy ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 50.0 ;
+        sh:maxInclusive 100.0 ;
+        sh:message      "Заполнение инкубатора"@ru
+    ] ;
+    sh:property [
+        sh:path         :incubatorOccupancyDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 50.0
+    ] ;
+
+    sh:property [
+        sh:path         :electricPower ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.5 ;
+        sh:maxInclusive 5.0 ;
+        sh:message      "Точка присоединения к электрической сети"@ru
+    ] ;
+    sh:property [
+        sh:path         :electricPowerDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 2.5
+    ] ;
+
+    sh:property [
+        sh:path         :coworking24hAccess ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 1.0 ;
+        sh:maxInclusive 1.0 ;
+        sh:message      "Коворкинг работает 24/7"@ru
+    ] ;
+    sh:property [
+        sh:path         :coworking24hAccessDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 0.5
+    ] .

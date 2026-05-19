@@ -1,0 +1,302 @@
+{
+  "rule_id": "rule_nsu-campus-physical-fitness",
+  "regulation_id": "nsu-campus-physical-fitness",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "action": "recommendation",
+      "text": "Регламент ФОК кампуса НГУ (разд. V «Требования к ФОК» п. 1-9 Стандарта 28.02.2024): 1. ДОСТУП ПО УМНОМУ БРАСЛЕТУ — 100% сервисов: турникеты, боксы хранения, прокат инвентаря, оплата доп. услуг. 2. ЗАЛЫ И ОБОРУДОВАНИЕ — кардио + силовой + йога + групповые занятия. Система кондиционирования. Музыкальная и интерактивная системы отслеживания физического состояния. 3. МЕДПУНКТ — доступность ≥ 12 часов/сутки. Травма в зале → тревожная кнопка → прибытие медработника ≤ 2 минут. 4. ПИКОВАЯ ЗАГРУЗКА — при > 90% бронирования за 1 час до пика → автоматическое открытие резервных слотов. 5. ИНВЕНТАРЬ — ежемесячный техосмотр тренажёров с записью в журнал. Прокат с возвратным депозитом. 6. ПИТАНИЕ — точка общественного питания в ФОК. Раздевалки с достаточным количеством банкеток при пиковой нагрузке.",
+      "priority": 3,
+      "position": {
+        "x": 880,
+        "y": 60
+      }
+    },
+    {
+      "id": "n_in_smartBraceletCoverage",
+      "type": "input",
+      "label": "smartBraceletCoverage",
+      "paramRef": "smartBraceletCoverage",
+      "position": {
+        "x": 60,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_thr_smartBraceletCoverage",
+      "type": "threshold",
+      "label": "100.0 ± 0.0 %",
+      "refValue": 100.0,
+      "deviation": 0.0,
+      "unit": "%",
+      "position": {
+        "x": 320,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_cmp_smartBraceletCoverage",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_in_medicalPointHoursPerDay",
+      "type": "input",
+      "label": "medicalPointHoursPerDay",
+      "paramRef": "medicalPointHoursPerDay",
+      "position": {
+        "x": 60,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_thr_medicalPointHoursPerDay",
+      "type": "threshold",
+      "label": "12.0 ± 2.0 часы",
+      "refValue": 12.0,
+      "deviation": 2.0,
+      "unit": "часы",
+      "position": {
+        "x": 320,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_cmp_medicalPointHoursPerDay",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_in_peakOccupancy",
+      "type": "input",
+      "label": "peakOccupancy",
+      "paramRef": "peakOccupancy",
+      "position": {
+        "x": 60,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_thr_peakOccupancy",
+      "type": "threshold",
+      "label": "80.0 ± 10.0 %",
+      "refValue": 80.0,
+      "deviation": 10.0,
+      "unit": "%",
+      "position": {
+        "x": 320,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_cmp_peakOccupancy",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_in_userSatisfaction",
+      "type": "input",
+      "label": "userSatisfaction",
+      "paramRef": "userSatisfaction",
+      "position": {
+        "x": 60,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_thr_userSatisfaction",
+      "type": "threshold",
+      "label": "80.0 ± 5.0 %",
+      "refValue": 80.0,
+      "deviation": 5.0,
+      "unit": "%",
+      "position": {
+        "x": 320,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_cmp_userSatisfaction",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_in_equipmentRentalAvailability",
+      "type": "input",
+      "label": "equipmentRentalAvailability",
+      "paramRef": "equipmentRentalAvailability",
+      "position": {
+        "x": 60,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_thr_equipmentRentalAvailability",
+      "type": "threshold",
+      "label": "95.0 ± 5.0 %",
+      "refValue": 95.0,
+      "deviation": 5.0,
+      "unit": "%",
+      "position": {
+        "x": 320,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_cmp_equipmentRentalAvailability",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_in_alarmButtonResponseTime",
+      "type": "input",
+      "label": "alarmButtonResponseTime",
+      "paramRef": "alarmButtonResponseTime",
+      "position": {
+        "x": 60,
+        "y": 780
+      }
+    },
+    {
+      "id": "n_thr_alarmButtonResponseTime",
+      "type": "threshold",
+      "label": "2.0 ± 1.0 мин",
+      "refValue": 2.0,
+      "deviation": 1.0,
+      "unit": "мин",
+      "position": {
+        "x": 320,
+        "y": 780
+      }
+    },
+    {
+      "id": "n_cmp_alarmButtonResponseTime",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 780
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_smartBraceletCoverage",
+      "target": "n_thr_smartBraceletCoverage",
+      "condition": null
+    },
+    {
+      "source": "n_thr_smartBraceletCoverage",
+      "target": "n_cmp_smartBraceletCoverage",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_smartBraceletCoverage",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_medicalPointHoursPerDay",
+      "target": "n_thr_medicalPointHoursPerDay",
+      "condition": null
+    },
+    {
+      "source": "n_thr_medicalPointHoursPerDay",
+      "target": "n_cmp_medicalPointHoursPerDay",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_medicalPointHoursPerDay",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_peakOccupancy",
+      "target": "n_thr_peakOccupancy",
+      "condition": null
+    },
+    {
+      "source": "n_thr_peakOccupancy",
+      "target": "n_cmp_peakOccupancy",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_peakOccupancy",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_userSatisfaction",
+      "target": "n_thr_userSatisfaction",
+      "condition": null
+    },
+    {
+      "source": "n_thr_userSatisfaction",
+      "target": "n_cmp_userSatisfaction",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_userSatisfaction",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_equipmentRentalAvailability",
+      "target": "n_thr_equipmentRentalAvailability",
+      "condition": null
+    },
+    {
+      "source": "n_thr_equipmentRentalAvailability",
+      "target": "n_cmp_equipmentRentalAvailability",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_equipmentRentalAvailability",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_alarmButtonResponseTime",
+      "target": "n_thr_alarmButtonResponseTime",
+      "condition": null
+    },
+    {
+      "source": "n_thr_alarmButtonResponseTime",
+      "target": "n_cmp_alarmButtonResponseTime",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_alarmButtonResponseTime",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент технопарка кампуса НГУ
+# Роль: Дирекция технопарка / Координатор экосистемы технопредпринимательства
+# Источник: Стандарт Минобрнауки, разд. V «Требования к технопаркам» и «к экосистеме».
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:subsidizedAreaShare          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:subsidizedAreaShareDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:residentSatisfaction          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:residentSatisfactionDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:newStartupsPerYear          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:newStartupsPerYearDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:incubatorOccupancy          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:incubatorOccupancyDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:electricPower          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:electricPowerDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:coworking24hAccess          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:coworking24hAccessDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:NsuCampusTechnoparkRegulation
+    a                      :Regulation ;
+    :name                  "Регламент технопарка кампуса НГУ" ;
+    :date                  "2024-02-28"^^xsd:date ;
+    :subsidizedAreaShare              30.0 ;
+    :subsidizedAreaShareDeviation     10.0 ;
+    :residentSatisfaction              80.0 ;
+    :residentSatisfactionDeviation     5.0 ;
+    :newStartupsPerYear              20.0 ;
+    :newStartupsPerYearDeviation     10.0 ;
+    :incubatorOccupancy              80.0 ;
+    :incubatorOccupancyDeviation     10.0 ;
+    :electricPower              0.8 ;
+    :electricPowerDeviation     0.3 ;
+    :coworking24hAccess              1.0 ;
+    :coworking24hAccessDeviation     0.0 ;
+    :recommendation        "Регламент технопарка кампуса НГУ (разд. V «Требования к объектам инфраструктуры технопарков» + «Требования к экосистеме технопредпринимательства» Стандарта 28.02.2024): 1. РЕЗИДЕНТЫ — отбор по отраслевой специализации технопарка + образовательной программе НГУ. Кандидат вне специализации — экспертиза дирекцией ≤ 30 дней. 2. ЛЬГОТНАЯ АРЕНДА — ≥ 30% площадей под льготную аренду резидентам (студенческие стартапы, аспиранты-предприниматели). 3. КОВОРКИНГ 24/7 — обязателен. Доступ по карте резидента, Wi-Fi 100%, оборудование: 3D-принтеры, 3D-сканеры, VR/AR-станции, ЧПУ-станки, чистая комната для инжиниринга. 4. УСЛУГИ ЭКОСИСТЕМЫ — программы инкубации/акселерации, менторская поддержка, услуги патентования и защиты ИС, юр./бух./маркетинг сопровождение, выход на электронные торговые площадки. 5. КОНТРОЛЬ АКТИВНОСТИ — резидент без активности > 6 месяцев → пересмотр условий аренды (рекомендация — освобождение для очереди). 6. ОТЧЁТНОСТЬ — раз в полгода публикация ключевых разработок на портале Прокампус.рф." .

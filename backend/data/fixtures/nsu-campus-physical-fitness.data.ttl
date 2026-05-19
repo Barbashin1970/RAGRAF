@@ -1,0 +1,46 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент физкультурно-оздоровительного корпуса (ФОК) кампуса НГУ
+# Роль: Спортивный отдел / Медицинский пункт ФОК
+# Источник: Стандарт Минобрнауки, разд. V «Требования к ФОК», п. 1-9.
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:smartBraceletCoverage          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:smartBraceletCoverageDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:medicalPointHoursPerDay          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:medicalPointHoursPerDayDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:peakOccupancy          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:peakOccupancyDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:userSatisfaction          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:userSatisfactionDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:equipmentRentalAvailability          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:equipmentRentalAvailabilityDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:alarmButtonResponseTime          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:alarmButtonResponseTimeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:NsuCampusPhysicalFitnessRegulation
+    a                      :Regulation ;
+    :name                  "Регламент физкультурно-оздоровительного корпуса (ФОК) кампуса НГУ" ;
+    :date                  "2024-02-28"^^xsd:date ;
+    :smartBraceletCoverage              100.0 ;
+    :smartBraceletCoverageDeviation     0.0 ;
+    :medicalPointHoursPerDay              12.0 ;
+    :medicalPointHoursPerDayDeviation     2.0 ;
+    :peakOccupancy              80.0 ;
+    :peakOccupancyDeviation     10.0 ;
+    :userSatisfaction              80.0 ;
+    :userSatisfactionDeviation     5.0 ;
+    :equipmentRentalAvailability              95.0 ;
+    :equipmentRentalAvailabilityDeviation     5.0 ;
+    :alarmButtonResponseTime              2.0 ;
+    :alarmButtonResponseTimeDeviation     1.0 ;
+    :recommendation        "Регламент ФОК кампуса НГУ (разд. V «Требования к ФОК» п. 1-9 Стандарта 28.02.2024): 1. ДОСТУП ПО УМНОМУ БРАСЛЕТУ — 100% сервисов: турникеты, боксы хранения, прокат инвентаря, оплата доп. услуг. 2. ЗАЛЫ И ОБОРУДОВАНИЕ — кардио + силовой + йога + групповые занятия. Система кондиционирования. Музыкальная и интерактивная системы отслеживания физического состояния. 3. МЕДПУНКТ — доступность ≥ 12 часов/сутки. Травма в зале → тревожная кнопка → прибытие медработника ≤ 2 минут. 4. ПИКОВАЯ ЗАГРУЗКА — при > 90% бронирования за 1 час до пика → автоматическое открытие резервных слотов. 5. ИНВЕНТАРЬ — ежемесячный техосмотр тренажёров с записью в журнал. Прокат с возвратным депозитом. 6. ПИТАНИЕ — точка общественного питания в ФОК. Раздевалки с достаточным количеством банкеток при пиковой нагрузке." .
