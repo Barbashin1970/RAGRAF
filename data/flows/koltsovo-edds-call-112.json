@@ -1,0 +1,467 @@
+{
+  "rule_id": "rule_koltsovo-edds-call-112",
+  "regulation_id": "koltsovo-edds-call-112",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "position": {
+        "x": 880.0,
+        "y": 60.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": "recommendation",
+      "text": "Алгоритм приёма вызова на 112 в ЕДДС р.п. Кольцово (на основе § 5.4.1, § 6.1-6.5, § 8.6.2 Положения о ЕДДС МКУ «СВЕТОЧ» №15 от 04.12.2020): 1) Ответить на вызов в течение 6 ± 2 секунд, использовать гарнитуру (§ 8.6.2). 2) Опросить заявителя по алгоритму системы-112: тип ЧС/происшествия, адрес, угроза жизни и здоровью, количество пострадавших, текущая обстановка. Окно опроса 90 ± 30 секунд. 3) Зарегистрировать вызов в КСА ЕДДС, привязать к зоне ответственности соответствующей ДДС. 4) Передать карточку происшествия в профильную ДДС («01», «02», «03», «04», отраслевая ДДС предприятия) в течение 2 ± 1 минут; при угрозе жизни — параллельно вызвать профильную службу сразу. 5) При классификации ситуации как ЧС выше локального характера — немедленно доложить старшему оперативному дежурному ЕДДС и в ЦУКС ГУ МЧС России по НСО (см. отдельный регламент koltsovo-edds-cuks-report). 6) Все переговоры записываются и хранятся 30 ± 5 суток. 7) Контактный круглосуточный номер СОД ЕДДС р.п. Кольцово: 336-56-47; тел/факс «112»: 306-67-93; почта: mku_svetoch@mail.ru.",
+      "priority": 1,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_answerTimeSeconds",
+      "type": "input",
+      "label": "answerTimeSeconds",
+      "position": {
+        "x": 60.0,
+        "y": 80.0
+      },
+      "paramRef": "answerTimeSeconds",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_answerTimeSeconds",
+      "type": "threshold",
+      "label": "6.0 ± 2.0 с",
+      "position": {
+        "x": 320.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": 6.0,
+      "deviation": 2.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "с",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_answerTimeSeconds",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_handlingTimeSeconds",
+      "type": "input",
+      "label": "handlingTimeSeconds",
+      "position": {
+        "x": 60.0,
+        "y": 220.0
+      },
+      "paramRef": "handlingTimeSeconds",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_handlingTimeSeconds",
+      "type": "threshold",
+      "label": "90.0 ± 30.0 с",
+      "position": {
+        "x": 320.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": 90.0,
+      "deviation": 30.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "с",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_handlingTimeSeconds",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_dispatchTimeMinutes",
+      "type": "input",
+      "label": "dispatchTimeMinutes",
+      "position": {
+        "x": 60.0,
+        "y": 360.0
+      },
+      "paramRef": "dispatchTimeMinutes",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_dispatchTimeMinutes",
+      "type": "threshold",
+      "label": "2.0 ± 1.0 мин",
+      "position": {
+        "x": 320.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": 2.0,
+      "deviation": 1.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "мин",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_dispatchTimeMinutes",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_recordRetentionDays",
+      "type": "input",
+      "label": "recordRetentionDays",
+      "position": {
+        "x": 60.0,
+        "y": 500.0
+      },
+      "paramRef": "recordRetentionDays",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_recordRetentionDays",
+      "type": "threshold",
+      "label": "30.0 ± 5.0 сут",
+      "position": {
+        "x": 320.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": 30.0,
+      "deviation": 5.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "сут",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_recordRetentionDays",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_operatorsOnDuty",
+      "type": "input",
+      "label": "operatorsOnDuty",
+      "position": {
+        "x": 60.0,
+        "y": 640.0
+      },
+      "paramRef": "operatorsOnDuty",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_operatorsOnDuty",
+      "type": "threshold",
+      "label": "2.0 ± 1.0 чел.",
+      "position": {
+        "x": 320.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": 2.0,
+      "deviation": 1.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "чел.",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_operatorsOnDuty",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_answerTimeSeconds",
+      "target": "n_thr_answerTimeSeconds",
+      "condition": null
+    },
+    {
+      "source": "n_thr_answerTimeSeconds",
+      "target": "n_cmp_answerTimeSeconds",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_answerTimeSeconds",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_handlingTimeSeconds",
+      "target": "n_thr_handlingTimeSeconds",
+      "condition": null
+    },
+    {
+      "source": "n_thr_handlingTimeSeconds",
+      "target": "n_cmp_handlingTimeSeconds",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_handlingTimeSeconds",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_dispatchTimeMinutes",
+      "target": "n_thr_dispatchTimeMinutes",
+      "condition": null
+    },
+    {
+      "source": "n_thr_dispatchTimeMinutes",
+      "target": "n_cmp_dispatchTimeMinutes",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_dispatchTimeMinutes",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_recordRetentionDays",
+      "target": "n_thr_recordRetentionDays",
+      "condition": null
+    },
+    {
+      "source": "n_thr_recordRetentionDays",
+      "target": "n_cmp_recordRetentionDays",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_recordRetentionDays",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_operatorsOnDuty",
+      "target": "n_thr_operatorsOnDuty",
+      "condition": null
+    },
+    {
+      "source": "n_thr_operatorsOnDuty",
+      "target": "n_cmp_operatorsOnDuty",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_operatorsOnDuty",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

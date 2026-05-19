@@ -1,0 +1,475 @@
+{
+  "version_id": "e1472b665c904736a518169b9fff3fac",
+  "regulation_id": "dormitory-flood",
+  "created_at": "2026-05-19T06:26:09.211047+00:00",
+  "author": "system",
+  "comment": "Sync с регламентом: добавлены waterLevel, stackFlowRate, nightModeStart, commandantArrivalTime, evacuationThresholdLevel",
+  "dsl_snapshot": {
+    "rule_id": "rule_dormitory-flood",
+    "regulation_id": "dormitory-flood",
+    "nodes": [
+      {
+        "id": "n_output",
+        "type": "output",
+        "label": "Рекомендация",
+        "position": {
+          "x": 880.0,
+          "y": 60.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": "recommendation",
+        "text": "Регламент: при выходе параметра за допустимое отклонение — уведомить ответственное лицо.",
+        "priority": 1,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_waterLevel",
+        "type": "input",
+        "label": "waterLevel",
+        "position": {
+          "x": 60.0,
+          "y": 80.0
+        },
+        "paramRef": "waterLevel",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_waterLevel",
+        "type": "threshold",
+        "label": "0.0 ± 0.5 см",
+        "position": {
+          "x": 320.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": 0.0,
+        "deviation": 0.5,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": "см",
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_waterLevel",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_stackFlowRate",
+        "type": "input",
+        "label": "stackFlowRate",
+        "position": {
+          "x": 60.0,
+          "y": 220.0
+        },
+        "paramRef": "stackFlowRate",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_stackFlowRate",
+        "type": "threshold",
+        "label": "0.5 ± 0.3 м³/ч",
+        "position": {
+          "x": 320.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": 0.5,
+        "deviation": 0.3,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": "м³/ч",
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_stackFlowRate",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_nightModeStart",
+        "type": "input",
+        "label": "nightModeStart",
+        "position": {
+          "x": 60.0,
+          "y": 360.0
+        },
+        "paramRef": "nightModeStart",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_nightModeStart",
+        "type": "threshold",
+        "label": "22.0 ± 0.5 ч",
+        "position": {
+          "x": 320.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": 22.0,
+        "deviation": 0.5,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": "ч",
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_nightModeStart",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_commandantArrivalTime",
+        "type": "input",
+        "label": "commandantArrivalTime",
+        "position": {
+          "x": 60.0,
+          "y": 500.0
+        },
+        "paramRef": "commandantArrivalTime",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_commandantArrivalTime",
+        "type": "threshold",
+        "label": "15.0 ± 5.0 мин",
+        "position": {
+          "x": 320.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": 15.0,
+        "deviation": 5.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": "мин",
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_commandantArrivalTime",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_evacuationThresholdLevel",
+        "type": "input",
+        "label": "evacuationThresholdLevel",
+        "position": {
+          "x": 60.0,
+          "y": 640.0
+        },
+        "paramRef": "evacuationThresholdLevel",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_evacuationThresholdLevel",
+        "type": "threshold",
+        "label": "5.0 ± 1.0 см",
+        "position": {
+          "x": 320.0,
+          "y": 640.0
+        },
+        "paramRef": null,
+        "refValue": 5.0,
+        "deviation": 1.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": "см",
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_evacuationThresholdLevel",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 640.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      }
+    ],
+    "edges": [
+      {
+        "source": "n_in_waterLevel",
+        "target": "n_thr_waterLevel",
+        "condition": null
+      },
+      {
+        "source": "n_thr_waterLevel",
+        "target": "n_cmp_waterLevel",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_waterLevel",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_stackFlowRate",
+        "target": "n_thr_stackFlowRate",
+        "condition": null
+      },
+      {
+        "source": "n_thr_stackFlowRate",
+        "target": "n_cmp_stackFlowRate",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_stackFlowRate",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_nightModeStart",
+        "target": "n_thr_nightModeStart",
+        "condition": null
+      },
+      {
+        "source": "n_thr_nightModeStart",
+        "target": "n_cmp_nightModeStart",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_nightModeStart",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_commandantArrivalTime",
+        "target": "n_thr_commandantArrivalTime",
+        "condition": null
+      },
+      {
+        "source": "n_thr_commandantArrivalTime",
+        "target": "n_cmp_commandantArrivalTime",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_commandantArrivalTime",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_evacuationThresholdLevel",
+        "target": "n_thr_evacuationThresholdLevel",
+        "condition": null
+      },
+      {
+        "source": "n_thr_evacuationThresholdLevel",
+        "target": "n_cmp_evacuationThresholdLevel",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_evacuationThresholdLevel",
+        "target": "n_output",
+        "condition": "outside"
+      }
+    ]
+  },
+  "diff_summary": null
+}

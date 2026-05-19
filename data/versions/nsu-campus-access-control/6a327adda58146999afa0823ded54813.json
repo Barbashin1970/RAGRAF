@@ -1,0 +1,562 @@
+{
+  "version_id": "6a327adda58146999afa0823ded54813",
+  "regulation_id": "nsu-campus-access-control",
+  "created_at": "2026-05-19T06:26:09.449499+00:00",
+  "author": "system",
+  "comment": "Sync с регламентом: добавлены identificationTime, recognitionAccuracy, unauthorizedAccessReaction, videoCoverage, biometricDataRetention, cameraUptimeAvg",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-campus-access-control",
+    "regulation_id": "nsu-campus-access-control",
+    "nodes": [
+      {
+        "id": "n_output",
+        "type": "output",
+        "label": "Рекомендация",
+        "position": {
+          "x": 880.0,
+          "y": 60.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": "recommendation",
+        "text": "Регламент: при выходе параметра за допустимое отклонение — уведомить ответственное лицо.",
+        "priority": 1,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_identificationTime",
+        "type": "input",
+        "label": "identificationTime",
+        "position": {
+          "x": 60.0,
+          "y": 80.0
+        },
+        "paramRef": "identificationTime",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_identificationTime",
+        "type": "threshold",
+        "label": "1.5 ± 0.5",
+        "position": {
+          "x": 320.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": 1.5,
+        "deviation": 0.5,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_identificationTime",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_recognitionAccuracy",
+        "type": "input",
+        "label": "recognitionAccuracy",
+        "position": {
+          "x": 60.0,
+          "y": 220.0
+        },
+        "paramRef": "recognitionAccuracy",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_recognitionAccuracy",
+        "type": "threshold",
+        "label": "98.0 ± 1.0",
+        "position": {
+          "x": 320.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": 98.0,
+        "deviation": 1.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_recognitionAccuracy",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_unauthorizedAccessReaction",
+        "type": "input",
+        "label": "unauthorizedAccessReaction",
+        "position": {
+          "x": 60.0,
+          "y": 360.0
+        },
+        "paramRef": "unauthorizedAccessReaction",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_unauthorizedAccessReaction",
+        "type": "threshold",
+        "label": "20.0 ± 10.0",
+        "position": {
+          "x": 320.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": 20.0,
+        "deviation": 10.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_unauthorizedAccessReaction",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_videoCoverage",
+        "type": "input",
+        "label": "videoCoverage",
+        "position": {
+          "x": 60.0,
+          "y": 500.0
+        },
+        "paramRef": "videoCoverage",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_videoCoverage",
+        "type": "threshold",
+        "label": "100.0 ± 0.0",
+        "position": {
+          "x": 320.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": 100.0,
+        "deviation": 0.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_videoCoverage",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_biometricDataRetention",
+        "type": "input",
+        "label": "biometricDataRetention",
+        "position": {
+          "x": 60.0,
+          "y": 640.0
+        },
+        "paramRef": "biometricDataRetention",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_biometricDataRetention",
+        "type": "threshold",
+        "label": "30.0 ± 0.0",
+        "position": {
+          "x": 320.0,
+          "y": 640.0
+        },
+        "paramRef": null,
+        "refValue": 30.0,
+        "deviation": 0.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_biometricDataRetention",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 640.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_cameraUptimeAvg",
+        "type": "input",
+        "label": "cameraUptimeAvg",
+        "position": {
+          "x": 60.0,
+          "y": 780.0
+        },
+        "paramRef": "cameraUptimeAvg",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_cameraUptimeAvg",
+        "type": "threshold",
+        "label": "99.5 ± 0.5",
+        "position": {
+          "x": 320.0,
+          "y": 780.0
+        },
+        "paramRef": null,
+        "refValue": 99.5,
+        "deviation": 0.5,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_cameraUptimeAvg",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 780.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      }
+    ],
+    "edges": [
+      {
+        "source": "n_in_identificationTime",
+        "target": "n_thr_identificationTime",
+        "condition": null
+      },
+      {
+        "source": "n_thr_identificationTime",
+        "target": "n_cmp_identificationTime",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_identificationTime",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_recognitionAccuracy",
+        "target": "n_thr_recognitionAccuracy",
+        "condition": null
+      },
+      {
+        "source": "n_thr_recognitionAccuracy",
+        "target": "n_cmp_recognitionAccuracy",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_recognitionAccuracy",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_unauthorizedAccessReaction",
+        "target": "n_thr_unauthorizedAccessReaction",
+        "condition": null
+      },
+      {
+        "source": "n_thr_unauthorizedAccessReaction",
+        "target": "n_cmp_unauthorizedAccessReaction",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_unauthorizedAccessReaction",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_videoCoverage",
+        "target": "n_thr_videoCoverage",
+        "condition": null
+      },
+      {
+        "source": "n_thr_videoCoverage",
+        "target": "n_cmp_videoCoverage",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_videoCoverage",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_biometricDataRetention",
+        "target": "n_thr_biometricDataRetention",
+        "condition": null
+      },
+      {
+        "source": "n_thr_biometricDataRetention",
+        "target": "n_cmp_biometricDataRetention",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_biometricDataRetention",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_cameraUptimeAvg",
+        "target": "n_thr_cameraUptimeAvg",
+        "condition": null
+      },
+      {
+        "source": "n_thr_cameraUptimeAvg",
+        "target": "n_cmp_cameraUptimeAvg",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_cameraUptimeAvg",
+        "target": "n_output",
+        "condition": "outside"
+      }
+    ]
+  },
+  "diff_summary": null
+}

@@ -1,0 +1,554 @@
+{
+  "rule_id": "rule_koltsovo-edds-adpi-monitoring",
+  "regulation_id": "koltsovo-edds-adpi-monitoring",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "position": {
+        "x": 880.0,
+        "y": 60.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": "recommendation",
+      "text": "Мониторинг АДПИ GSM в ЕДДС р.п. Кольцово (на основе § 4.1 «Основные задачи ЕДДС» и § 5.4.1 Положения о ЕДДС МКУ «СВЕТОЧ» №15 от 04.12.2020): \n\n1. ПРИЁМ СИГНАЛА — тревога от АДПИ GSM поступает по сотовому каналу на АРМ оператора интеллектуальных транспортных систем и видеонаблюдения (§ 10.2). Время доставки 15 ± 5 секунд. \n\n2. ПОДТВЕРЖДЕНИЕ — оператор в течение 5 ± 2 минут пытается подтвердить тревогу: звонок собственнику, контакт ответственного по адресу, проверка через камеры видеонаблюдения (если доступны). \n\n3. ПЕРЕДАЧА В «01» — при подтверждении пожара либо при отсутствии связи в течение окна подтверждения — передача в пожарную ДДС «01» за 1 ± 0.5 минуты с указанием точного адреса, типа объекта (жилой дом, общежитие, социальный объект), наличия людей. \n\n4. РЕГИСТРАЦИЯ — в КСА ЕДДС создаётся карточка происшествия с привязкой к адресу и устройству; голосовые переговоры записываются (см. регламент koltsovo-edds-call-112). \n\n5. КАЧЕСТВО СЕРВИСА: \n   - максимум 500 ± 100 устройств на одно АРМ; \n   - допустимая доля ложных срабатываний 5 ± 2 % в месяц; \n   - при превышении — анализ конкретных устройств, настройка порогов или замена. \n\n6. ОБСЛУЖИВАНИЕ — извещатели сообщают о низком заряде батареи при остатке 20 ± 5 %; ЕДДС формирует уведомление собственнику/УК с напоминанием о замене элемента питания. \n\n7. ЭКСКАЛАЦИЯ — при массовом срабатывании в одном квартале (≥ 3 устройства) — переход в режим повышенной готовности (см. регламент koltsovo-edds-mode-escalation) и доклад в ЦУКС ГУ МЧС России по НСО.",
+      "priority": 1,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_alarmDeliverySeconds",
+      "type": "input",
+      "label": "alarmDeliverySeconds",
+      "position": {
+        "x": 60.0,
+        "y": 80.0
+      },
+      "paramRef": "alarmDeliverySeconds",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_alarmDeliverySeconds",
+      "type": "threshold",
+      "label": "15.0 ± 5.0 с",
+      "position": {
+        "x": 320.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": 15.0,
+      "deviation": 5.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "с",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_alarmDeliverySeconds",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_operatorConfirmMinutes",
+      "type": "input",
+      "label": "operatorConfirmMinutes",
+      "position": {
+        "x": 60.0,
+        "y": 220.0
+      },
+      "paramRef": "operatorConfirmMinutes",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_operatorConfirmMinutes",
+      "type": "threshold",
+      "label": "5.0 ± 2.0 мин",
+      "position": {
+        "x": 320.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": 5.0,
+      "deviation": 2.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "мин",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_operatorConfirmMinutes",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_fireDispatchMinutes",
+      "type": "input",
+      "label": "fireDispatchMinutes",
+      "position": {
+        "x": 60.0,
+        "y": 360.0
+      },
+      "paramRef": "fireDispatchMinutes",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_fireDispatchMinutes",
+      "type": "threshold",
+      "label": "1.0 ± 0.5 мин",
+      "position": {
+        "x": 320.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": 1.0,
+      "deviation": 0.5,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "мин",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_fireDispatchMinutes",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_devicesPerWorkstation",
+      "type": "input",
+      "label": "devicesPerWorkstation",
+      "position": {
+        "x": 60.0,
+        "y": 500.0
+      },
+      "paramRef": "devicesPerWorkstation",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_devicesPerWorkstation",
+      "type": "threshold",
+      "label": "500.0 ± 100.0 шт.",
+      "position": {
+        "x": 320.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": 500.0,
+      "deviation": 100.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "шт.",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_devicesPerWorkstation",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_falseAlarmRatePercent",
+      "type": "input",
+      "label": "falseAlarmRatePercent",
+      "position": {
+        "x": 60.0,
+        "y": 640.0
+      },
+      "paramRef": "falseAlarmRatePercent",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_falseAlarmRatePercent",
+      "type": "threshold",
+      "label": "5.0 ± 2.0 %",
+      "position": {
+        "x": 320.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": 5.0,
+      "deviation": 2.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "%",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_falseAlarmRatePercent",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_lowBatteryThresholdPercent",
+      "type": "input",
+      "label": "lowBatteryThresholdPercent",
+      "position": {
+        "x": 60.0,
+        "y": 780.0
+      },
+      "paramRef": "lowBatteryThresholdPercent",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_lowBatteryThresholdPercent",
+      "type": "threshold",
+      "label": "20.0 ± 5.0 %",
+      "position": {
+        "x": 320.0,
+        "y": 780.0
+      },
+      "paramRef": null,
+      "refValue": 20.0,
+      "deviation": 5.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "%",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_lowBatteryThresholdPercent",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 780.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_alarmDeliverySeconds",
+      "target": "n_thr_alarmDeliverySeconds",
+      "condition": null
+    },
+    {
+      "source": "n_thr_alarmDeliverySeconds",
+      "target": "n_cmp_alarmDeliverySeconds",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_alarmDeliverySeconds",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_operatorConfirmMinutes",
+      "target": "n_thr_operatorConfirmMinutes",
+      "condition": null
+    },
+    {
+      "source": "n_thr_operatorConfirmMinutes",
+      "target": "n_cmp_operatorConfirmMinutes",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_operatorConfirmMinutes",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_fireDispatchMinutes",
+      "target": "n_thr_fireDispatchMinutes",
+      "condition": null
+    },
+    {
+      "source": "n_thr_fireDispatchMinutes",
+      "target": "n_cmp_fireDispatchMinutes",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_fireDispatchMinutes",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_devicesPerWorkstation",
+      "target": "n_thr_devicesPerWorkstation",
+      "condition": null
+    },
+    {
+      "source": "n_thr_devicesPerWorkstation",
+      "target": "n_cmp_devicesPerWorkstation",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_devicesPerWorkstation",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_falseAlarmRatePercent",
+      "target": "n_thr_falseAlarmRatePercent",
+      "condition": null
+    },
+    {
+      "source": "n_thr_falseAlarmRatePercent",
+      "target": "n_cmp_falseAlarmRatePercent",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_falseAlarmRatePercent",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_lowBatteryThresholdPercent",
+      "target": "n_thr_lowBatteryThresholdPercent",
+      "condition": null
+    },
+    {
+      "source": "n_thr_lowBatteryThresholdPercent",
+      "target": "n_cmp_lowBatteryThresholdPercent",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_lowBatteryThresholdPercent",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

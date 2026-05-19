@@ -1,0 +1,14 @@
+{
+  "version_id": "37103784ab174ddc865816960216fd0c",
+  "regulation_id": "koltsovo-edds-cuks-report",
+  "created_at": "2026-05-19T06:26:09.364176+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_koltsovo-edds-cuks-report",
+    "regulation_id": "koltsovo-edds-cuks-report",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

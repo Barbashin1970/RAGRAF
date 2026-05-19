@@ -1,0 +1,554 @@
+{
+  "rule_id": "rule_nsu-campus-situational-center",
+  "regulation_id": "nsu-campus-situational-center",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "position": {
+        "x": 880.0,
+        "y": 60.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": "recommendation",
+      "text": "Регламент работы ситуационного центра кампуса НГУ (основан на разд. II п. 7-24 и разд. V п. 3-11 Стандарта Минобрнауки 28.02.2024): 1. ФИКСАЦИЯ СОБЫТИЯ — все события от инженерных датчиков, СКД, ИБ-систем, видеоаналитики поступают в единую интеграционную платформу СЦ. Задержка передачи ≤ 60 секунд, доступность платформы ≥ 99.5% за месяц. 2. КЛАССИФИКАЦИЯ ПО УРОВНЯМ — info / warning / critical. Critical — угроза жизни, отказ ключевой системы, ИБ-инцидент. 3. РЕАГИРОВАНИЕ — оператор СЦ обязан реагировать на critical-событие в течение 3 ± 2 минут: оповестить начальника СЦ, профильную службу (ИТ-отдел / Служба безопасности / Эксплуатация), при необходимости — дежурного по университету. 4. ЭСКАЛАЦИЯ — события класса «множественные одновременные», ИБ-инциденты, пожарные тревоги, попытки взлома физических периметров — на руководство университета в течение 15 минут. 5. КАНАЛЫ — основной канал интеграционной платформы + резервный (переключение автоматическое при отказе ≤ 30 сек). 6. ОТЧЁТНОСТЬ — журнал инцидентов ведётся в КСА, после закрытия инцидента — отчёт о реагировании в течение 24 часов. Месячная сводка ректору и в Минобрнауки (через Прокампус.рф).",
+      "priority": 1,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_platformUptime",
+      "type": "input",
+      "label": "platformUptime",
+      "position": {
+        "x": 60.0,
+        "y": 80.0
+      },
+      "paramRef": "platformUptime",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_platformUptime",
+      "type": "threshold",
+      "label": "99.7 ± 0.3",
+      "position": {
+        "x": 320.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": 99.7,
+      "deviation": 0.3,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_platformUptime",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_sensorDataLatency",
+      "type": "input",
+      "label": "sensorDataLatency",
+      "position": {
+        "x": 60.0,
+        "y": 220.0
+      },
+      "paramRef": "sensorDataLatency",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_sensorDataLatency",
+      "type": "threshold",
+      "label": "30.0 ± 30.0",
+      "position": {
+        "x": 320.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": 30.0,
+      "deviation": 30.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_sensorDataLatency",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_securityEventReactionTime",
+      "type": "input",
+      "label": "securityEventReactionTime",
+      "position": {
+        "x": 60.0,
+        "y": 360.0
+      },
+      "paramRef": "securityEventReactionTime",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_securityEventReactionTime",
+      "type": "threshold",
+      "label": "3.0 ± 2.0",
+      "position": {
+        "x": 320.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": 3.0,
+      "deviation": 2.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_securityEventReactionTime",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_subsystemsCoverage",
+      "type": "input",
+      "label": "subsystemsCoverage",
+      "position": {
+        "x": 60.0,
+        "y": 500.0
+      },
+      "paramRef": "subsystemsCoverage",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_subsystemsCoverage",
+      "type": "threshold",
+      "label": "97.0 ± 3.0",
+      "position": {
+        "x": 320.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": 97.0,
+      "deviation": 3.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_subsystemsCoverage",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_simultaneousEventCapacity",
+      "type": "input",
+      "label": "simultaneousEventCapacity",
+      "position": {
+        "x": 60.0,
+        "y": 640.0
+      },
+      "paramRef": "simultaneousEventCapacity",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_simultaneousEventCapacity",
+      "type": "threshold",
+      "label": "50.0 ± 25.0",
+      "position": {
+        "x": 320.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": 50.0,
+      "deviation": 25.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_simultaneousEventCapacity",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_operatorShiftSize",
+      "type": "input",
+      "label": "operatorShiftSize",
+      "position": {
+        "x": 60.0,
+        "y": 780.0
+      },
+      "paramRef": "operatorShiftSize",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_operatorShiftSize",
+      "type": "threshold",
+      "label": "3.0 ± 1.0",
+      "position": {
+        "x": 320.0,
+        "y": 780.0
+      },
+      "paramRef": null,
+      "refValue": 3.0,
+      "deviation": 1.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_operatorShiftSize",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 780.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_platformUptime",
+      "target": "n_thr_platformUptime",
+      "condition": null
+    },
+    {
+      "source": "n_thr_platformUptime",
+      "target": "n_cmp_platformUptime",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_platformUptime",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_sensorDataLatency",
+      "target": "n_thr_sensorDataLatency",
+      "condition": null
+    },
+    {
+      "source": "n_thr_sensorDataLatency",
+      "target": "n_cmp_sensorDataLatency",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_sensorDataLatency",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_securityEventReactionTime",
+      "target": "n_thr_securityEventReactionTime",
+      "condition": null
+    },
+    {
+      "source": "n_thr_securityEventReactionTime",
+      "target": "n_cmp_securityEventReactionTime",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_securityEventReactionTime",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_subsystemsCoverage",
+      "target": "n_thr_subsystemsCoverage",
+      "condition": null
+    },
+    {
+      "source": "n_thr_subsystemsCoverage",
+      "target": "n_cmp_subsystemsCoverage",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_subsystemsCoverage",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_simultaneousEventCapacity",
+      "target": "n_thr_simultaneousEventCapacity",
+      "condition": null
+    },
+    {
+      "source": "n_thr_simultaneousEventCapacity",
+      "target": "n_cmp_simultaneousEventCapacity",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_simultaneousEventCapacity",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_operatorShiftSize",
+      "target": "n_thr_operatorShiftSize",
+      "condition": null
+    },
+    {
+      "source": "n_thr_operatorShiftSize",
+      "target": "n_cmp_operatorShiftSize",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_operatorShiftSize",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

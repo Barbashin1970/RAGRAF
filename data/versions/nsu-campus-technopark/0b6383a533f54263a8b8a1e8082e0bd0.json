@@ -1,0 +1,14 @@
+{
+  "version_id": "0b6383a533f54263a8b8a1e8082e0bd0",
+  "regulation_id": "nsu-campus-technopark",
+  "created_at": "2026-05-19T06:26:09.589265+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-campus-technopark",
+    "regulation_id": "nsu-campus-technopark",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

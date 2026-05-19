@@ -1,0 +1,562 @@
+{
+  "version_id": "808d3cec45cc47e293b3fe712f6f5cc5",
+  "regulation_id": "nsu-campus-antiterrorism",
+  "created_at": "2026-05-19T06:26:09.676295+00:00",
+  "author": "system",
+  "comment": "Sync с регламентом: добавлены massGuardCoverage, drillsPerYear, emergencyNotificationTime, notificationSystemChecks, guardResponseTime, suspiciousItemReportTime",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-campus-antiterrorism",
+    "regulation_id": "nsu-campus-antiterrorism",
+    "nodes": [
+      {
+        "id": "n_output",
+        "type": "output",
+        "label": "Рекомендация",
+        "position": {
+          "x": 880.0,
+          "y": 60.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": "recommendation",
+        "text": "Регламент: при выходе параметра за допустимое отклонение — уведомить ответственное лицо.",
+        "priority": 1,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_massGuardCoverage",
+        "type": "input",
+        "label": "massGuardCoverage",
+        "position": {
+          "x": 60.0,
+          "y": 80.0
+        },
+        "paramRef": "massGuardCoverage",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_massGuardCoverage",
+        "type": "threshold",
+        "label": "100.0 ± 0.0",
+        "position": {
+          "x": 320.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": 100.0,
+        "deviation": 0.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_massGuardCoverage",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_drillsPerYear",
+        "type": "input",
+        "label": "drillsPerYear",
+        "position": {
+          "x": 60.0,
+          "y": 220.0
+        },
+        "paramRef": "drillsPerYear",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_drillsPerYear",
+        "type": "threshold",
+        "label": "4.0 ± 1.0",
+        "position": {
+          "x": 320.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": 4.0,
+        "deviation": 1.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_drillsPerYear",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_emergencyNotificationTime",
+        "type": "input",
+        "label": "emergencyNotificationTime",
+        "position": {
+          "x": 60.0,
+          "y": 360.0
+        },
+        "paramRef": "emergencyNotificationTime",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_emergencyNotificationTime",
+        "type": "threshold",
+        "label": "3.0 ± 2.0",
+        "position": {
+          "x": 320.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": 3.0,
+        "deviation": 2.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_emergencyNotificationTime",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_notificationSystemChecks",
+        "type": "input",
+        "label": "notificationSystemChecks",
+        "position": {
+          "x": 60.0,
+          "y": 500.0
+        },
+        "paramRef": "notificationSystemChecks",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_notificationSystemChecks",
+        "type": "threshold",
+        "label": "2.0 ± 1.0",
+        "position": {
+          "x": 320.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": 2.0,
+        "deviation": 1.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_notificationSystemChecks",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_guardResponseTime",
+        "type": "input",
+        "label": "guardResponseTime",
+        "position": {
+          "x": 60.0,
+          "y": 640.0
+        },
+        "paramRef": "guardResponseTime",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_guardResponseTime",
+        "type": "threshold",
+        "label": "3.0 ± 2.0",
+        "position": {
+          "x": 320.0,
+          "y": 640.0
+        },
+        "paramRef": null,
+        "refValue": 3.0,
+        "deviation": 2.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_guardResponseTime",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 640.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_suspiciousItemReportTime",
+        "type": "input",
+        "label": "suspiciousItemReportTime",
+        "position": {
+          "x": 60.0,
+          "y": 780.0
+        },
+        "paramRef": "suspiciousItemReportTime",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_suspiciousItemReportTime",
+        "type": "threshold",
+        "label": "60.0 ± 30.0",
+        "position": {
+          "x": 320.0,
+          "y": 780.0
+        },
+        "paramRef": null,
+        "refValue": 60.0,
+        "deviation": 30.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_suspiciousItemReportTime",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 780.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      }
+    ],
+    "edges": [
+      {
+        "source": "n_in_massGuardCoverage",
+        "target": "n_thr_massGuardCoverage",
+        "condition": null
+      },
+      {
+        "source": "n_thr_massGuardCoverage",
+        "target": "n_cmp_massGuardCoverage",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_massGuardCoverage",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_drillsPerYear",
+        "target": "n_thr_drillsPerYear",
+        "condition": null
+      },
+      {
+        "source": "n_thr_drillsPerYear",
+        "target": "n_cmp_drillsPerYear",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_drillsPerYear",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_emergencyNotificationTime",
+        "target": "n_thr_emergencyNotificationTime",
+        "condition": null
+      },
+      {
+        "source": "n_thr_emergencyNotificationTime",
+        "target": "n_cmp_emergencyNotificationTime",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_emergencyNotificationTime",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_notificationSystemChecks",
+        "target": "n_thr_notificationSystemChecks",
+        "condition": null
+      },
+      {
+        "source": "n_thr_notificationSystemChecks",
+        "target": "n_cmp_notificationSystemChecks",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_notificationSystemChecks",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_guardResponseTime",
+        "target": "n_thr_guardResponseTime",
+        "condition": null
+      },
+      {
+        "source": "n_thr_guardResponseTime",
+        "target": "n_cmp_guardResponseTime",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_guardResponseTime",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_suspiciousItemReportTime",
+        "target": "n_thr_suspiciousItemReportTime",
+        "condition": null
+      },
+      {
+        "source": "n_thr_suspiciousItemReportTime",
+        "target": "n_cmp_suspiciousItemReportTime",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_suspiciousItemReportTime",
+        "target": "n_output",
+        "condition": "outside"
+      }
+    ]
+  },
+  "diff_summary": null
+}

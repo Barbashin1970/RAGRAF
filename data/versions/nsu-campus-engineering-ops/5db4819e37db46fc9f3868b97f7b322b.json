@@ -1,0 +1,14 @@
+{
+  "version_id": "5db4819e37db46fc9f3868b97f7b322b",
+  "regulation_id": "nsu-campus-engineering-ops",
+  "created_at": "2026-05-19T06:26:09.507142+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-campus-engineering-ops",
+    "regulation_id": "nsu-campus-engineering-ops",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

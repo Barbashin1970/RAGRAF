@@ -1,0 +1,14 @@
+{
+  "version_id": "b4a64e83df1449d1ac3dd527a8dee68f",
+  "regulation_id": "nsu-campus-dormitory-standard",
+  "created_at": "2026-05-19T06:26:09.535722+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-campus-dormitory-standard",
+    "regulation_id": "nsu-campus-dormitory-standard",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

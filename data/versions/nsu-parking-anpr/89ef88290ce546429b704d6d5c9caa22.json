@@ -1,0 +1,388 @@
+{
+  "version_id": "89ef88290ce546429b704d6d5c9caa22",
+  "regulation_id": "nsu-parking-anpr",
+  "created_at": "2026-05-19T06:26:09.289071+00:00",
+  "author": "system",
+  "comment": "Sync с регламентом: добавлены recognitionConfidence, maxParkingHours, gracePeriodMinutes, operatorFallbackTimeoutSec",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-parking-anpr",
+    "regulation_id": "nsu-parking-anpr",
+    "nodes": [
+      {
+        "id": "n_output",
+        "type": "output",
+        "label": "Рекомендация",
+        "position": {
+          "x": 880.0,
+          "y": 60.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": "recommendation",
+        "text": "Регламент: при выходе параметра за допустимое отклонение — уведомить ответственное лицо.",
+        "priority": 1,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_recognitionConfidence",
+        "type": "input",
+        "label": "recognitionConfidence",
+        "position": {
+          "x": 60.0,
+          "y": 80.0
+        },
+        "paramRef": "recognitionConfidence",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_recognitionConfidence",
+        "type": "threshold",
+        "label": "0.85 ± 0.05",
+        "position": {
+          "x": 320.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": 0.85,
+        "deviation": 0.05,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_recognitionConfidence",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_maxParkingHours",
+        "type": "input",
+        "label": "maxParkingHours",
+        "position": {
+          "x": 60.0,
+          "y": 220.0
+        },
+        "paramRef": "maxParkingHours",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_maxParkingHours",
+        "type": "threshold",
+        "label": "12.0 ± 0.0",
+        "position": {
+          "x": 320.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": 12.0,
+        "deviation": 0.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_maxParkingHours",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_gracePeriodMinutes",
+        "type": "input",
+        "label": "gracePeriodMinutes",
+        "position": {
+          "x": 60.0,
+          "y": 360.0
+        },
+        "paramRef": "gracePeriodMinutes",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_gracePeriodMinutes",
+        "type": "threshold",
+        "label": "15.0 ± 5.0",
+        "position": {
+          "x": 320.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": 15.0,
+        "deviation": 5.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_gracePeriodMinutes",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_operatorFallbackTimeoutSec",
+        "type": "input",
+        "label": "operatorFallbackTimeoutSec",
+        "position": {
+          "x": 60.0,
+          "y": 500.0
+        },
+        "paramRef": "operatorFallbackTimeoutSec",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_operatorFallbackTimeoutSec",
+        "type": "threshold",
+        "label": "30.0 ± 10.0",
+        "position": {
+          "x": 320.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": 30.0,
+        "deviation": 10.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_operatorFallbackTimeoutSec",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      }
+    ],
+    "edges": [
+      {
+        "source": "n_in_recognitionConfidence",
+        "target": "n_thr_recognitionConfidence",
+        "condition": null
+      },
+      {
+        "source": "n_thr_recognitionConfidence",
+        "target": "n_cmp_recognitionConfidence",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_recognitionConfidence",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_maxParkingHours",
+        "target": "n_thr_maxParkingHours",
+        "condition": null
+      },
+      {
+        "source": "n_thr_maxParkingHours",
+        "target": "n_cmp_maxParkingHours",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_maxParkingHours",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_gracePeriodMinutes",
+        "target": "n_thr_gracePeriodMinutes",
+        "condition": null
+      },
+      {
+        "source": "n_thr_gracePeriodMinutes",
+        "target": "n_cmp_gracePeriodMinutes",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_gracePeriodMinutes",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_operatorFallbackTimeoutSec",
+        "target": "n_thr_operatorFallbackTimeoutSec",
+        "condition": null
+      },
+      {
+        "source": "n_thr_operatorFallbackTimeoutSec",
+        "target": "n_cmp_operatorFallbackTimeoutSec",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_operatorFallbackTimeoutSec",
+        "target": "n_output",
+        "condition": "outside"
+      }
+    ]
+  },
+  "diff_summary": null
+}

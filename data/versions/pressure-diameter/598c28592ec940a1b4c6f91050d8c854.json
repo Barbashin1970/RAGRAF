@@ -1,0 +1,14 @@
+{
+  "version_id": "598c28592ec940a1b4c6f91050d8c854",
+  "regulation_id": "pressure-diameter",
+  "created_at": "2026-05-19T06:26:09.128583+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_pressure-diameter",
+    "regulation_id": "pressure-diameter",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

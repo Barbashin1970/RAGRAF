@@ -1,0 +1,214 @@
+{
+  "version_id": "76f39a998b054a8cb8ce6ae565d86557",
+  "regulation_id": "pressure-diameter",
+  "created_at": "2026-05-19T06:26:09.129654+00:00",
+  "author": "system",
+  "comment": "Sync с регламентом: добавлены pressure, diameter",
+  "dsl_snapshot": {
+    "rule_id": "rule_pressure-diameter",
+    "regulation_id": "pressure-diameter",
+    "nodes": [
+      {
+        "id": "n_output",
+        "type": "output",
+        "label": "Рекомендация",
+        "position": {
+          "x": 880.0,
+          "y": 60.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": "recommendation",
+        "text": "Регламент: при выходе параметра за допустимое отклонение — уведомить ответственное лицо.",
+        "priority": 1,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_pressure",
+        "type": "input",
+        "label": "pressure",
+        "position": {
+          "x": 60.0,
+          "y": 80.0
+        },
+        "paramRef": "pressure",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_pressure",
+        "type": "threshold",
+        "label": "20.5 ± 1.5 атм",
+        "position": {
+          "x": 320.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": 20.5,
+        "deviation": 1.5,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": "атм",
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_pressure",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_diameter",
+        "type": "input",
+        "label": "diameter",
+        "position": {
+          "x": 60.0,
+          "y": 220.0
+        },
+        "paramRef": "diameter",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_diameter",
+        "type": "threshold",
+        "label": "5.0 ± 0.2 см",
+        "position": {
+          "x": 320.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": 5.0,
+        "deviation": 0.2,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": "см",
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_diameter",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      }
+    ],
+    "edges": [
+      {
+        "source": "n_in_pressure",
+        "target": "n_thr_pressure",
+        "condition": null
+      },
+      {
+        "source": "n_thr_pressure",
+        "target": "n_cmp_pressure",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_pressure",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_diameter",
+        "target": "n_thr_diameter",
+        "condition": null
+      },
+      {
+        "source": "n_thr_diameter",
+        "target": "n_cmp_diameter",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_diameter",
+        "target": "n_output",
+        "condition": "outside"
+      }
+    ]
+  },
+  "diff_summary": null
+}

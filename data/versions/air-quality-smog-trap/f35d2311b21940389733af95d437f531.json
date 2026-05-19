@@ -1,0 +1,14 @@
+{
+  "version_id": "f35d2311b21940389733af95d437f531",
+  "regulation_id": "air-quality-smog-trap",
+  "created_at": "2026-05-19T06:26:09.264510+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_air-quality-smog-trap",
+    "regulation_id": "air-quality-smog-trap",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

@@ -1,0 +1,554 @@
+{
+  "rule_id": "rule_nsu-campus-engineering-ops",
+  "regulation_id": "nsu-campus-engineering-ops",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "position": {
+        "x": 880.0,
+        "y": 60.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": "recommendation",
+      "text": "Регламент эксплуатации инженерных сетей и ЦИМ кампуса НГУ (разд. II п. 23-24 Стандарта 28.02.2024): 1. ЦИМ ЗДАНИЯ — центральная цифровая информационная модель, доступность ≥ 99.5%. Содержит данные обо всех элементах конструкций, инженерных систем, технической документации. 2. УТЕЧКИ — датчики давления + расхода. При detection > 5 минут → автоматическое перекрытие стояка smart-valve + оповещение диспетчера в СЦ за ≤ 60 секунд. 3. ВЕНТИЛЯЦИЯ — при отказе → переключение на резервный контур + выезд дежурного инженера за ≤ 30 минут. 4. ИВЦ — загрузка 50-70% (норма). > 80% — план апгрейда. < 30% за месяц — возможна оптимизация. 5. ЭНЕРГОЭФФЕКТИВНОСТЬ — расход на охлаждение целевой ≤ 20 кВт·ч/м². Месячный отчёт энергоменеджера. 6. ПРОСТОИ — внеплановые ≤ 4 часов/месяц. Если больше — разбор + корректировка регламента ТО.",
+      "priority": 1,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_cimAvailability",
+      "type": "input",
+      "label": "cimAvailability",
+      "position": {
+        "x": 60.0,
+        "y": 80.0
+      },
+      "paramRef": "cimAvailability",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_cimAvailability",
+      "type": "threshold",
+      "label": "99.5 ± 0.5",
+      "position": {
+        "x": 320.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": 99.5,
+      "deviation": 0.5,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_cimAvailability",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_leakDetectionTime",
+      "type": "input",
+      "label": "leakDetectionTime",
+      "position": {
+        "x": 60.0,
+        "y": 220.0
+      },
+      "paramRef": "leakDetectionTime",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_leakDetectionTime",
+      "type": "threshold",
+      "label": "3.0 ± 2.0",
+      "position": {
+        "x": 320.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": 3.0,
+      "deviation": 2.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_leakDetectionTime",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_ventReactionTime",
+      "type": "input",
+      "label": "ventReactionTime",
+      "position": {
+        "x": 60.0,
+        "y": 360.0
+      },
+      "paramRef": "ventReactionTime",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_ventReactionTime",
+      "type": "threshold",
+      "label": "20.0 ± 10.0",
+      "position": {
+        "x": 320.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": 20.0,
+      "deviation": 10.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_ventReactionTime",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_ivcLoad",
+      "type": "input",
+      "label": "ivcLoad",
+      "position": {
+        "x": 60.0,
+        "y": 500.0
+      },
+      "paramRef": "ivcLoad",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_ivcLoad",
+      "type": "threshold",
+      "label": "55.0 ± 15.0",
+      "position": {
+        "x": 320.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": 55.0,
+      "deviation": 15.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_ivcLoad",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_coolingEnergyConsumption",
+      "type": "input",
+      "label": "coolingEnergyConsumption",
+      "position": {
+        "x": 60.0,
+        "y": 640.0
+      },
+      "paramRef": "coolingEnergyConsumption",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_coolingEnergyConsumption",
+      "type": "threshold",
+      "label": "18.0 ± 5.0",
+      "position": {
+        "x": 320.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": 18.0,
+      "deviation": 5.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_coolingEnergyConsumption",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_unplannedDowntimeMonthly",
+      "type": "input",
+      "label": "unplannedDowntimeMonthly",
+      "position": {
+        "x": 60.0,
+        "y": 780.0
+      },
+      "paramRef": "unplannedDowntimeMonthly",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_unplannedDowntimeMonthly",
+      "type": "threshold",
+      "label": "2.0 ± 2.0",
+      "position": {
+        "x": 320.0,
+        "y": 780.0
+      },
+      "paramRef": null,
+      "refValue": 2.0,
+      "deviation": 2.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_unplannedDowntimeMonthly",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 780.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_cimAvailability",
+      "target": "n_thr_cimAvailability",
+      "condition": null
+    },
+    {
+      "source": "n_thr_cimAvailability",
+      "target": "n_cmp_cimAvailability",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_cimAvailability",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_leakDetectionTime",
+      "target": "n_thr_leakDetectionTime",
+      "condition": null
+    },
+    {
+      "source": "n_thr_leakDetectionTime",
+      "target": "n_cmp_leakDetectionTime",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_leakDetectionTime",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_ventReactionTime",
+      "target": "n_thr_ventReactionTime",
+      "condition": null
+    },
+    {
+      "source": "n_thr_ventReactionTime",
+      "target": "n_cmp_ventReactionTime",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_ventReactionTime",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_ivcLoad",
+      "target": "n_thr_ivcLoad",
+      "condition": null
+    },
+    {
+      "source": "n_thr_ivcLoad",
+      "target": "n_cmp_ivcLoad",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_ivcLoad",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_coolingEnergyConsumption",
+      "target": "n_thr_coolingEnergyConsumption",
+      "condition": null
+    },
+    {
+      "source": "n_thr_coolingEnergyConsumption",
+      "target": "n_cmp_coolingEnergyConsumption",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_coolingEnergyConsumption",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_unplannedDowntimeMonthly",
+      "target": "n_thr_unplannedDowntimeMonthly",
+      "condition": null
+    },
+    {
+      "source": "n_thr_unplannedDowntimeMonthly",
+      "target": "n_cmp_unplannedDowntimeMonthly",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_unplannedDowntimeMonthly",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "version_id": "bf56c86045434a268356b648be2b1867",
+  "regulation_id": "roof-snow-fencing",
+  "created_at": "2026-05-19T06:26:09.182774+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_roof-snow-fencing",
+    "regulation_id": "roof-snow-fencing",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

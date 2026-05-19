@@ -1,0 +1,14 @@
+{
+  "version_id": "c728a37b75d446f394260264d4cb6b16",
+  "regulation_id": "nsu-campus-situational-center",
+  "created_at": "2026-05-19T06:26:09.421824+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-campus-situational-center",
+    "regulation_id": "nsu-campus-situational-center",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

@@ -1,0 +1,14 @@
+{
+  "version_id": "b2045533723544b28c1d760bf0bbadb1",
+  "regulation_id": "nsu-campus-antiterrorism",
+  "created_at": "2026-05-19T06:26:09.675352+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-campus-antiterrorism",
+    "regulation_id": "nsu-campus-antiterrorism",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

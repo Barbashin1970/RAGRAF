@@ -1,0 +1,14 @@
+{
+  "version_id": "ace5b4b8acf54002988ac1dfd264c1bb",
+  "regulation_id": "dormitory-flood",
+  "created_at": "2026-05-19T06:26:09.210341+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_dormitory-flood",
+    "regulation_id": "dormitory-flood",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

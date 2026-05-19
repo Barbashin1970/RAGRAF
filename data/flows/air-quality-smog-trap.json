@@ -1,0 +1,467 @@
+{
+  "rule_id": "rule_air-quality-smog-trap",
+  "regulation_id": "air-quality-smog-trap",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "position": {
+        "x": 880.0,
+        "y": 60.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": "recommendation",
+      "text": "При безветрии (ветер < 1.5 м/с) и росте PM2.5 формируется экологическая ловушка. ДЛЯ ЖИТЕЛЕЙ: не открывайте окна для проветривания ночью, включите домашние очистители воздуха, отложите пробежки и интенсивные занятия на улице. ПРИ PM2.5 > 35 мкг/м³ (превышение ПДК ВОЗ): ограничьте время на улице, используйте маски FFP2/N95, не проветривайте помещения. ОПЕРАТИВНЫЕ ДЕЙСТВИЯ: 1) Уведомить городскую службу экологии и оперативного штаба. 2) За 6 ± 2 часа направить SMS уязвимым группам (астма, ХОБЛ, дети, пожилые). 3) При подтверждённом ПДК объявить режим НМУ (неблагоприятные метеоусловия), выпустить предписания предприятиям на снижение выбросов 15–20%. 4) Задействовать систему экстренного оповещения населения, информировать школы и детские сады.",
+      "priority": 1,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_windSpeed",
+      "type": "input",
+      "label": "windSpeed",
+      "position": {
+        "x": 60.0,
+        "y": 80.0
+      },
+      "paramRef": "windSpeed",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_windSpeed",
+      "type": "threshold",
+      "label": "3.0 ± 1.5 м/с",
+      "position": {
+        "x": 320.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": 3.0,
+      "deviation": 1.5,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "м/с",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_windSpeed",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_pm25Concentration",
+      "type": "input",
+      "label": "pm25Concentration",
+      "position": {
+        "x": 60.0,
+        "y": 220.0
+      },
+      "paramRef": "pm25Concentration",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_pm25Concentration",
+      "type": "threshold",
+      "label": "10.0 ± 10.0 мкг/м³",
+      "position": {
+        "x": 320.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": 10.0,
+      "deviation": 10.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "мкг/м³",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_pm25Concentration",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_pdkExceedanceHours",
+      "type": "input",
+      "label": "pdkExceedanceHours",
+      "position": {
+        "x": 60.0,
+        "y": 360.0
+      },
+      "paramRef": "pdkExceedanceHours",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_pdkExceedanceHours",
+      "type": "threshold",
+      "label": "0.0 ± 4.0 ч/сутки",
+      "position": {
+        "x": 320.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": 0.0,
+      "deviation": 4.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "ч/сутки",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_pdkExceedanceHours",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_notificationLeadHours",
+      "type": "input",
+      "label": "notificationLeadHours",
+      "position": {
+        "x": 60.0,
+        "y": 500.0
+      },
+      "paramRef": "notificationLeadHours",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_notificationLeadHours",
+      "type": "threshold",
+      "label": "6.0 ± 2.0 ч",
+      "position": {
+        "x": 320.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": 6.0,
+      "deviation": 2.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "ч",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_notificationLeadHours",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_emissionReductionPercent",
+      "type": "input",
+      "label": "emissionReductionPercent",
+      "position": {
+        "x": 60.0,
+        "y": 640.0
+      },
+      "paramRef": "emissionReductionPercent",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_emissionReductionPercent",
+      "type": "threshold",
+      "label": "17.5 ± 2.5 %",
+      "position": {
+        "x": 320.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": 17.5,
+      "deviation": 2.5,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "%",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_emissionReductionPercent",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_windSpeed",
+      "target": "n_thr_windSpeed",
+      "condition": null
+    },
+    {
+      "source": "n_thr_windSpeed",
+      "target": "n_cmp_windSpeed",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_windSpeed",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_pm25Concentration",
+      "target": "n_thr_pm25Concentration",
+      "condition": null
+    },
+    {
+      "source": "n_thr_pm25Concentration",
+      "target": "n_cmp_pm25Concentration",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_pm25Concentration",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_pdkExceedanceHours",
+      "target": "n_thr_pdkExceedanceHours",
+      "condition": null
+    },
+    {
+      "source": "n_thr_pdkExceedanceHours",
+      "target": "n_cmp_pdkExceedanceHours",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_pdkExceedanceHours",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_notificationLeadHours",
+      "target": "n_thr_notificationLeadHours",
+      "condition": null
+    },
+    {
+      "source": "n_thr_notificationLeadHours",
+      "target": "n_cmp_notificationLeadHours",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_notificationLeadHours",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_emissionReductionPercent",
+      "target": "n_thr_emissionReductionPercent",
+      "condition": null
+    },
+    {
+      "source": "n_thr_emissionReductionPercent",
+      "target": "n_cmp_emissionReductionPercent",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_emissionReductionPercent",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

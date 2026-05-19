@@ -1,0 +1,14 @@
+{
+  "version_id": "a284b4a0b1b44c8bab5e962d58846092",
+  "regulation_id": "koltsovo-edds-mode-escalation",
+  "created_at": "2026-05-19T06:26:09.338964+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_koltsovo-edds-mode-escalation",
+    "regulation_id": "koltsovo-edds-mode-escalation",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

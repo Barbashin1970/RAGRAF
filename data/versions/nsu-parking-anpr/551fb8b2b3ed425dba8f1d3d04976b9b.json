@@ -1,0 +1,14 @@
+{
+  "version_id": "551fb8b2b3ed425dba8f1d3d04976b9b",
+  "regulation_id": "nsu-parking-anpr",
+  "created_at": "2026-05-19T06:26:09.288362+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-parking-anpr",
+    "regulation_id": "nsu-parking-anpr",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

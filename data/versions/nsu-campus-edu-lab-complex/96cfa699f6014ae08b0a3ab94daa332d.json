@@ -1,0 +1,14 @@
+{
+  "version_id": "96cfa699f6014ae08b0a3ab94daa332d",
+  "regulation_id": "nsu-campus-edu-lab-complex",
+  "created_at": "2026-05-19T06:26:09.562809+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-campus-edu-lab-complex",
+    "regulation_id": "nsu-campus-edu-lab-complex",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

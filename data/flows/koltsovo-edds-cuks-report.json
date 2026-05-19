@@ -1,0 +1,467 @@
+{
+  "rule_id": "rule_koltsovo-edds-cuks-report",
+  "regulation_id": "koltsovo-edds-cuks-report",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "position": {
+        "x": 880.0,
+        "y": 60.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": "recommendation",
+      "text": "Доклад в ЦУКС ГУ МЧС России по НСО при ЧС выше локального (на основе § 5.4.1, § 5.6.4, § 6.4 Положения о ЕДДС МКУ «СВЕТОЧ» №15 от 04.12.2020 и ПП РФ № 304-2007 о классификации ЧС): \n\n1. КЛАССИФИКАЦИЯ — старший оперативный дежурный (СОД) ЕДДС оценивает событие как ЧС выше локального характера, если: \n   - количество пострадавших превышает 10 ± 5 чел., либо \n   - материальный ущерб превышает 5 ± 1 млн ₽, либо \n   - зона ЧС выходит за пределы одного объекта, либо \n   - есть угроза распространения. \n\n2. УСТНЫЙ ДОКЛАД — в течение 3 ± 1 минут по прямой линии связи: оперативному дежурному ЦУКС ГУ МЧС России по НСО. Параллельно — Главе р.п. Кольцово и первому заместителю председателя КЧС и ОПБ. \n\n3. ФОРМАЛИЗОВАННОЕ ДОНЕСЕНИЕ — за 20 ± 5 минут подготовить и направить в ЦУКС форму донесения (1ЧС — об угрозе, 2ЧС — о факте, 4ЧС — о ходе ликвидации) с точными координатами зоны ЧС, описанием обстановки, привлекаемыми силами. \n\n4. ПОВТОРНЫЕ ДОКЛАДЫ — каждый 1 ± 0.5 ч до окончания ликвидации: изменение обстановки, потери, привлечённые силы, прогноз. \n\n5. ВЗАИМОДЕЙСТВИЕ С ОШ ЛЧС — при развёртывании Оперативного штаба ликвидации ЧС ГУ МЧС, ЕДДС в части действий по данной ЧС выполняет указания ОШ ЛЧС (§ 5.5.3, § 5.6.5). \n\n6. ИНФОРМАЦИОННЫЙ ПОТОК — поступающие данные о силах/средствах, доводятся ЕДДС всем взаимодействующим ДДС, органам управления и в ЦУКС (§ 5.6.4). \n\nКонтакт ЦУКС ГУ МЧС по НСО — линия 112 регионального уровня; круглосуточный СОД ЕДДС р.п. Кольцово: 336-56-47.",
+      "priority": 1,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_verbalReportMinutes",
+      "type": "input",
+      "label": "verbalReportMinutes",
+      "position": {
+        "x": 60.0,
+        "y": 80.0
+      },
+      "paramRef": "verbalReportMinutes",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_verbalReportMinutes",
+      "type": "threshold",
+      "label": "3.0 ± 1.0 мин",
+      "position": {
+        "x": 320.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": 3.0,
+      "deviation": 1.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "мин",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_verbalReportMinutes",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_formalReportMinutes",
+      "type": "input",
+      "label": "formalReportMinutes",
+      "position": {
+        "x": 60.0,
+        "y": 220.0
+      },
+      "paramRef": "formalReportMinutes",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_formalReportMinutes",
+      "type": "threshold",
+      "label": "20.0 ± 5.0 мин",
+      "position": {
+        "x": 320.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": 20.0,
+      "deviation": 5.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "мин",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_formalReportMinutes",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_affectedPeopleThreshold",
+      "type": "input",
+      "label": "affectedPeopleThreshold",
+      "position": {
+        "x": 60.0,
+        "y": 360.0
+      },
+      "paramRef": "affectedPeopleThreshold",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_affectedPeopleThreshold",
+      "type": "threshold",
+      "label": "10.0 ± 5.0 чел.",
+      "position": {
+        "x": 320.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": 10.0,
+      "deviation": 5.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "чел.",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_affectedPeopleThreshold",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_damageThresholdMillionRub",
+      "type": "input",
+      "label": "damageThresholdMillionRub",
+      "position": {
+        "x": 60.0,
+        "y": 500.0
+      },
+      "paramRef": "damageThresholdMillionRub",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_damageThresholdMillionRub",
+      "type": "threshold",
+      "label": "5.0 ± 1.0 млн ₽",
+      "position": {
+        "x": 320.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": 5.0,
+      "deviation": 1.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "млн ₽",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_damageThresholdMillionRub",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_reportRefreshHours",
+      "type": "input",
+      "label": "reportRefreshHours",
+      "position": {
+        "x": 60.0,
+        "y": 640.0
+      },
+      "paramRef": "reportRefreshHours",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_reportRefreshHours",
+      "type": "threshold",
+      "label": "1.0 ± 0.5 ч",
+      "position": {
+        "x": 320.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": 1.0,
+      "deviation": 0.5,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "ч",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_reportRefreshHours",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_verbalReportMinutes",
+      "target": "n_thr_verbalReportMinutes",
+      "condition": null
+    },
+    {
+      "source": "n_thr_verbalReportMinutes",
+      "target": "n_cmp_verbalReportMinutes",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_verbalReportMinutes",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_formalReportMinutes",
+      "target": "n_thr_formalReportMinutes",
+      "condition": null
+    },
+    {
+      "source": "n_thr_formalReportMinutes",
+      "target": "n_cmp_formalReportMinutes",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_formalReportMinutes",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_affectedPeopleThreshold",
+      "target": "n_thr_affectedPeopleThreshold",
+      "condition": null
+    },
+    {
+      "source": "n_thr_affectedPeopleThreshold",
+      "target": "n_cmp_affectedPeopleThreshold",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_affectedPeopleThreshold",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_damageThresholdMillionRub",
+      "target": "n_thr_damageThresholdMillionRub",
+      "condition": null
+    },
+    {
+      "source": "n_thr_damageThresholdMillionRub",
+      "target": "n_cmp_damageThresholdMillionRub",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_damageThresholdMillionRub",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_reportRefreshHours",
+      "target": "n_thr_reportRefreshHours",
+      "condition": null
+    },
+    {
+      "source": "n_thr_reportRefreshHours",
+      "target": "n_cmp_reportRefreshHours",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_reportRefreshHours",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

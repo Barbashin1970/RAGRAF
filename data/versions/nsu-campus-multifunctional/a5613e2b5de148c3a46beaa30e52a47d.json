@@ -1,0 +1,562 @@
+{
+  "version_id": "a5613e2b5de148c3a46beaa30e52a47d",
+  "regulation_id": "nsu-campus-multifunctional",
+  "created_at": "2026-05-19T06:26:09.647555+00:00",
+  "author": "system",
+  "comment": "Sync с регламентом: добавлены coworking24h, concertHallEventsMonthly, mfcSatisfaction, libraryDigitalRequestsDaily, bookingDeskLatency, itResponseTime",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-campus-multifunctional",
+    "regulation_id": "nsu-campus-multifunctional",
+    "nodes": [
+      {
+        "id": "n_output",
+        "type": "output",
+        "label": "Рекомендация",
+        "position": {
+          "x": 880.0,
+          "y": 60.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": "recommendation",
+        "text": "Регламент: при выходе параметра за допустимое отклонение — уведомить ответственное лицо.",
+        "priority": 1,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_coworking24h",
+        "type": "input",
+        "label": "coworking24h",
+        "position": {
+          "x": 60.0,
+          "y": 80.0
+        },
+        "paramRef": "coworking24h",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_coworking24h",
+        "type": "threshold",
+        "label": "1.0 ± 0.0",
+        "position": {
+          "x": 320.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": 1.0,
+        "deviation": 0.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_coworking24h",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_concertHallEventsMonthly",
+        "type": "input",
+        "label": "concertHallEventsMonthly",
+        "position": {
+          "x": 60.0,
+          "y": 220.0
+        },
+        "paramRef": "concertHallEventsMonthly",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_concertHallEventsMonthly",
+        "type": "threshold",
+        "label": "15.0 ± 5.0",
+        "position": {
+          "x": 320.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": 15.0,
+        "deviation": 5.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_concertHallEventsMonthly",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_mfcSatisfaction",
+        "type": "input",
+        "label": "mfcSatisfaction",
+        "position": {
+          "x": 60.0,
+          "y": 360.0
+        },
+        "paramRef": "mfcSatisfaction",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_mfcSatisfaction",
+        "type": "threshold",
+        "label": "80.0 ± 5.0",
+        "position": {
+          "x": 320.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": 80.0,
+        "deviation": 5.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_mfcSatisfaction",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_libraryDigitalRequestsDaily",
+        "type": "input",
+        "label": "libraryDigitalRequestsDaily",
+        "position": {
+          "x": 60.0,
+          "y": 500.0
+        },
+        "paramRef": "libraryDigitalRequestsDaily",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_libraryDigitalRequestsDaily",
+        "type": "threshold",
+        "label": "200.0 ± 50.0",
+        "position": {
+          "x": 320.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": 200.0,
+        "deviation": 50.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_libraryDigitalRequestsDaily",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_bookingDeskLatency",
+        "type": "input",
+        "label": "bookingDeskLatency",
+        "position": {
+          "x": 60.0,
+          "y": 640.0
+        },
+        "paramRef": "bookingDeskLatency",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_bookingDeskLatency",
+        "type": "threshold",
+        "label": "60.0 ± 30.0",
+        "position": {
+          "x": 320.0,
+          "y": 640.0
+        },
+        "paramRef": null,
+        "refValue": 60.0,
+        "deviation": 30.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_bookingDeskLatency",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 640.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_itResponseTime",
+        "type": "input",
+        "label": "itResponseTime",
+        "position": {
+          "x": 60.0,
+          "y": 780.0
+        },
+        "paramRef": "itResponseTime",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_itResponseTime",
+        "type": "threshold",
+        "label": "15.0 ± 5.0",
+        "position": {
+          "x": 320.0,
+          "y": 780.0
+        },
+        "paramRef": null,
+        "refValue": 15.0,
+        "deviation": 5.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_itResponseTime",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 780.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      }
+    ],
+    "edges": [
+      {
+        "source": "n_in_coworking24h",
+        "target": "n_thr_coworking24h",
+        "condition": null
+      },
+      {
+        "source": "n_thr_coworking24h",
+        "target": "n_cmp_coworking24h",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_coworking24h",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_concertHallEventsMonthly",
+        "target": "n_thr_concertHallEventsMonthly",
+        "condition": null
+      },
+      {
+        "source": "n_thr_concertHallEventsMonthly",
+        "target": "n_cmp_concertHallEventsMonthly",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_concertHallEventsMonthly",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_mfcSatisfaction",
+        "target": "n_thr_mfcSatisfaction",
+        "condition": null
+      },
+      {
+        "source": "n_thr_mfcSatisfaction",
+        "target": "n_cmp_mfcSatisfaction",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_mfcSatisfaction",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_libraryDigitalRequestsDaily",
+        "target": "n_thr_libraryDigitalRequestsDaily",
+        "condition": null
+      },
+      {
+        "source": "n_thr_libraryDigitalRequestsDaily",
+        "target": "n_cmp_libraryDigitalRequestsDaily",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_libraryDigitalRequestsDaily",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_bookingDeskLatency",
+        "target": "n_thr_bookingDeskLatency",
+        "condition": null
+      },
+      {
+        "source": "n_thr_bookingDeskLatency",
+        "target": "n_cmp_bookingDeskLatency",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_bookingDeskLatency",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_itResponseTime",
+        "target": "n_thr_itResponseTime",
+        "condition": null
+      },
+      {
+        "source": "n_thr_itResponseTime",
+        "target": "n_cmp_itResponseTime",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_itResponseTime",
+        "target": "n_output",
+        "condition": "outside"
+      }
+    ]
+  },
+  "diff_summary": null
+}

@@ -1,0 +1,467 @@
+{
+  "rule_id": "rule_heat-inlet-breach",
+  "regulation_id": "heat-inlet-breach",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "position": {
+        "x": 880.0,
+        "y": 60.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": "recommendation",
+      "text": "При подтверждении утечки в тепловом узле: 1) Уведомить инженерную службу объекта и городские теплосети. 2) Подготовить smart valve к автоматическому перекрытию — ждать подтверждение обходчика (7 ± 3 мин) для исключения ложного срабатывания. 3) При подтверждённом прорыве — вызов аварийной бригады теплосетей, координация с ЕДДС. 4) Оповестить смежный медицинский реанимационный блок в окне 15 ± 5 минут для перевода на резервный контур.",
+      "priority": 1,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_inletPressure",
+      "type": "input",
+      "label": "inletPressure",
+      "position": {
+        "x": 60.0,
+        "y": 80.0
+      },
+      "paramRef": "inletPressure",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_inletPressure",
+      "type": "threshold",
+      "label": "4.0 ± 0.5 атм",
+      "position": {
+        "x": 320.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": 4.0,
+      "deviation": 0.5,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "атм",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_inletPressure",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_inletTemperature",
+      "type": "input",
+      "label": "inletTemperature",
+      "position": {
+        "x": 60.0,
+        "y": 220.0
+      },
+      "paramRef": "inletTemperature",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_inletTemperature",
+      "type": "threshold",
+      "label": "70.0 ± 10.0 °C",
+      "position": {
+        "x": 320.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": 70.0,
+      "deviation": 10.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "°C",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_inletTemperature",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_pressureFallRate",
+      "type": "input",
+      "label": "pressureFallRate",
+      "position": {
+        "x": 60.0,
+        "y": 360.0
+      },
+      "paramRef": "pressureFallRate",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_pressureFallRate",
+      "type": "threshold",
+      "label": "0.0 ± 0.2 атм/мин",
+      "position": {
+        "x": 320.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": 0.0,
+      "deviation": 0.2,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "атм/мин",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_pressureFallRate",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_walkerConfirmTime",
+      "type": "input",
+      "label": "walkerConfirmTime",
+      "position": {
+        "x": 60.0,
+        "y": 500.0
+      },
+      "paramRef": "walkerConfirmTime",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_walkerConfirmTime",
+      "type": "threshold",
+      "label": "7.0 ± 3.0 мин",
+      "position": {
+        "x": 320.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": 7.0,
+      "deviation": 3.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "мин",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_walkerConfirmTime",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_medicalAlertWindow",
+      "type": "input",
+      "label": "medicalAlertWindow",
+      "position": {
+        "x": 60.0,
+        "y": 640.0
+      },
+      "paramRef": "medicalAlertWindow",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_medicalAlertWindow",
+      "type": "threshold",
+      "label": "15.0 ± 5.0 мин",
+      "position": {
+        "x": 320.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": 15.0,
+      "deviation": 5.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "мин",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_medicalAlertWindow",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_inletPressure",
+      "target": "n_thr_inletPressure",
+      "condition": null
+    },
+    {
+      "source": "n_thr_inletPressure",
+      "target": "n_cmp_inletPressure",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_inletPressure",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_inletTemperature",
+      "target": "n_thr_inletTemperature",
+      "condition": null
+    },
+    {
+      "source": "n_thr_inletTemperature",
+      "target": "n_cmp_inletTemperature",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_inletTemperature",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_pressureFallRate",
+      "target": "n_thr_pressureFallRate",
+      "condition": null
+    },
+    {
+      "source": "n_thr_pressureFallRate",
+      "target": "n_cmp_pressureFallRate",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_pressureFallRate",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_walkerConfirmTime",
+      "target": "n_thr_walkerConfirmTime",
+      "condition": null
+    },
+    {
+      "source": "n_thr_walkerConfirmTime",
+      "target": "n_cmp_walkerConfirmTime",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_walkerConfirmTime",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_medicalAlertWindow",
+      "target": "n_thr_medicalAlertWindow",
+      "condition": null
+    },
+    {
+      "source": "n_thr_medicalAlertWindow",
+      "target": "n_cmp_medicalAlertWindow",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_medicalAlertWindow",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

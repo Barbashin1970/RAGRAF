@@ -1,0 +1,14 @@
+{
+  "version_id": "6ab7a7c540b741fea8cffb4e1841d2f4",
+  "regulation_id": "heat-inlet-breach",
+  "created_at": "2026-05-19T06:26:09.155096+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_heat-inlet-breach",
+    "regulation_id": "heat-inlet-breach",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

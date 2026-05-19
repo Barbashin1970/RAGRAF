@@ -1,0 +1,554 @@
+{
+  "rule_id": "rule_nsu-campus-technopark",
+  "regulation_id": "nsu-campus-technopark",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "position": {
+        "x": 880.0,
+        "y": 60.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": "recommendation",
+      "text": "Регламент технопарка кампуса НГУ (разд. V «Требования к объектам инфраструктуры технопарков» + «Требования к экосистеме технопредпринимательства» Стандарта 28.02.2024): 1. РЕЗИДЕНТЫ — отбор по отраслевой специализации технопарка + образовательной программе НГУ. Кандидат вне специализации — экспертиза дирекцией ≤ 30 дней. 2. ЛЬГОТНАЯ АРЕНДА — ≥ 30% площадей под льготную аренду резидентам (студенческие стартапы, аспиранты-предприниматели). 3. КОВОРКИНГ 24/7 — обязателен. Доступ по карте резидента, Wi-Fi 100%, оборудование: 3D-принтеры, 3D-сканеры, VR/AR-станции, ЧПУ-станки, чистая комната для инжиниринга. 4. УСЛУГИ ЭКОСИСТЕМЫ — программы инкубации/акселерации, менторская поддержка, услуги патентования и защиты ИС, юр./бух./маркетинг сопровождение, выход на электронные торговые площадки. 5. КОНТРОЛЬ АКТИВНОСТИ — резидент без активности > 6 месяцев → пересмотр условий аренды (рекомендация — освобождение для очереди). 6. ОТЧЁТНОСТЬ — раз в полгода публикация ключевых разработок на портале Прокампус.рф.",
+      "priority": 1,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_subsidizedAreaShare",
+      "type": "input",
+      "label": "subsidizedAreaShare",
+      "position": {
+        "x": 60.0,
+        "y": 80.0
+      },
+      "paramRef": "subsidizedAreaShare",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_subsidizedAreaShare",
+      "type": "threshold",
+      "label": "30.0 ± 10.0",
+      "position": {
+        "x": 320.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": 30.0,
+      "deviation": 10.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_subsidizedAreaShare",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_residentSatisfaction",
+      "type": "input",
+      "label": "residentSatisfaction",
+      "position": {
+        "x": 60.0,
+        "y": 220.0
+      },
+      "paramRef": "residentSatisfaction",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_residentSatisfaction",
+      "type": "threshold",
+      "label": "80.0 ± 5.0",
+      "position": {
+        "x": 320.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": 80.0,
+      "deviation": 5.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_residentSatisfaction",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_newStartupsPerYear",
+      "type": "input",
+      "label": "newStartupsPerYear",
+      "position": {
+        "x": 60.0,
+        "y": 360.0
+      },
+      "paramRef": "newStartupsPerYear",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_newStartupsPerYear",
+      "type": "threshold",
+      "label": "20.0 ± 10.0",
+      "position": {
+        "x": 320.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": 20.0,
+      "deviation": 10.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_newStartupsPerYear",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_incubatorOccupancy",
+      "type": "input",
+      "label": "incubatorOccupancy",
+      "position": {
+        "x": 60.0,
+        "y": 500.0
+      },
+      "paramRef": "incubatorOccupancy",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_incubatorOccupancy",
+      "type": "threshold",
+      "label": "80.0 ± 10.0",
+      "position": {
+        "x": 320.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": 80.0,
+      "deviation": 10.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_incubatorOccupancy",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_electricPower",
+      "type": "input",
+      "label": "electricPower",
+      "position": {
+        "x": 60.0,
+        "y": 640.0
+      },
+      "paramRef": "electricPower",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_electricPower",
+      "type": "threshold",
+      "label": "0.8 ± 0.3",
+      "position": {
+        "x": 320.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": 0.8,
+      "deviation": 0.3,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_electricPower",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_coworking24hAccess",
+      "type": "input",
+      "label": "coworking24hAccess",
+      "position": {
+        "x": 60.0,
+        "y": 780.0
+      },
+      "paramRef": "coworking24hAccess",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_coworking24hAccess",
+      "type": "threshold",
+      "label": "1.0 ± 0.0",
+      "position": {
+        "x": 320.0,
+        "y": 780.0
+      },
+      "paramRef": null,
+      "refValue": 1.0,
+      "deviation": 0.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_coworking24hAccess",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 780.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_subsidizedAreaShare",
+      "target": "n_thr_subsidizedAreaShare",
+      "condition": null
+    },
+    {
+      "source": "n_thr_subsidizedAreaShare",
+      "target": "n_cmp_subsidizedAreaShare",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_subsidizedAreaShare",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_residentSatisfaction",
+      "target": "n_thr_residentSatisfaction",
+      "condition": null
+    },
+    {
+      "source": "n_thr_residentSatisfaction",
+      "target": "n_cmp_residentSatisfaction",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_residentSatisfaction",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_newStartupsPerYear",
+      "target": "n_thr_newStartupsPerYear",
+      "condition": null
+    },
+    {
+      "source": "n_thr_newStartupsPerYear",
+      "target": "n_cmp_newStartupsPerYear",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_newStartupsPerYear",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_incubatorOccupancy",
+      "target": "n_thr_incubatorOccupancy",
+      "condition": null
+    },
+    {
+      "source": "n_thr_incubatorOccupancy",
+      "target": "n_cmp_incubatorOccupancy",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_incubatorOccupancy",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_electricPower",
+      "target": "n_thr_electricPower",
+      "condition": null
+    },
+    {
+      "source": "n_thr_electricPower",
+      "target": "n_cmp_electricPower",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_electricPower",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_coworking24hAccess",
+      "target": "n_thr_coworking24hAccess",
+      "condition": null
+    },
+    {
+      "source": "n_thr_coworking24hAccess",
+      "target": "n_cmp_coworking24hAccess",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_coworking24hAccess",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

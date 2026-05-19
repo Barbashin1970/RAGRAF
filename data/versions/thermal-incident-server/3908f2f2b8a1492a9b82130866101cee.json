@@ -1,0 +1,475 @@
+{
+  "version_id": "3908f2f2b8a1492a9b82130866101cee",
+  "regulation_id": "thermal-incident-server",
+  "created_at": "2026-05-19T06:26:09.237224+00:00",
+  "author": "system",
+  "comment": "Sync с регламентом: добавлены serverTemperature, smokeConcentration, coolingFlowRate, confirmTimeMinutes, escalationTimeMinutes",
+  "dsl_snapshot": {
+    "rule_id": "rule_thermal-incident-server",
+    "regulation_id": "thermal-incident-server",
+    "nodes": [
+      {
+        "id": "n_output",
+        "type": "output",
+        "label": "Рекомендация",
+        "position": {
+          "x": 880.0,
+          "y": 60.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": "recommendation",
+        "text": "Регламент: при выходе параметра за допустимое отклонение — уведомить ответственное лицо.",
+        "priority": 1,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_serverTemperature",
+        "type": "input",
+        "label": "serverTemperature",
+        "position": {
+          "x": 60.0,
+          "y": 80.0
+        },
+        "paramRef": "serverTemperature",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_serverTemperature",
+        "type": "threshold",
+        "label": "22.0 ± 4.0 °C",
+        "position": {
+          "x": 320.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": 22.0,
+        "deviation": 4.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": "°C",
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_serverTemperature",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_smokeConcentration",
+        "type": "input",
+        "label": "smokeConcentration",
+        "position": {
+          "x": 60.0,
+          "y": 220.0
+        },
+        "paramRef": "smokeConcentration",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_smokeConcentration",
+        "type": "threshold",
+        "label": "0.0 ± 50.0 ppm",
+        "position": {
+          "x": 320.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": 0.0,
+        "deviation": 50.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": "ppm",
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_smokeConcentration",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_coolingFlowRate",
+        "type": "input",
+        "label": "coolingFlowRate",
+        "position": {
+          "x": 60.0,
+          "y": 360.0
+        },
+        "paramRef": "coolingFlowRate",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_coolingFlowRate",
+        "type": "threshold",
+        "label": "800.0 ± 200.0 м³/ч",
+        "position": {
+          "x": 320.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": 800.0,
+        "deviation": 200.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": "м³/ч",
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_coolingFlowRate",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_confirmTimeMinutes",
+        "type": "input",
+        "label": "confirmTimeMinutes",
+        "position": {
+          "x": 60.0,
+          "y": 500.0
+        },
+        "paramRef": "confirmTimeMinutes",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_confirmTimeMinutes",
+        "type": "threshold",
+        "label": "5.0 ± 2.0 мин",
+        "position": {
+          "x": 320.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": 5.0,
+        "deviation": 2.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": "мин",
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_confirmTimeMinutes",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_escalationTimeMinutes",
+        "type": "input",
+        "label": "escalationTimeMinutes",
+        "position": {
+          "x": 60.0,
+          "y": 640.0
+        },
+        "paramRef": "escalationTimeMinutes",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_escalationTimeMinutes",
+        "type": "threshold",
+        "label": "10.0 ± 3.0 мин",
+        "position": {
+          "x": 320.0,
+          "y": 640.0
+        },
+        "paramRef": null,
+        "refValue": 10.0,
+        "deviation": 3.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": "мин",
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_escalationTimeMinutes",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 640.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      }
+    ],
+    "edges": [
+      {
+        "source": "n_in_serverTemperature",
+        "target": "n_thr_serverTemperature",
+        "condition": null
+      },
+      {
+        "source": "n_thr_serverTemperature",
+        "target": "n_cmp_serverTemperature",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_serverTemperature",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_smokeConcentration",
+        "target": "n_thr_smokeConcentration",
+        "condition": null
+      },
+      {
+        "source": "n_thr_smokeConcentration",
+        "target": "n_cmp_smokeConcentration",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_smokeConcentration",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_coolingFlowRate",
+        "target": "n_thr_coolingFlowRate",
+        "condition": null
+      },
+      {
+        "source": "n_thr_coolingFlowRate",
+        "target": "n_cmp_coolingFlowRate",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_coolingFlowRate",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_confirmTimeMinutes",
+        "target": "n_thr_confirmTimeMinutes",
+        "condition": null
+      },
+      {
+        "source": "n_thr_confirmTimeMinutes",
+        "target": "n_cmp_confirmTimeMinutes",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_confirmTimeMinutes",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_escalationTimeMinutes",
+        "target": "n_thr_escalationTimeMinutes",
+        "condition": null
+      },
+      {
+        "source": "n_thr_escalationTimeMinutes",
+        "target": "n_cmp_escalationTimeMinutes",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_escalationTimeMinutes",
+        "target": "n_output",
+        "condition": "outside"
+      }
+    ]
+  },
+  "diff_summary": null
+}

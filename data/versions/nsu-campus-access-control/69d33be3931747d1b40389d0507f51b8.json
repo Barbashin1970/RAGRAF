@@ -1,0 +1,14 @@
+{
+  "version_id": "69d33be3931747d1b40389d0507f51b8",
+  "regulation_id": "nsu-campus-access-control",
+  "created_at": "2026-05-19T06:26:09.448737+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-campus-access-control",
+    "regulation_id": "nsu-campus-access-control",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}

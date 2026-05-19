@@ -1,0 +1,562 @@
+{
+  "version_id": "8e7048b7b1584b8880a37b626d57ac66",
+  "regulation_id": "nsu-campus-fire-action",
+  "created_at": "2026-05-19T06:26:09.703959+00:00",
+  "author": "system",
+  "comment": "Sync с регламентом: добавлены notificationTime, smokeDetectionLatency, evacuationTime, fireBrigadeArrival, evacuationMapsCount, supervisorNotificationTime",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-campus-fire-action",
+    "regulation_id": "nsu-campus-fire-action",
+    "nodes": [
+      {
+        "id": "n_output",
+        "type": "output",
+        "label": "Рекомендация",
+        "position": {
+          "x": 880.0,
+          "y": 60.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": "recommendation",
+        "text": "Регламент: при выходе параметра за допустимое отклонение — уведомить ответственное лицо.",
+        "priority": 1,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_notificationTime",
+        "type": "input",
+        "label": "notificationTime",
+        "position": {
+          "x": 60.0,
+          "y": 80.0
+        },
+        "paramRef": "notificationTime",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_notificationTime",
+        "type": "threshold",
+        "label": "30.0 ± 30.0",
+        "position": {
+          "x": 320.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": 30.0,
+        "deviation": 30.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_notificationTime",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_smokeDetectionLatency",
+        "type": "input",
+        "label": "smokeDetectionLatency",
+        "position": {
+          "x": 60.0,
+          "y": 220.0
+        },
+        "paramRef": "smokeDetectionLatency",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_smokeDetectionLatency",
+        "type": "threshold",
+        "label": "60.0 ± 30.0",
+        "position": {
+          "x": 320.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": 60.0,
+        "deviation": 30.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_smokeDetectionLatency",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_evacuationTime",
+        "type": "input",
+        "label": "evacuationTime",
+        "position": {
+          "x": 60.0,
+          "y": 360.0
+        },
+        "paramRef": "evacuationTime",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_evacuationTime",
+        "type": "threshold",
+        "label": "6.0 ± 2.0",
+        "position": {
+          "x": 320.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": 6.0,
+        "deviation": 2.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_evacuationTime",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_fireBrigadeArrival",
+        "type": "input",
+        "label": "fireBrigadeArrival",
+        "position": {
+          "x": 60.0,
+          "y": 500.0
+        },
+        "paramRef": "fireBrigadeArrival",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_fireBrigadeArrival",
+        "type": "threshold",
+        "label": "8.0 ± 3.0",
+        "position": {
+          "x": 320.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": 8.0,
+        "deviation": 3.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_fireBrigadeArrival",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_evacuationMapsCount",
+        "type": "input",
+        "label": "evacuationMapsCount",
+        "position": {
+          "x": 60.0,
+          "y": 640.0
+        },
+        "paramRef": "evacuationMapsCount",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_evacuationMapsCount",
+        "type": "threshold",
+        "label": "4.0 ± 1.0",
+        "position": {
+          "x": 320.0,
+          "y": 640.0
+        },
+        "paramRef": null,
+        "refValue": 4.0,
+        "deviation": 1.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_evacuationMapsCount",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 640.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_supervisorNotificationTime",
+        "type": "input",
+        "label": "supervisorNotificationTime",
+        "position": {
+          "x": 60.0,
+          "y": 780.0
+        },
+        "paramRef": "supervisorNotificationTime",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_supervisorNotificationTime",
+        "type": "threshold",
+        "label": "5.0 ± 3.0",
+        "position": {
+          "x": 320.0,
+          "y": 780.0
+        },
+        "paramRef": null,
+        "refValue": 5.0,
+        "deviation": 3.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_supervisorNotificationTime",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 780.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      }
+    ],
+    "edges": [
+      {
+        "source": "n_in_notificationTime",
+        "target": "n_thr_notificationTime",
+        "condition": null
+      },
+      {
+        "source": "n_thr_notificationTime",
+        "target": "n_cmp_notificationTime",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_notificationTime",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_smokeDetectionLatency",
+        "target": "n_thr_smokeDetectionLatency",
+        "condition": null
+      },
+      {
+        "source": "n_thr_smokeDetectionLatency",
+        "target": "n_cmp_smokeDetectionLatency",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_smokeDetectionLatency",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_evacuationTime",
+        "target": "n_thr_evacuationTime",
+        "condition": null
+      },
+      {
+        "source": "n_thr_evacuationTime",
+        "target": "n_cmp_evacuationTime",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_evacuationTime",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_fireBrigadeArrival",
+        "target": "n_thr_fireBrigadeArrival",
+        "condition": null
+      },
+      {
+        "source": "n_thr_fireBrigadeArrival",
+        "target": "n_cmp_fireBrigadeArrival",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_fireBrigadeArrival",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_evacuationMapsCount",
+        "target": "n_thr_evacuationMapsCount",
+        "condition": null
+      },
+      {
+        "source": "n_thr_evacuationMapsCount",
+        "target": "n_cmp_evacuationMapsCount",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_evacuationMapsCount",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_supervisorNotificationTime",
+        "target": "n_thr_supervisorNotificationTime",
+        "condition": null
+      },
+      {
+        "source": "n_thr_supervisorNotificationTime",
+        "target": "n_cmp_supervisorNotificationTime",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_supervisorNotificationTime",
+        "target": "n_output",
+        "condition": "outside"
+      }
+    ]
+  },
+  "diff_summary": null
+}

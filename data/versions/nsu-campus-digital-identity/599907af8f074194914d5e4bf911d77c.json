@@ -1,0 +1,562 @@
+{
+  "version_id": "599907af8f074194914d5e4bf911d77c",
+  "regulation_id": "nsu-campus-digital-identity",
+  "created_at": "2026-05-19T06:26:09.478366+00:00",
+  "author": "system",
+  "comment": "Sync с регламентом: добавлены ssoCoverage, firstAuthLatency, activeProfiles, accountCompromiseAlerts, deprovisioningLatency, mfaPenetration",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-campus-digital-identity",
+    "regulation_id": "nsu-campus-digital-identity",
+    "nodes": [
+      {
+        "id": "n_output",
+        "type": "output",
+        "label": "Рекомендация",
+        "position": {
+          "x": 880.0,
+          "y": 60.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": "recommendation",
+        "text": "Регламент: при выходе параметра за допустимое отклонение — уведомить ответственное лицо.",
+        "priority": 1,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_ssoCoverage",
+        "type": "input",
+        "label": "ssoCoverage",
+        "position": {
+          "x": 60.0,
+          "y": 80.0
+        },
+        "paramRef": "ssoCoverage",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_ssoCoverage",
+        "type": "threshold",
+        "label": "95.0 ± 5.0",
+        "position": {
+          "x": 320.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": 95.0,
+        "deviation": 5.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_ssoCoverage",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 80.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_firstAuthLatency",
+        "type": "input",
+        "label": "firstAuthLatency",
+        "position": {
+          "x": 60.0,
+          "y": 220.0
+        },
+        "paramRef": "firstAuthLatency",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_firstAuthLatency",
+        "type": "threshold",
+        "label": "3.0 ± 2.0",
+        "position": {
+          "x": 320.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": 3.0,
+        "deviation": 2.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_firstAuthLatency",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 220.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_activeProfiles",
+        "type": "input",
+        "label": "activeProfiles",
+        "position": {
+          "x": 60.0,
+          "y": 360.0
+        },
+        "paramRef": "activeProfiles",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_activeProfiles",
+        "type": "threshold",
+        "label": "92.0 ± 5.0",
+        "position": {
+          "x": 320.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": 92.0,
+        "deviation": 5.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_activeProfiles",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 360.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_accountCompromiseAlerts",
+        "type": "input",
+        "label": "accountCompromiseAlerts",
+        "position": {
+          "x": 60.0,
+          "y": 500.0
+        },
+        "paramRef": "accountCompromiseAlerts",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_accountCompromiseAlerts",
+        "type": "threshold",
+        "label": "0.0 ± 0.0",
+        "position": {
+          "x": 320.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": 0.0,
+        "deviation": 0.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_accountCompromiseAlerts",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 500.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_deprovisioningLatency",
+        "type": "input",
+        "label": "deprovisioningLatency",
+        "position": {
+          "x": 60.0,
+          "y": 640.0
+        },
+        "paramRef": "deprovisioningLatency",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_deprovisioningLatency",
+        "type": "threshold",
+        "label": "8.0 ± 8.0",
+        "position": {
+          "x": 320.0,
+          "y": 640.0
+        },
+        "paramRef": null,
+        "refValue": 8.0,
+        "deviation": 8.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_deprovisioningLatency",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 640.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_in_mfaPenetration",
+        "type": "input",
+        "label": "mfaPenetration",
+        "position": {
+          "x": 60.0,
+          "y": 780.0
+        },
+        "paramRef": "mfaPenetration",
+        "refValue": null,
+        "deviation": null,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_thr_mfaPenetration",
+        "type": "threshold",
+        "label": "80.0 ± 10.0",
+        "position": {
+          "x": 320.0,
+          "y": 780.0
+        },
+        "paramRef": null,
+        "refValue": 80.0,
+        "deviation": 10.0,
+        "operator": null,
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      },
+      {
+        "id": "n_cmp_mfaPenetration",
+        "type": "compare",
+        "label": "вне диапазона?",
+        "position": {
+          "x": 580.0,
+          "y": 780.0
+        },
+        "paramRef": null,
+        "refValue": null,
+        "deviation": null,
+        "operator": "outside_range",
+        "expression": null,
+        "cases": null,
+        "action": null,
+        "text": null,
+        "priority": null,
+        "constraintRef": null,
+        "unit": null,
+        "sensorType": null,
+        "sensorSubtype": null,
+        "bindsTo": null,
+        "externalId": null
+      }
+    ],
+    "edges": [
+      {
+        "source": "n_in_ssoCoverage",
+        "target": "n_thr_ssoCoverage",
+        "condition": null
+      },
+      {
+        "source": "n_thr_ssoCoverage",
+        "target": "n_cmp_ssoCoverage",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_ssoCoverage",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_firstAuthLatency",
+        "target": "n_thr_firstAuthLatency",
+        "condition": null
+      },
+      {
+        "source": "n_thr_firstAuthLatency",
+        "target": "n_cmp_firstAuthLatency",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_firstAuthLatency",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_activeProfiles",
+        "target": "n_thr_activeProfiles",
+        "condition": null
+      },
+      {
+        "source": "n_thr_activeProfiles",
+        "target": "n_cmp_activeProfiles",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_activeProfiles",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_accountCompromiseAlerts",
+        "target": "n_thr_accountCompromiseAlerts",
+        "condition": null
+      },
+      {
+        "source": "n_thr_accountCompromiseAlerts",
+        "target": "n_cmp_accountCompromiseAlerts",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_accountCompromiseAlerts",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_deprovisioningLatency",
+        "target": "n_thr_deprovisioningLatency",
+        "condition": null
+      },
+      {
+        "source": "n_thr_deprovisioningLatency",
+        "target": "n_cmp_deprovisioningLatency",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_deprovisioningLatency",
+        "target": "n_output",
+        "condition": "outside"
+      },
+      {
+        "source": "n_in_mfaPenetration",
+        "target": "n_thr_mfaPenetration",
+        "condition": null
+      },
+      {
+        "source": "n_thr_mfaPenetration",
+        "target": "n_cmp_mfaPenetration",
+        "condition": null
+      },
+      {
+        "source": "n_cmp_mfaPenetration",
+        "target": "n_output",
+        "condition": "outside"
+      }
+    ]
+  },
+  "diff_summary": null
+}

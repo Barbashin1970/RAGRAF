@@ -1,0 +1,467 @@
+{
+  "rule_id": "rule_koltsovo-edds-mode-escalation",
+  "regulation_id": "koltsovo-edds-mode-escalation",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "position": {
+        "x": 880.0,
+        "y": 60.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": "recommendation",
+      "text": "Переход ЕДДС р.п. Кольцово между режимами функционирования (на основе § 5.1-5.7 Положения о ЕДДС МКУ «СВЕТОЧ» №15 от 04.12.2020): \n\n1. РЕЖИМ ПОВСЕДНЕВНОЙ ДЕЯТЕЛЬНОСТИ — круглосуточное дежурство, приём 112, мониторинг АДПИ GSM и видеонаблюдения, контроль готовности подведомственных ДДС, ежедневные тренировки с ЦУКС. \n\n2. ПЕРЕХОД В РЕЖИМ ПОВЫШЕННОЙ ГОТОВНОСТИ (решение принимает Глава р.п. Кольцово): \n   - оповещение должностных лиц КЧС и ОПБ, администрации, ДДС предприятий — за 15 ± 5 минут; \n   - сбор и обобщение данных обстановки по ПОО и окружающей среде с периодичностью 30 ± 10 минут; \n   - прогнозирование развития обстановки, подготовка предложений по силам/средствам; \n   - координация экстренных мер ДДС предприятий и сил РСЧС. \n\n3. ПЕРЕХОД В РЕЖИМ ЧРЕЗВЫЧАЙНОЙ СИТУАЦИИ (решение Главы): \n   - все информационные потоки между ДДС и силами РСЧС идут через ЕДДС; \n   - доклад обстановки в ЦУКС ГУ МЧС России по НСО — каждый 1 ± 0.5 ч; \n   - контроль за установлением границ зоны ЧС, оповещение населения; \n   - непрерывный контроль окружающей среды на аварийных объектах; \n   - размер ОДС наращивается до 5 ± 2 человек. \n\n4. ИНФРАСТРУКТУРА: при потере основного питания ИБП удерживает работу пульта; переключение на резервный дизель — 30 ± 10 секунд (§ 10.2). \n\n5. ВЫПОЛНЕНИЕ УКАЗАНИЙ КЧС и ОПБ или Оперативного штаба ЛЧС ГУ МЧС: в части действий по конкретной ЧС ЕДДС подчиняется указаниям ОШ ЛЧС (§ 5.5.3, 5.6.5).",
+      "priority": 1,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_activationTimeMinutes",
+      "type": "input",
+      "label": "activationTimeMinutes",
+      "position": {
+        "x": 60.0,
+        "y": 80.0
+      },
+      "paramRef": "activationTimeMinutes",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_activationTimeMinutes",
+      "type": "threshold",
+      "label": "15.0 ± 5.0 мин",
+      "position": {
+        "x": 320.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": 15.0,
+      "deviation": 5.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "мин",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_activationTimeMinutes",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_monitoringIntervalMinutes",
+      "type": "input",
+      "label": "monitoringIntervalMinutes",
+      "position": {
+        "x": 60.0,
+        "y": 220.0
+      },
+      "paramRef": "monitoringIntervalMinutes",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_monitoringIntervalMinutes",
+      "type": "threshold",
+      "label": "30.0 ± 10.0 мин",
+      "position": {
+        "x": 320.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": 30.0,
+      "deviation": 10.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "мин",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_monitoringIntervalMinutes",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_reportIntervalHours",
+      "type": "input",
+      "label": "reportIntervalHours",
+      "position": {
+        "x": 60.0,
+        "y": 360.0
+      },
+      "paramRef": "reportIntervalHours",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_reportIntervalHours",
+      "type": "threshold",
+      "label": "1.0 ± 0.5 ч",
+      "position": {
+        "x": 320.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": 1.0,
+      "deviation": 0.5,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "ч",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_reportIntervalHours",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_powerSwitchoverSeconds",
+      "type": "input",
+      "label": "powerSwitchoverSeconds",
+      "position": {
+        "x": 60.0,
+        "y": 500.0
+      },
+      "paramRef": "powerSwitchoverSeconds",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_powerSwitchoverSeconds",
+      "type": "threshold",
+      "label": "30.0 ± 10.0 с",
+      "position": {
+        "x": 320.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": 30.0,
+      "deviation": 10.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "с",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_powerSwitchoverSeconds",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_dutyShiftSize",
+      "type": "input",
+      "label": "dutyShiftSize",
+      "position": {
+        "x": 60.0,
+        "y": 640.0
+      },
+      "paramRef": "dutyShiftSize",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_dutyShiftSize",
+      "type": "threshold",
+      "label": "5.0 ± 2.0 чел.",
+      "position": {
+        "x": 320.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": 5.0,
+      "deviation": 2.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "чел.",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_dutyShiftSize",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_activationTimeMinutes",
+      "target": "n_thr_activationTimeMinutes",
+      "condition": null
+    },
+    {
+      "source": "n_thr_activationTimeMinutes",
+      "target": "n_cmp_activationTimeMinutes",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_activationTimeMinutes",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_monitoringIntervalMinutes",
+      "target": "n_thr_monitoringIntervalMinutes",
+      "condition": null
+    },
+    {
+      "source": "n_thr_monitoringIntervalMinutes",
+      "target": "n_cmp_monitoringIntervalMinutes",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_monitoringIntervalMinutes",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_reportIntervalHours",
+      "target": "n_thr_reportIntervalHours",
+      "condition": null
+    },
+    {
+      "source": "n_thr_reportIntervalHours",
+      "target": "n_cmp_reportIntervalHours",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_reportIntervalHours",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_powerSwitchoverSeconds",
+      "target": "n_thr_powerSwitchoverSeconds",
+      "condition": null
+    },
+    {
+      "source": "n_thr_powerSwitchoverSeconds",
+      "target": "n_cmp_powerSwitchoverSeconds",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_powerSwitchoverSeconds",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_dutyShiftSize",
+      "target": "n_thr_dutyShiftSize",
+      "condition": null
+    },
+    {
+      "source": "n_thr_dutyShiftSize",
+      "target": "n_cmp_dutyShiftSize",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_dutyShiftSize",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

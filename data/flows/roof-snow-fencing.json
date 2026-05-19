@@ -1,0 +1,467 @@
+{
+  "rule_id": "rule_roof-snow-fencing",
+  "regulation_id": "roof-snow-fencing",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "position": {
+        "x": 880.0,
+        "y": 60.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": "recommendation",
+      "text": "Огородить придомовую территорию сигнальной лентой по периметру свесов кровли; за 4 ± 1 часа до прогнозируемого риска направить SMS-уведомления всем ответственным лицам подрядчика по эксплуатации кровли и управляющему ТСЖ; обеспечить контроль исполнения и подготовить наряд на очистку кровли от снега и сбивание сосулек для снижения массы тающего снега и размера наледи.",
+      "priority": 1,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_temperature",
+      "type": "input",
+      "label": "temperature",
+      "position": {
+        "x": 60.0,
+        "y": 80.0
+      },
+      "paramRef": "temperature",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_temperature",
+      "type": "threshold",
+      "label": "-2.0 ± 2.0 °C",
+      "position": {
+        "x": 320.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": -2.0,
+      "deviation": 2.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "°C",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_temperature",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 80.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_temperatureRiseRate",
+      "type": "input",
+      "label": "temperatureRiseRate",
+      "position": {
+        "x": 60.0,
+        "y": 220.0
+      },
+      "paramRef": "temperatureRiseRate",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_temperatureRiseRate",
+      "type": "threshold",
+      "label": "0.5 ± 0.5 °C/ч",
+      "position": {
+        "x": 320.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": 0.5,
+      "deviation": 0.5,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "°C/ч",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_temperatureRiseRate",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 220.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_snowDepth",
+      "type": "input",
+      "label": "snowDepth",
+      "position": {
+        "x": 60.0,
+        "y": 360.0
+      },
+      "paramRef": "snowDepth",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_snowDepth",
+      "type": "threshold",
+      "label": "3.0 ± 2.0 см",
+      "position": {
+        "x": 320.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": 3.0,
+      "deviation": 2.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "см",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_snowDepth",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 360.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_iceLength",
+      "type": "input",
+      "label": "iceLength",
+      "position": {
+        "x": 60.0,
+        "y": 500.0
+      },
+      "paramRef": "iceLength",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_iceLength",
+      "type": "threshold",
+      "label": "5.0 ± 5.0 см",
+      "position": {
+        "x": 320.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": 5.0,
+      "deviation": 5.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "см",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_iceLength",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 500.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_in_smsLeadHours",
+      "type": "input",
+      "label": "smsLeadHours",
+      "position": {
+        "x": 60.0,
+        "y": 640.0
+      },
+      "paramRef": "smsLeadHours",
+      "refValue": null,
+      "deviation": null,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_thr_smsLeadHours",
+      "type": "threshold",
+      "label": "4.0 ± 1.0 ч",
+      "position": {
+        "x": 320.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": 4.0,
+      "deviation": 1.0,
+      "operator": null,
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": "ч",
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    },
+    {
+      "id": "n_cmp_smsLeadHours",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "position": {
+        "x": 580.0,
+        "y": 640.0
+      },
+      "paramRef": null,
+      "refValue": null,
+      "deviation": null,
+      "operator": "outside_range",
+      "expression": null,
+      "cases": null,
+      "action": null,
+      "text": null,
+      "priority": null,
+      "constraintRef": null,
+      "unit": null,
+      "sensorType": null,
+      "sensorSubtype": null,
+      "bindsTo": null,
+      "externalId": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_temperature",
+      "target": "n_thr_temperature",
+      "condition": null
+    },
+    {
+      "source": "n_thr_temperature",
+      "target": "n_cmp_temperature",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_temperature",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_temperatureRiseRate",
+      "target": "n_thr_temperatureRiseRate",
+      "condition": null
+    },
+    {
+      "source": "n_thr_temperatureRiseRate",
+      "target": "n_cmp_temperatureRiseRate",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_temperatureRiseRate",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_snowDepth",
+      "target": "n_thr_snowDepth",
+      "condition": null
+    },
+    {
+      "source": "n_thr_snowDepth",
+      "target": "n_cmp_snowDepth",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_snowDepth",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_iceLength",
+      "target": "n_thr_iceLength",
+      "condition": null
+    },
+    {
+      "source": "n_thr_iceLength",
+      "target": "n_cmp_iceLength",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_iceLength",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_smsLeadHours",
+      "target": "n_thr_smsLeadHours",
+      "condition": null
+    },
+    {
+      "source": "n_thr_smsLeadHours",
+      "target": "n_cmp_smsLeadHours",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_smsLeadHours",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

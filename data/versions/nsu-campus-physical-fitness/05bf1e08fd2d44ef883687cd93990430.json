@@ -1,0 +1,14 @@
+{
+  "version_id": "05bf1e08fd2d44ef883687cd93990430",
+  "regulation_id": "nsu-campus-physical-fitness",
+  "created_at": "2026-05-19T06:26:09.619504+00:00",
+  "author": "system",
+  "comment": "Авто-создан при save регламента",
+  "dsl_snapshot": {
+    "rule_id": "rule_nsu-campus-physical-fitness",
+    "regulation_id": "nsu-campus-physical-fitness",
+    "nodes": [],
+    "edges": []
+  },
+  "diff_summary": null
+}
