@@ -7,7 +7,7 @@
       "type": "output",
       "label": "Рекомендация",
       "action": "recommendation",
-      "text": "Регламент антитеррористической защищённости кампуса НГУ (разд. II п. 23 Стандарта 28.02.2024 + Постановление Правительства РФ от 02.08.2019 № 1006 «Об утверждении требований к АТЗ»): 1. ПЕРИМЕТР — 100% покрытие охраной зон массового пребывания (учебные корпуса, библиотека, ФОК, общежития, МФК). СКД + видеонаблюдение с распознаванием лиц. 2. ТРЕВОГА — автоматическое оповещение через РАСЦО за 5 ± 2 минут. Прибытие группы быстрого реагирования ≤ 5 минут. 3. УЧЕНИЯ — не менее 4 в год по эвакуации; не менее 2 проверок систем оповещения в месяц. 4. ОПЕРШТАБ — сбор ≤ 30 минут (аналог koltsovo-edds-mode-escalation). Состав: ректор, заместитель по безопасности, начальник СЦ, представитель ФСБ/МВД. 5. ВЗАИМОДЕЙСТВИЕ С УФСБ/МВД — доклад по протоколу в течение 10 минут с момента подтверждения угрозы. 6. ПОСТАНАЛИЗ — разбор инцидента, корректировка плана учений, доклад ректору и в Минобрнауки.",
+      "text": "Регламент антитеррористической защищённости кампуса НГУ (на основе Инструкции НГУ № 0721-3 Приложение № 6 от 26.03.20**, Стандарта Минобрнауки 28.02.2024 разд. II п. 23, Постановления Правительства РФ от 02.08.2019 № 1006 о требованиях к АТЗ). \n\nI. КОНТАКТЫ ЭКСТРЕННЫХ СЛУЖБ И ОХРАНЫ НГУ\n  • Единый номер 112 — экстренные оперативные службы\n  • Охрана НГУ (ближайший пост / старший смены): 363-41-23 или 8-961-879-01-95\n  • Дежурный НГУ: 363-40-87 или 8-983-301-46-35\n\nII. ПРИ ОБНАРУЖЕНИИ ПОДОЗРИТЕЛЬНЫХ ЛИЦ (§ 1 Инструкции):\n  1) Не привлекать к себе внимание лиц, действия которых показались подозрительными.\n  2) Зафиксировать их точное местонахождение (направление движения).\n  3) Попытаться запомнить приметы.\n  4) Сообщить охране НГУ на ближайшем посту.\n  5) НЕ предпринимать никаких самостоятельных активных действий.\n\nIII. ПРИ ОБНАРУЖЕНИИ ПОДОЗРИТЕЛЬНОГО ПРЕДМЕТА (§ 2 Инструкции):\n  1) Отойти на безопасное расстояние.\n  2) Жестами/голосом предупредить окружающих об опасности.\n  3) Сообщить охране НГУ (363-41-23 / 8-961-879-01-95) — целевое время реакции ≤ 60 секунд.\n  4) НЕ подходить к предмету и НЕ предпринимать действий по его обезвреживанию.\n\nIV. ПРИ ИНФОРМАЦИИ ОБ УГРОЗЕ ТЕРАКТА (§ 3 Инструкции):\n  1) Звонок на 112.\n  2) Уведомление охраны НГУ (363-41-23 / 8-961-879-01-95).\n  3) Уведомление дежурного НГУ (363-40-87 / 8-983-301-46-35).\n  4) Сбор оперштаба ≤ 30 минут (ректор, зам по безопасности, начальник СЦ, представитель ФСБ/МВД).\n  5) Доклад в УФСБ/МВД по протоколу в течение 10 минут с момента подтверждения угрозы.\n\nV. ДАННЫЕ ДЛЯ ПЕРЕДАЧИ (§ 4 Инструкции):\n  • ФИО и должность звонящего\n  • Наименование объекта и точный адрес\n  • Дата и время получения информации\n  • Имеющиеся сведения об угрозе\n  • Количество людей на объекте\n  ⚠ За заведомо ложное сообщение об акте терроризма — уголовная ответственность по ст. 207 УК РФ.\n\nVI. ПРИ ОБЪЯВЛЕНИИ ЭВАКУАЦИИ (§ 5 Инструкции):\n  1) Внимательно прослушать речевое/голосовое оповещение.\n  2) Быстро, без паники, покинуть здание по рекомендованным маршрутам, следуя схемам эвакуации.\n  3) Передвигаться спокойно, не обгоняя впереди идущих людей.\n\nVII. ИНФРАСТРУКТУРА:\n  • 100% покрытие охраной зон массового пребывания (учебные корпуса, библиотека, ФОК, общежития, МФК).\n  • СКД + видеонаблюдение с распознаванием лиц.\n  • РАСЦО — оповещение ≤ 5 ± 2 минут.\n  • Не менее 4 учений по эвакуации в год; не менее 2 проверок систем оповещения в месяц.",
       "priority": 1,
       "position": {
         "x": 880,
@@ -143,20 +143,20 @@
       }
     },
     {
-      "id": "n_in_responseTeamArrival",
+      "id": "n_in_guardResponseTime",
       "type": "input",
-      "label": "responseTeamArrival",
-      "paramRef": "responseTeamArrival",
+      "label": "guardResponseTime",
+      "paramRef": "guardResponseTime",
       "position": {
         "x": 60,
         "y": 640
       }
     },
     {
-      "id": "n_thr_responseTeamArrival",
+      "id": "n_thr_guardResponseTime",
       "type": "threshold",
-      "label": "4.0 ± 2.0 мин",
-      "refValue": 4.0,
+      "label": "3.0 ± 2.0 мин",
+      "refValue": 3.0,
       "deviation": 2.0,
       "unit": "мин",
       "position": {
@@ -165,7 +165,7 @@
       }
     },
     {
-      "id": "n_cmp_responseTeamArrival",
+      "id": "n_cmp_guardResponseTime",
       "type": "compare",
       "label": "вне диапазона?",
       "operator": "outside_range",
@@ -175,29 +175,29 @@
       }
     },
     {
-      "id": "n_in_perimeterIncidentReports",
+      "id": "n_in_suspiciousItemReportTime",
       "type": "input",
-      "label": "perimeterIncidentReports",
-      "paramRef": "perimeterIncidentReports",
+      "label": "suspiciousItemReportTime",
+      "paramRef": "suspiciousItemReportTime",
       "position": {
         "x": 60,
         "y": 780
       }
     },
     {
-      "id": "n_thr_perimeterIncidentReports",
+      "id": "n_thr_suspiciousItemReportTime",
       "type": "threshold",
-      "label": "0.0 ± 2.0 шт/мес",
-      "refValue": 0.0,
-      "deviation": 2.0,
-      "unit": "шт/мес",
+      "label": "60.0 ± 30.0 сек",
+      "refValue": 60.0,
+      "deviation": 30.0,
+      "unit": "сек",
       "position": {
         "x": 320,
         "y": 780
       }
     },
     {
-      "id": "n_cmp_perimeterIncidentReports",
+      "id": "n_cmp_suspiciousItemReportTime",
       "type": "compare",
       "label": "вне диапазона?",
       "operator": "outside_range",
@@ -269,32 +269,32 @@
       "condition": "outside"
     },
     {
-      "source": "n_in_responseTeamArrival",
-      "target": "n_thr_responseTeamArrival",
+      "source": "n_in_guardResponseTime",
+      "target": "n_thr_guardResponseTime",
       "condition": null
     },
     {
-      "source": "n_thr_responseTeamArrival",
-      "target": "n_cmp_responseTeamArrival",
+      "source": "n_thr_guardResponseTime",
+      "target": "n_cmp_guardResponseTime",
       "condition": null
     },
     {
-      "source": "n_cmp_responseTeamArrival",
+      "source": "n_cmp_guardResponseTime",
       "target": "n_output",
       "condition": "outside"
     },
     {
-      "source": "n_in_perimeterIncidentReports",
-      "target": "n_thr_perimeterIncidentReports",
+      "source": "n_in_suspiciousItemReportTime",
+      "target": "n_thr_suspiciousItemReportTime",
       "condition": null
     },
     {
-      "source": "n_thr_perimeterIncidentReports",
-      "target": "n_cmp_perimeterIncidentReports",
+      "source": "n_thr_suspiciousItemReportTime",
+      "target": "n_cmp_suspiciousItemReportTime",
       "condition": null
     },
     {
-      "source": "n_cmp_perimeterIncidentReports",
+      "source": "n_cmp_suspiciousItemReportTime",
       "target": "n_output",
       "condition": "outside"
     }

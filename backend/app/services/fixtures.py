@@ -140,6 +140,10 @@ REGISTRY: dict[str, dict[str, str]] = {
         "name":   "Регламент антитеррористической защищённости кампуса НГУ",
         "domain": "campus",
     },
+    "nsu-campus-fire-action": {
+        "name":   "Регламент действий при пожаре на объектах кампуса НГУ",
+        "domain": "campus",
+    },
 }
 
 

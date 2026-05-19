@@ -1,0 +1,302 @@
+{
+  "rule_id": "rule_nsu-campus-fire-action",
+  "regulation_id": "nsu-campus-fire-action",
+  "nodes": [
+    {
+      "id": "n_output",
+      "type": "output",
+      "label": "Рекомендация",
+      "action": "recommendation",
+      "text": "Регламент действий при пожаре на объектах кампуса НГУ (на основе плаката «Актион Охрана труда» «Как действовать при пожаре», СП 3.13130.2009 «СОУЭ» и ФЗ № 69-ФЗ «О пожарной безопасности»). \n\n8 ШАГОВ (для любого работника, обучающегося, преподавателя — свидетеля пожара):\n\n1) СООБЩИТЬ — позвонить на 01, 101 либо 112 за ≤ 30 секунд от обнаружения, если не справились с огнём за несколько секунд (огнетушитель + кран ПК).\n\n2) ИЗВЕСТИТЬ РУКОВОДИТЕЛЯ — сообщить о пожаре руководителю подразделения или организации (старший смены, декан, проректор, ректор по эскалации) ≤ 5 минут.\n\n3) ЭВАКУАЦИЯ — покиньте здание или, по возможности, примите меры по эвакуации людей и тушению пожара. Норматив времени эвакуации — ≤ 6 минут (зависит от этажности и категории здания).\n\n4) ОКНА И СТЁКЛА — НЕ открывайте окна и НЕ разбивайте стёкла, чтобы НЕ усилить распространение огня (приток кислорода ускоряет горение).\n\n5) ВЫСОТА — НЕ прыгайте из окон и балконов верхних этажей зданий и НЕ прячьтесь в малозаметные места (туалеты, подсобки) — поисково-спасательная группа может вас не найти.\n\n6) ЛЕСТНИЦЫ — спускайтесь по пожарным лестницам по одному, страхуйте коллег. НЕ используйте лифты (могут остановиться при отключении электроэнергии).\n\n7) ДВЕРИ В ОЧАГ — НЕ открывайте или открывайте с осторожностью двери в помещение, где возник пожар, чтобы избежать вспышки пламени от быстрого притока свежего воздуха (эффект «обратной тяги»).\n\n8) ОЖИДАНИЕ — ожидайте в безопасном месте приезда пожарной службы (норматив МЧС ≤ 10 минут) и окончания тушения и ликвидации последствий пожара.\n\nИНФРАСТРУКТУРА (ответственность УК сервисная + Служба ГО):\n  • Датчики дыма АДПИ GSM в каждом помещении (задержка ≤ 60 сек).\n  • СОУЭ — речевая система оповещения + светозвуковая индикация.\n  • Схемы эвакуации на каждом этаже — не менее 4 (по сторонам света), размещение по СП 3.13130.\n  • Кнопки ручной пожарной сигнализации в коридорах ≤ 30 м между точками.\n  • Огнетушители и пожарные краны — проверка ежемесячно, перезарядка раз в год.\n  • Все эвакуационные выходы свободны 24/7.",
+      "priority": 1,
+      "position": {
+        "x": 880,
+        "y": 60
+      }
+    },
+    {
+      "id": "n_in_notificationTime",
+      "type": "input",
+      "label": "notificationTime",
+      "paramRef": "notificationTime",
+      "position": {
+        "x": 60,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_thr_notificationTime",
+      "type": "threshold",
+      "label": "30.0 ± 30.0 сек",
+      "refValue": 30.0,
+      "deviation": 30.0,
+      "unit": "сек",
+      "position": {
+        "x": 320,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_cmp_notificationTime",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 80
+      }
+    },
+    {
+      "id": "n_in_smokeDetectionLatency",
+      "type": "input",
+      "label": "smokeDetectionLatency",
+      "paramRef": "smokeDetectionLatency",
+      "position": {
+        "x": 60,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_thr_smokeDetectionLatency",
+      "type": "threshold",
+      "label": "60.0 ± 30.0 сек",
+      "refValue": 60.0,
+      "deviation": 30.0,
+      "unit": "сек",
+      "position": {
+        "x": 320,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_cmp_smokeDetectionLatency",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 220
+      }
+    },
+    {
+      "id": "n_in_evacuationTime",
+      "type": "input",
+      "label": "evacuationTime",
+      "paramRef": "evacuationTime",
+      "position": {
+        "x": 60,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_thr_evacuationTime",
+      "type": "threshold",
+      "label": "6.0 ± 2.0 мин",
+      "refValue": 6.0,
+      "deviation": 2.0,
+      "unit": "мин",
+      "position": {
+        "x": 320,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_cmp_evacuationTime",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 360
+      }
+    },
+    {
+      "id": "n_in_fireBrigadeArrival",
+      "type": "input",
+      "label": "fireBrigadeArrival",
+      "paramRef": "fireBrigadeArrival",
+      "position": {
+        "x": 60,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_thr_fireBrigadeArrival",
+      "type": "threshold",
+      "label": "8.0 ± 3.0 мин",
+      "refValue": 8.0,
+      "deviation": 3.0,
+      "unit": "мин",
+      "position": {
+        "x": 320,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_cmp_fireBrigadeArrival",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 500
+      }
+    },
+    {
+      "id": "n_in_evacuationMapsCount",
+      "type": "input",
+      "label": "evacuationMapsCount",
+      "paramRef": "evacuationMapsCount",
+      "position": {
+        "x": 60,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_thr_evacuationMapsCount",
+      "type": "threshold",
+      "label": "4.0 ± 1.0 шт/этаж",
+      "refValue": 4.0,
+      "deviation": 1.0,
+      "unit": "шт/этаж",
+      "position": {
+        "x": 320,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_cmp_evacuationMapsCount",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 640
+      }
+    },
+    {
+      "id": "n_in_supervisorNotificationTime",
+      "type": "input",
+      "label": "supervisorNotificationTime",
+      "paramRef": "supervisorNotificationTime",
+      "position": {
+        "x": 60,
+        "y": 780
+      }
+    },
+    {
+      "id": "n_thr_supervisorNotificationTime",
+      "type": "threshold",
+      "label": "5.0 ± 3.0 мин",
+      "refValue": 5.0,
+      "deviation": 3.0,
+      "unit": "мин",
+      "position": {
+        "x": 320,
+        "y": 780
+      }
+    },
+    {
+      "id": "n_cmp_supervisorNotificationTime",
+      "type": "compare",
+      "label": "вне диапазона?",
+      "operator": "outside_range",
+      "position": {
+        "x": 580,
+        "y": 780
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "n_in_notificationTime",
+      "target": "n_thr_notificationTime",
+      "condition": null
+    },
+    {
+      "source": "n_thr_notificationTime",
+      "target": "n_cmp_notificationTime",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_notificationTime",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_smokeDetectionLatency",
+      "target": "n_thr_smokeDetectionLatency",
+      "condition": null
+    },
+    {
+      "source": "n_thr_smokeDetectionLatency",
+      "target": "n_cmp_smokeDetectionLatency",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_smokeDetectionLatency",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_evacuationTime",
+      "target": "n_thr_evacuationTime",
+      "condition": null
+    },
+    {
+      "source": "n_thr_evacuationTime",
+      "target": "n_cmp_evacuationTime",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_evacuationTime",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_fireBrigadeArrival",
+      "target": "n_thr_fireBrigadeArrival",
+      "condition": null
+    },
+    {
+      "source": "n_thr_fireBrigadeArrival",
+      "target": "n_cmp_fireBrigadeArrival",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_fireBrigadeArrival",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_evacuationMapsCount",
+      "target": "n_thr_evacuationMapsCount",
+      "condition": null
+    },
+    {
+      "source": "n_thr_evacuationMapsCount",
+      "target": "n_cmp_evacuationMapsCount",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_evacuationMapsCount",
+      "target": "n_output",
+      "condition": "outside"
+    },
+    {
+      "source": "n_in_supervisorNotificationTime",
+      "target": "n_thr_supervisorNotificationTime",
+      "condition": null
+    },
+    {
+      "source": "n_thr_supervisorNotificationTime",
+      "target": "n_cmp_supervisorNotificationTime",
+      "condition": null
+    },
+    {
+      "source": "n_cmp_supervisorNotificationTime",
+      "target": "n_output",
+      "condition": "outside"
+    }
+  ]
+}

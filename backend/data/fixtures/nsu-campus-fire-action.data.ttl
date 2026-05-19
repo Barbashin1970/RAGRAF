@@ -1,0 +1,46 @@
+@prefix :     <http://regulations.local/ontology#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# Регламент действий при пожаре на объектах кампуса НГУ
+# Роль: Сотрудник, обучающийся, преподаватель — любой свидетель пожара / Охрана НГУ / Руководитель подразделения
+# Источник: Плакат «Актион Охрана труда» (8 шагов) + СП 3.13130.2009 «СОУЭ» + ФЗ № 69-ФЗ «О пожарной безопасности».
+
+:Regulation a owl:Class .
+
+:name           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+:date           a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:date .
+:recommendation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:string .
+
+:notificationTime          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:notificationTimeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:smokeDetectionLatency          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:smokeDetectionLatencyDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:evacuationTime          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:evacuationTimeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:fireBrigadeArrival          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:fireBrigadeArrivalDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:evacuationMapsCount          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:evacuationMapsCountDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:supervisorNotificationTime          a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+:supervisorNotificationTimeDeviation a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal .
+
+:NsuCampusFireActionRegulation
+    a                      :Regulation ;
+    :name                  "Регламент действий при пожаре на объектах кампуса НГУ" ;
+    :date                  "2024-03-26"^^xsd:date ;
+    :notificationTime              30.0 ;
+    :notificationTimeDeviation     30.0 ;
+    :smokeDetectionLatency              60.0 ;
+    :smokeDetectionLatencyDeviation     30.0 ;
+    :evacuationTime              6.0 ;
+    :evacuationTimeDeviation     2.0 ;
+    :fireBrigadeArrival              8.0 ;
+    :fireBrigadeArrivalDeviation     3.0 ;
+    :evacuationMapsCount              4.0 ;
+    :evacuationMapsCountDeviation     1.0 ;
+    :supervisorNotificationTime              5.0 ;
+    :supervisorNotificationTimeDeviation     3.0 ;
+    :recommendation        "Регламент действий при пожаре на объектах кампуса НГУ (на основе плаката «Актион Охрана труда» «Как действовать при пожаре», СП 3.13130.2009 «СОУЭ» и ФЗ № 69-ФЗ «О пожарной безопасности»). \n\n8 ШАГОВ (для любого работника, обучающегося, преподавателя — свидетеля пожара):\n\n1) СООБЩИТЬ — позвонить на 01, 101 либо 112 за ≤ 30 секунд от обнаружения, если не справились с огнём за несколько секунд (огнетушитель + кран ПК).\n\n2) ИЗВЕСТИТЬ РУКОВОДИТЕЛЯ — сообщить о пожаре руководителю подразделения или организации (старший смены, декан, проректор, ректор по эскалации) ≤ 5 минут.\n\n3) ЭВАКУАЦИЯ — покиньте здание или, по возможности, примите меры по эвакуации людей и тушению пожара. Норматив времени эвакуации — ≤ 6 минут (зависит от этажности и категории здания).\n\n4) ОКНА И СТЁКЛА — НЕ открывайте окна и НЕ разбивайте стёкла, чтобы НЕ усилить распространение огня (приток кислорода ускоряет горение).\n\n5) ВЫСОТА — НЕ прыгайте из окон и балконов верхних этажей зданий и НЕ прячьтесь в малозаметные места (туалеты, подсобки) — поисково-спасательная группа может вас не найти.\n\n6) ЛЕСТНИЦЫ — спускайтесь по пожарным лестницам по одному, страхуйте коллег. НЕ используйте лифты (могут остановиться при отключении электроэнергии).\n\n7) ДВЕРИ В ОЧАГ — НЕ открывайте или открывайте с осторожностью двери в помещение, где возник пожар, чтобы избежать вспышки пламени от быстрого притока свежего воздуха (эффект «обратной тяги»).\n\n8) ОЖИДАНИЕ — ожидайте в безопасном месте приезда пожарной службы (норматив МЧС ≤ 10 минут) и окончания тушения и ликвидации последствий пожара.\n\nИНФРАСТРУКТУРА (ответственность УК сервисная + Служба ГО):\n  • Датчики дыма АДПИ GSM в каждом помещении (задержка ≤ 60 сек).\n  • СОУЭ — речевая система оповещения + светозвуковая индикация.\n  • Схемы эвакуации на каждом этаже — не менее 4 (по сторонам света), размещение по СП 3.13130.\n  • Кнопки ручной пожарной сигнализации в коридорах ≤ 30 м между точками.\n  • Огнетушители и пожарные краны — проверка ежемесячно, перезарядка раз в год.\n  • Все эвакуационные выходы свободны 24/7." .

@@ -2,7 +2,7 @@
 @prefix sh:  <http://www.w3.org/ns/shacl#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
-:NsuCampusAntiterrorismShape
+:NsuCampusFireActionShape
     a sh:NodeShape ;
     sh:targetClass :Regulation ;
 
@@ -10,47 +10,47 @@
     sh:property [ sh:path :date ; sh:datatype xsd:date ; sh:minCount 1 ] ;
 
     sh:property [
-        sh:path         :massGuardCoverage ;
-        sh:datatype     xsd:decimal ;
-        sh:minCount     1 ;
-        sh:minInclusive 95.0 ;
-        sh:maxInclusive 100.0 ;
-        sh:message      "Покрытие охраной зон массового пребывания"@ru
-    ] ;
-    sh:property [
-        sh:path         :massGuardCoverageDeviation ;
+        sh:path         :notificationTime ;
         sh:datatype     xsd:decimal ;
         sh:minCount     1 ;
         sh:minInclusive 0.0 ;
-        sh:maxInclusive 50.0
+        sh:maxInclusive 180.0 ;
+        sh:message      "Время сообщения о пожаре на 01/101/112 от обнаружения"@ru
+    ] ;
+    sh:property [
+        sh:path         :notificationTimeDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 150.0
     ] ;
 
     sh:property [
-        sh:path         :drillsPerYear ;
+        sh:path         :smokeDetectionLatency ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 300.0 ;
+        sh:message      "Задержка детектора дыма до сигнала на пульт"@ru
+    ] ;
+    sh:property [
+        sh:path         :smokeDetectionLatencyDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 150.0
+    ] ;
+
+    sh:property [
+        sh:path         :evacuationTime ;
         sh:datatype     xsd:decimal ;
         sh:minCount     1 ;
         sh:minInclusive 2.0 ;
-        sh:maxInclusive 12.0 ;
-        sh:message      "Учений по эвакуации в год"@ru
-    ] ;
-    sh:property [
-        sh:path         :drillsPerYearDeviation ;
-        sh:datatype     xsd:decimal ;
-        sh:minCount     1 ;
-        sh:minInclusive 0.0 ;
-        sh:maxInclusive 6.0
-    ] ;
-
-    sh:property [
-        sh:path         :emergencyNotificationTime ;
-        sh:datatype     xsd:decimal ;
-        sh:minCount     1 ;
-        sh:minInclusive 0.0 ;
         sh:maxInclusive 15.0 ;
-        sh:message      "Время оповещения при ЧС через РАСЦО"@ru
+        sh:message      "Время эвакуации из здания по нормативу"@ru
     ] ;
     sh:property [
-        sh:path         :emergencyNotificationTimeDeviation ;
+        sh:path         :evacuationTimeDeviation ;
         sh:datatype     xsd:decimal ;
         sh:minCount     1 ;
         sh:minInclusive 0.0 ;
@@ -58,15 +58,31 @@
     ] ;
 
     sh:property [
-        sh:path         :notificationSystemChecks ;
+        sh:path         :fireBrigadeArrival ;
         sh:datatype     xsd:decimal ;
         sh:minCount     1 ;
-        sh:minInclusive 1.0 ;
-        sh:maxInclusive 8.0 ;
-        sh:message      "Проверок систем оповещения/мес"@ru
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 20.0 ;
+        sh:message      "Прибытие пожарной службы (норматив МЧС)"@ru
     ] ;
     sh:property [
-        sh:path         :notificationSystemChecksDeviation ;
+        sh:path         :fireBrigadeArrivalDeviation ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 0.0 ;
+        sh:maxInclusive 15.0
+    ] ;
+
+    sh:property [
+        sh:path         :evacuationMapsCount ;
+        sh:datatype     xsd:decimal ;
+        sh:minCount     1 ;
+        sh:minInclusive 2.0 ;
+        sh:maxInclusive 10.0 ;
+        sh:message      "Схем эвакуации на этаже"@ru
+    ] ;
+    sh:property [
+        sh:path         :evacuationMapsCountDeviation ;
         sh:datatype     xsd:decimal ;
         sh:minCount     1 ;
         sh:minInclusive 0.0 ;
@@ -74,33 +90,17 @@
     ] ;
 
     sh:property [
-        sh:path         :guardResponseTime ;
+        sh:path         :supervisorNotificationTime ;
         sh:datatype     xsd:decimal ;
         sh:minCount     1 ;
         sh:minInclusive 0.0 ;
-        sh:maxInclusive 10.0 ;
-        sh:message      "Прибытие охраны на ближайший пост по тревоге"@ru
+        sh:maxInclusive 30.0 ;
+        sh:message      "Сообщение руководителю подразделения о пожаре"@ru
     ] ;
     sh:property [
-        sh:path         :guardResponseTimeDeviation ;
+        sh:path         :supervisorNotificationTimeDeviation ;
         sh:datatype     xsd:decimal ;
         sh:minCount     1 ;
         sh:minInclusive 0.0 ;
-        sh:maxInclusive 10.0
-    ] ;
-
-    sh:property [
-        sh:path         :suspiciousItemReportTime ;
-        sh:datatype     xsd:decimal ;
-        sh:minCount     1 ;
-        sh:minInclusive 0.0 ;
-        sh:maxInclusive 300.0 ;
-        sh:message      "Время сообщения охране о подозрительном предмете"@ru
-    ] ;
-    sh:property [
-        sh:path         :suspiciousItemReportTimeDeviation ;
-        sh:datatype     xsd:decimal ;
-        sh:minCount     1 ;
-        sh:minInclusive 0.0 ;
-        sh:maxInclusive 150.0
+        sh:maxInclusive 15.0
     ] .
