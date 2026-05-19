@@ -69,60 +69,46 @@ fi
 
 if [ -f "$DUCKDB_FILE" ]; then
     echo "==> DuckDB integrity check: ${DUCKDB_FILE}"
-    # Probe — 3 уровня. Слабый probe (только SELECT) пропускает
-    # повреждённые ИНДЕКСЫ: файл читается, но при первом же COMMIT
-    # `RemoveFromIndexes` бросает FatalException → SIGABRT → крашится
-    # контейнер. Сейчас имитируем тот же путь, что делает uvicorn-процесс:
-    #   1) open + SELECT (читаемость);
-    #   2) CHECKPOINT (force-flush WAL — лечит часть transient bugs);
-    #   3) write-roundtrip на `parameters`: UPDATE/COMMIT/UPDATE-обратно/COMMIT
-    #      — это поднимет тот же crash что и при работе приложения,
-    #      и мы успеем ротировать файл вместо вечного цикла рестартов.
-    # SIGABRT (exit 134) и SIGSEGV (139) bash ловит через `if !`.
+    # Probe — ТОЛЬКО read-only. Раньше делали write-roundtrip с UPDATE/COMMIT
+    # на parameters чтобы поймать повреждённый PRIMARY KEY index. Это давало
+    # **false-positive ротацию на каждый деплой** при transient COMMIT-ошибке
+    # (например, версия DuckDB чуть-чуть отличается между dev и prod) →
+    # файл ротировался в .broken-* → сид-блок копировал dev-snapshot
+    # поверх прод-данных → **цифровые двойники пользователя терялись**.
+    #
+    # Новая логика:
+    #   1) open + SELECT 1 — базовая читаемость.
+    #   2) CHECKPOINT — force-flush WAL, лечит transient несоответствия.
+    # БЕЗ write-probe. Если индексы повреждены при работе приложения, FastAPI
+    # сам обработает ошибку и вернёт 500 на конкретный запрос — это лучше
+    # чем тихо потерять данные. Crashes из-за SIGABRT в нативном DuckDB
+    # ловятся первым же `SELECT 1` (нативный crash происходит на read
+    # corrupted page, не на write).
     if python -c "
 import duckdb, sys
 try:
     c = duckdb.connect('${DUCKDB_FILE}')
-    # 1) базовая читаемость
     c.execute('SELECT 1').fetchone()
-    # 2) CHECKPOINT — flush WAL → может исправить transient несоответствия
     try:
         c.execute('CHECKPOINT')
     except Exception as e:
         print(f'CHECKPOINT skipped: {type(e).__name__}: {e}', file=sys.stderr)
-    # 3) Write-roundtrip на parameters — самый частый источник crash:
-    #    повреждённый PRIMARY KEY index 'PRIMARY_parameters_*'.
-    #    Если таблица пуста или нет — пропускаем (нечего тестировать).
-    try:
-        row = c.execute('SELECT source_id, id FROM parameters LIMIT 1').fetchone()
-    except Exception:
-        row = None
-    if row:
-        sid, pid = row
-        # Идемпотентный UPDATE на то же значение — не меняет данные,
-        # но дёргает index pipeline ровно так же как save().
-        c.execute('BEGIN')
-        c.execute('UPDATE parameters SET position = position WHERE source_id = ? AND id = ?', [sid, pid])
-        c.execute('COMMIT')
-        # Если COMMIT прошёл — индекс жив.
     c.close()
     sys.exit(0)
 except Exception as e:
     print(f'duckdb probe failed: {type(e).__name__}: {e}', file=sys.stderr)
     sys.exit(1)
 " 2>&1; then
-        echo "==> DuckDB OK (включая write-roundtrip)"
+        echo "==> DuckDB OK (read + checkpoint)"
     else
         EXIT_CODE=$?
         TS=$(date +%s)
         echo "==> WARN: DuckDB-файл повреждён (exit ${EXIT_CODE} — SIGABRT=134/SIGSEGV=139/Python=1) — ротируем в .broken-${TS}"
         mv "${DUCKDB_FILE}" "${DUCKDB_FILE}.broken-${TS}" 2>/dev/null || true
-        # WAL без главного файла бесполезен и может вызвать тот же crash при
-        # реоткрытии — тоже ротируем. -f чтобы не падать если WAL нет.
         if [ -f "${DUCKDB_FILE}.wal" ]; then
             mv "${DUCKDB_FILE}.wal" "${DUCKDB_FILE}.wal.broken-${TS}" 2>/dev/null || true
         fi
-        echo "==> ротация выполнена; init_db() / seed сейчас создадут свежий файл"
+        echo "==> ротация выполнена; init_db() сейчас создаст свежий файл из фикстур"
     fi
 fi
 
@@ -134,12 +120,25 @@ if [ ! -f "${DATA_DIR_PATH}/regulations.duckdb" ]; then
         echo "==> /data пустой — копируем seed из ${SEED_DIR}"
         # cp -rn = не перезаписывать существующее (защита на случай частичной
         # инициализации). -L разворачивает симлинки, чтобы Volume не зависел
-        # от структуры image. Бэкапы DuckDB в seed не попадают благодаря
-        # .dockerignore, но на всякий случай отрежем тут тоже.
+        # от структуры image.
+        #
+        # ВАЖНО: ЯВНО исключаем `regulations.duckdb*` (хотя они уже отрезаны
+        # .dockerignore'ом) — defense-in-depth от регрессии. БД на проде
+        # ВСЕГДА должна создаваться через `init_db()` из фикстур, никогда
+        # не копироваться dev-snapshot'ом. Иначе цифровые двойники
+        # пользователя теряются. Аналогично `flows/` и `versions/` — это
+        # user-state, копировать его из dev-машины нельзя.
         mkdir -p "$DATA_DIR_PATH"
         find "$SEED_DIR" -mindepth 1 -maxdepth 1 \
+            ! -name 'regulations.duckdb' \
+            ! -name 'regulations.duckdb.wal' \
+            ! -name 'flows' \
+            ! -name 'versions' \
+            ! -name 'ragu_store' \
+            ! -name 'source_documents' \
             ! -name '*.bak-*' \
             ! -name '*.broken-*' \
+            ! -name '*.obsolete-*' \
             -exec cp -rnL {} "$DATA_DIR_PATH"/ \;
         echo "==> seed copied:"
         ls -la "$DATA_DIR_PATH" | head -20

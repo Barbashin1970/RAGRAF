@@ -50,11 +50,23 @@ TZ_RAGRAF.md
 TZ_SIGMA*.pdf
 Rules-Management.pdf
 
-# ── DuckDB-бэкапы ─────────────────────────────────────────────────────
-# Локальные timestamped-бэкапы хранят 8+ МБ каждый, на проде не нужны.
+# ── DuckDB и runtime-состояние ────────────────────────────────────────
+# КРИТИЧНО: эти файлы — РАБОЧЕЕ СОСТОЯНИЕ dev-машины, их нельзя пихать в
+# Docker image. Иначе seed на пустом Volume (или после ротации probe'ом
+# повреждённого файла) перезатирает прод данные dev'овским snapshot'ом —
+# пользователь теряет все цифровые двойники, flow'ы, версии, audit-лог.
+# Прод должен **создавать БД с нуля** через `init_db()` из фикстур.
+backend/data/regulations.duckdb
+backend/data/regulations.duckdb.wal
 backend/data/*.bak-*
 backend/data/*.wal.bak-*
-backend/data/regulations.duckdb.wal
+# Runtime-папки: flow'ы, версии, RAGU-стор, загруженные документы — это
+# user-state, который накапливается в проде. На dev-машине они есть для
+# локальной отладки, но в image их быть не должно.
+backend/data/flows/
+backend/data/versions/
+backend/data/ragu_store/
+backend/data/source_documents/
 
 # ── Логи / отчёты ─────────────────────────────────────────────────────
 *.log

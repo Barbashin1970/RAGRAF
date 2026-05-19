@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from app.config import settings
 from app.schemas.domain import Regulation
 from app.services import domain_store, fixtures, regulation_store, templates
-from app.services.flow_storage import delete_flow as save_flow_module_delete, save_flow
+from app.services.flow_storage import delete_flow as save_flow_module_delete, load_flow, save_flow
 from app.services.regulation_client import client
 from app.services.templates import ensure_unique_source_id, slugify
 from app.services.turtle_bridge import parse_regulation_turtle, regulation_to_turtle
@@ -77,6 +77,97 @@ def create_regulation(payload: CreateRegulationRequest) -> Regulation:
         save_flow(source_id, flow, author="anonymous", comment="Starter flow из шаблона домена")
 
     return reg
+
+
+# ---- Duplicate existing regulation ----
+
+
+class DuplicateRequest(BaseModel):
+    """Тело POST /api/regulations/{id}/duplicate — переиспользует структуру.
+
+    UX-сценарий: аналитик нашёл похожий регламент, хочет на его основе
+    создать новый (тот же домен, те же параметры/триггеры/SHACL/flow),
+    подправить и сохранить. Без этой ручки приходится копировать руками
+    каждое поле — болезненно для регламентов с 10+ параметрами.
+
+    Поля:
+      - `name` — опционально; если не задано, прибавляем «(копия)» к имени-источнику
+      - `source_id` — опционально; если не задано, берём slug от name и добавляем uuid-суффикс
+    """
+    name: str | None = Field(None, description="Имя копии; если не задано — name источника + «(копия)»")
+    source_id: str | None = Field(None, description="ID копии; если не задано — генерируется")
+
+
+@router.post("/regulations/{source_id}/duplicate", status_code=201)
+async def duplicate_regulation(source_id: str, payload: DuplicateRequest) -> Regulation:
+    """Создать копию регламента — те же параметры/триггеры/flow/SHACL.
+
+    Шаги:
+      1. Достать оригинал (DuckDB → upstream/fixture fallback) — та же логика
+         что в `GET /regulations/{id}`.
+      2. Сгенерировать новый source_id (или использовать переданный, если он
+         свободен).
+      3. Скопировать всё содержимое в новый Regulation. version обнуляется
+         в '1.0', status → 'draft' (копия не может быть active без явного
+         подтверждения), updated_at новый.
+      4. Сохранить → создаётся первая запись в regulation_history.
+      5. Скопировать flow (если есть у источника) в новый source_id.
+
+    Возвращает созданный Regulation. UI сразу редиректит в /regulations/{new_id}/edit.
+    """
+    # 1. Прочитать оригинал через ту же логику что GET /regulations/{id}
+    src = regulation_store.get(source_id)
+    if src is None:
+        # Fallback — попытка достать из upstream/fixture
+        try:
+            turtle = await client.get_data(source_id)
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=f"Регламент '{source_id}' не найден: {e}") from e
+        shapes_turtle = ""
+        try:
+            shapes_turtle = await client.get_shapes(source_id)
+        except Exception:
+            pass
+        src = parse_regulation_turtle(turtle, source_id, shapes_turtle=shapes_turtle)
+        if shapes_turtle:
+            from app.services.turtle_bridge import parse_shapes_turtle
+            src.constraints = parse_shapes_turtle(shapes_turtle)
+
+    # 2. Сгенерировать новый source_id
+    new_name = payload.name or f"{src.name} (копия)"
+    base_slug = slugify(payload.source_id or new_name)
+    new_source_id = ensure_unique_source_id(base_slug)
+
+    # 3. Клонируем через model_copy с заменой ключевых полей. deep=True чтобы
+    # вложенные параметры/recommendation/constraints не шарились с оригиналом.
+    new_reg = src.model_copy(
+        deep=True,
+        update={
+            "source_id": new_source_id,
+            "name": new_name,
+            "version": "1.0",
+            "status": "draft",  # копия всегда стартует как draft
+        },
+    )
+
+    # 4. Сохранить в DuckDB (первая запись в history)
+    regulation_store.save(
+        new_reg,
+        author="anonymous",
+        comment=f"Создан копированием из {source_id}",
+    )
+
+    # 5. Скопировать flow если есть
+    src_flow = load_flow(source_id)
+    if src_flow is not None and src_flow.nodes:
+        save_flow(
+            new_source_id,
+            src_flow,
+            author="anonymous",
+            comment=f"Flow скопирован из {source_id}",
+        )
+
+    return new_reg
 
 
 # ---- Read / update existing ----

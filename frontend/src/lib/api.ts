@@ -358,6 +358,15 @@ export const api = {
         regulationSchema,
       ),
     get: (id: string) => request(`/api/regulations/${encodeURIComponent(id)}`, undefined, regulationSchema),
+    /** Дублировать существующий регламент — копирует параметры/триггеры/flow/SHACL.
+     *  Возвращает созданный Regulation. Backend генерирует уникальный source_id
+     *  и ставит status='draft' (копия не может быть active без явного approval). */
+    duplicate: (id: string, payload?: { name?: string; source_id?: string }) =>
+      request(
+        `/api/regulations/${encodeURIComponent(id)}/duplicate`,
+        { method: 'POST', body: JSON.stringify(payload ?? {}) },
+        regulationSchema,
+      ),
     save: (id: string, reg: Regulation) =>
       request(
         `/api/regulations/${encodeURIComponent(id)}`,

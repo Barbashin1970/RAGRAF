@@ -62,11 +62,20 @@ COPY backend/data/fixtures /srv/backend/data/fixtures
 # выставляет enabled=True — новичок сразу видит «3/3 документов включено».
 COPY backend/data/demo_documents /srv/backend/data/demo_documents
 
-# Seed-данные DuckDB + начальное содержимое flows/ / versions/. ВАЖНО:
-# это копируется в `_seed_data/`, а runtime-каталог `/data` будет Volume
-# на Railway (см. start.sh — при первом запуске, если /data пустой,
-# копируем сюда seed). Бэкап `regulations.duckdb.bak-*` в .dockerignore.
-COPY backend/data /srv/_seed_data
+# Seed для Volume — ТОЛЬКО read-only артефакты (фикстуры + demo-документы).
+# **НЕ копируем** `regulations.duckdb`, `flows/`, `versions/`, `ragu_store/`,
+# `source_documents/` — это runtime-состояние dev-машины, на проде оно
+# должно создаваться с нуля через `init_db()` из фикстур. Иначе при
+# любом сценарии «волюм пустой» (первый деплой / probe ротирует
+# повреждённый файл) пользовательские цифровые двойники терялись бы,
+# заменяясь dev-snapshot'ом из image. См. start.sh §2.
+#
+# .dockerignore тоже отрезает эти файлы, но Dockerfile.COPY дублирует
+# защиту явным списком — defense-in-depth от регрессии при правке
+# .dockerignore.
+RUN mkdir -p /srv/_seed_data
+COPY backend/data/fixtures /srv/_seed_data/fixtures
+COPY backend/data/demo_documents /srv/_seed_data/demo_documents
 
 # Vite-build из stage 1.
 COPY --from=frontend-builder /app/dist /srv/frontend_dist

@@ -1,13 +1,16 @@
-import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertCircle,
   AlertTriangle,
+  AlignLeft,
   BookOpen,
   Boxes,
+  Copy,
   Download,
   FileText,
+  LayoutGrid,
   ListTree,
   Loader2,
   type LucideIcon,
@@ -18,6 +21,7 @@ import {
   Search,
   Shield,
   Sliders,
+  Star,
   Trash2,
   Upload,
   Workflow,
@@ -103,10 +107,71 @@ function expirationBadge(valid_to: string | null | undefined): { label: string; 
 // сюда тоже нужно добавить — иначе UI предложит удалить, а сервер ответит 409.
 const SEED_DOMAIN_IDS = new Set(['heating', 'housing', 'safety', 'environment'])
 
+// ── UX-state hooks ────────────────────────────────────────────────────
+//
+// «Мои регламенты» — личный рабочий набор аналитика, чтобы быстро находить
+// 2-3 регламента, над которыми он сейчас работает, не листая все 20+.
+// Storage в localStorage — позже синхронизируется с user-prefs БД.
+const STARRED_KEY = 'ragraf:starred-regulations:v1'
+
+function useStarred() {
+  const [starred, setStarred] = useState<Set<string>>(() => {
+    try {
+      const raw = localStorage.getItem(STARRED_KEY)
+      if (!raw) return new Set()
+      const arr = JSON.parse(raw)
+      return new Set(Array.isArray(arr) ? arr.filter((x) => typeof x === 'string') : [])
+    } catch {
+      return new Set()
+    }
+  })
+  const toggle = useCallback((id: string) => {
+    setStarred((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      try {
+        localStorage.setItem(STARRED_KEY, JSON.stringify([...next]))
+      } catch {
+        // localStorage может упасть в private mode — это ОК, состояние
+        // живёт в памяти до перезагрузки.
+      }
+      return next
+    })
+  }, [])
+  return { starred, toggle }
+}
+
+// Плотность отображения списка — 2 режима в Phase 1. Compact даёт ~3x больше
+// регламентов на экран; cards — для медленного методологического чтения.
+type Density = 'cards' | 'compact'
+const DENSITY_KEY = 'ragraf:list-density:v1'
+
+function useDensity(): [Density, (d: Density) => void] {
+  const [density, setDensityState] = useState<Density>(() => {
+    try {
+      const v = localStorage.getItem(DENSITY_KEY)
+      return v === 'compact' ? 'compact' : 'cards'
+    } catch {
+      return 'cards'
+    }
+  })
+  const setDensity = useCallback((d: Density) => {
+    setDensityState(d)
+    try {
+      localStorage.setItem(DENSITY_KEY, d)
+    } catch {}
+  }, [])
+  return [density, setDensity]
+}
+
 export function RegulationList() {
   const [query, setQuery] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [showCreateDomain, setShowCreateDomain] = useState(false)
+  const [filterTab, setFilterTab] = useState<'all' | 'starred'>('all')
+  const [density, setDensity] = useDensity()
+  const { starred, toggle: toggleStar } = useStarred()
   const qc = useQueryClient()
   const { data: rawDatasets, isLoading, error } = useQuery({
     queryKey: ['datasets'],
@@ -139,12 +204,21 @@ export function RegulationList() {
   }, [rawDatasets])
 
   const filtered = useMemo(() => {
+    let base = items
+    if (filterTab === 'starred') {
+      base = base.filter((r) => starred.has(r.id))
+    }
     const q = query.trim().toLowerCase()
-    if (!q) return items
-    return items.filter((r) =>
+    if (!q) return base
+    return base.filter((r) =>
       r.name.toLowerCase().includes(q) || r.id.toLowerCase().includes(q),
     )
-  }, [items, query])
+  }, [items, query, filterTab, starred])
+
+  const starredCount = useMemo(
+    () => items.filter((r) => starred.has(r.id)).length,
+    [items, starred],
+  )
 
   const byDomain = useMemo(() => {
     const m = new Map<string | null, RegRow[]>()
@@ -315,6 +389,41 @@ export function RegulationList() {
       )}
 
       <PageBody>
+        {/* Sub-toolbar: вкладки фильтра + переключатель плотности.
+            Live preview UX-эксперимента в Phase 1 backlog'а: «Мои регламенты»
+            (рабочий набор аналитика) + density toggle. */}
+        <div className="mb-4 flex items-center justify-between border-b border-stone-200 pb-2">
+          <div className="flex items-center gap-1 text-sm">
+            <TabButton
+              active={filterTab === 'all'}
+              onClick={() => setFilterTab('all')}
+              icon={ListTree}
+              label="Все"
+              count={items.length}
+            />
+            <TabButton
+              active={filterTab === 'starred'}
+              onClick={() => setFilterTab('starred')}
+              icon={Star}
+              label="Мои"
+              count={starredCount}
+              accentTone="amber"
+            />
+          </div>
+          <DensityToggle density={density} setDensity={setDensity} />
+        </div>
+
+        {filterTab === 'starred' && starredCount === 0 && (
+          <div className="rounded-md border border-dashed border-amber-200 bg-amber-50/40 p-6 text-center text-sm text-stone-600">
+            <Star size={20} className="mx-auto mb-2 text-amber-400" />
+            <div className="font-medium text-stone-800">«Мои регламенты» пусты</div>
+            <p className="mt-1 text-xs text-stone-500">
+              Кликни на ⭐ на любом регламенте — он попадёт сюда. Удобно держать здесь те,
+              над которыми работаешь сейчас, чтобы не листать весь корпус.
+            </p>
+          </div>
+        )}
+
         {isLoading && (
           <div className="flex items-center gap-2 text-sm text-stone-500">
             <Loader2 size={14} className="animate-spin" /> Загрузка регламентов…
@@ -361,6 +470,9 @@ export function RegulationList() {
               domain={domains.find((d) => d.id === key) ?? null}
               fallbackKey={key}
               items={group}
+              density={density}
+              starred={starred}
+              onToggleStar={toggleStar}
             />
           )
         })}
@@ -369,14 +481,129 @@ export function RegulationList() {
   )
 }
 
+function TabButton({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+  count,
+  accentTone,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: LucideIcon
+  label: string
+  count: number
+  accentTone?: 'amber'
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition',
+        active
+          ? 'bg-stone-900 text-white shadow-sm'
+          : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900',
+      )}
+    >
+      <Icon
+        size={14}
+        className={cn(
+          active ? '' : accentTone === 'amber' && count > 0 ? 'fill-amber-400 text-amber-500' : 'text-stone-400',
+        )}
+      />
+      {label}
+      <span
+        className={cn(
+          'tabular-nums',
+          active ? 'text-white/70' : 'text-stone-400',
+        )}
+      >
+        {count}
+      </span>
+    </button>
+  )
+}
+
+function DensityToggle({
+  density,
+  setDensity,
+}: {
+  density: Density
+  setDensity: (d: Density) => void
+}) {
+  return (
+    <div
+      role="radiogroup"
+      aria-label="Плотность списка"
+      className="inline-flex items-center rounded-md border border-stone-200 bg-white p-0.5"
+    >
+      <DensityOption
+        active={density === 'cards'}
+        onClick={() => setDensity('cards')}
+        icon={LayoutGrid}
+        label="Карточки"
+        title="Полные карточки с действиями — медленное чтение"
+      />
+      <DensityOption
+        active={density === 'compact'}
+        onClick={() => setDensity('compact')}
+        icon={AlignLeft}
+        label="Компакт"
+        title="Однострочные строки — обзор многих регламентов"
+      />
+    </div>
+  )
+}
+
+function DensityOption({
+  active,
+  onClick,
+  icon: Icon,
+  label,
+  title,
+}: {
+  active: boolean
+  onClick: () => void
+  icon: LucideIcon
+  label: string
+  title: string
+}) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      onClick={onClick}
+      title={title}
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs font-medium transition',
+        active
+          ? 'bg-stone-900 text-white'
+          : 'text-stone-600 hover:bg-stone-100',
+      )}
+    >
+      <Icon size={12} />
+      <span className="hidden sm:inline">{label}</span>
+    </button>
+  )
+}
+
 function DomainSection({
   domain,
   fallbackKey,
   items,
+  density,
+  starred,
+  onToggleStar,
 }: {
   domain: Domain | null
   fallbackKey: string | null
   items: RegRow[]
+  density: Density
+  starred: Set<string>
+  onToggleStar: (id: string) => void
 }) {
   const qc = useQueryClient()
   const v = domain?.id ? getDomainVisual(domain.id) : FALLBACK_VISUAL
@@ -449,16 +676,47 @@ function DomainSection({
         )}
       </header>
 
-      <div className="grid grid-cols-1 gap-2">
-        {items.map((r) => (
-          <RegulationCard key={r.id} reg={r} visual={v} />
-        ))}
-      </div>
+      {density === 'compact' ? (
+        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+          {items.map((r, i) => (
+            <CompactRow
+              key={r.id}
+              reg={r}
+              visual={v}
+              starred={starred.has(r.id)}
+              onToggleStar={() => onToggleStar(r.id)}
+              isFirst={i === 0}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-2">
+          {items.map((r) => (
+            <RegulationCard
+              key={r.id}
+              reg={r}
+              visual={v}
+              starred={starred.has(r.id)}
+              onToggleStar={() => onToggleStar(r.id)}
+            />
+          ))}
+        </div>
+      )}
     </section>
   )
 }
 
-function RegulationCard({ reg, visual }: { reg: RegRow; visual: DomainVisual }) {
+function RegulationCard({
+  reg,
+  visual,
+  starred,
+  onToggleStar,
+}: {
+  reg: RegRow
+  visual: DomainVisual
+  starred: boolean
+  onToggleStar: () => void
+}) {
   const [confirming, setConfirming] = useState(false)
   return (
     <article
@@ -472,6 +730,15 @@ function RegulationCard({ reg, visual }: { reg: RegRow; visual: DomainVisual }) 
       <div className={cn('w-1 shrink-0', visual.accent)} />
 
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3 p-3 sm:flex-nowrap">
+        {/* Звезда «избранное» — слева, рядом с названием. Удобно при
+            быстром скане сверху-вниз: один клик пометил регламент в «Мои». */}
+        <StarButton
+          starred={starred}
+          onToggle={onToggleStar}
+          size="md"
+          className="shrink-0 self-start mt-0.5"
+        />
+
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start gap-x-2 gap-y-1">
             <Link
@@ -539,6 +806,7 @@ function RegulationCard({ reg, visual }: { reg: RegRow; visual: DomainVisual }) 
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {/* Primary action — всегда видна: 90% использования это «Редактор». */}
           <ActionButton
             to={`/regulations/${reg.id}/edit`}
             icon={Pencil}
@@ -546,30 +814,36 @@ function RegulationCard({ reg, visual }: { reg: RegRow; visual: DomainVisual }) 
             colorClasses="border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-300 hover:bg-violet-100"
             iconColor="text-violet-500"
           />
-          <ActionButton
-            to={`/regulations/${reg.id}/flow`}
-            icon={Workflow}
-            label="Поток"
-            colorClasses="border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300 hover:bg-blue-100"
-            iconColor="text-blue-500"
-          />
-          <ActionButton
-            to={`/regulations/${reg.id}/constraints`}
-            icon={Shield}
-            label="Ограничения"
-            colorClasses="border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300 hover:bg-amber-100"
-            iconColor="text-amber-500"
-          />
-          <ActionButton
-            to={reg.domain ? `/graph?domain=${reg.domain}` : '/graph'}
-            icon={Network}
-            label="Граф"
-            colorClasses="border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100"
-            iconColor="text-emerald-500"
-          />
-          {/* Опасное действие — отдельной красной кнопкой, отбито отступом, чтобы
-              не нажать случайно в стопке action-button'ов соседних типов. */}
-          <div className="ml-1 border-l border-stone-200 pl-1.5">
+          {/* Secondary actions: появляются на ховере карточки. Снижает шум
+              на 60% при сканировании списка, сохраняя 1-клик доступ. */}
+          <div className="hidden items-center gap-1.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 lg:flex">
+            <ActionButton
+              to={`/regulations/${reg.id}/flow`}
+              icon={Workflow}
+              label="Поток"
+              colorClasses="border-blue-200 bg-blue-50 text-blue-700 hover:border-blue-300 hover:bg-blue-100"
+              iconColor="text-blue-500"
+            />
+            <ActionButton
+              to={`/regulations/${reg.id}/constraints`}
+              icon={Shield}
+              label="Ограничения"
+              colorClasses="border-amber-200 bg-amber-50 text-amber-800 hover:border-amber-300 hover:bg-amber-100"
+              iconColor="text-amber-500"
+            />
+            <ActionButton
+              to={reg.domain ? `/graph?domain=${reg.domain}` : '/graph'}
+              icon={Network}
+              label="Граф"
+              colorClasses="border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100"
+              iconColor="text-emerald-500"
+            />
+          </div>
+          {/* Утилитарные действия (копировать/удалить) — тоже hover-only,
+              отбиты отступом. Дублирование в правый блок чтобы держать рядом
+              с «Удалить» — оба меняют состав корпуса. */}
+          <div className="ml-1 hidden items-center gap-1.5 border-l border-stone-200 pl-1.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 lg:flex">
+            <DuplicateButton regulationId={reg.id} regulationName={reg.name} />
             <button
               onClick={() => setConfirming(true)}
               title="Удалить регламент"
@@ -591,6 +865,230 @@ function RegulationCard({ reg, visual }: { reg: RegRow; visual: DomainVisual }) 
       )}
     </article>
   )
+}
+
+// ── CompactRow ─────────────────────────────────────────────────────────
+//
+// Однострочный вариант для density='compact'. Идея: сжать карточку до
+// одной строки с минимумом метаданных, hover-actions справа. Даёт ~3x
+// больше регламентов на экран по сравнению с RegulationCard.
+function CompactRow({
+  reg,
+  visual,
+  starred,
+  onToggleStar,
+  isFirst,
+}: {
+  reg: RegRow
+  visual: DomainVisual
+  starred: boolean
+  onToggleStar: () => void
+  isFirst: boolean
+}) {
+  const [confirming, setConfirming] = useState(false)
+  return (
+    <>
+      <div
+        className={cn(
+          'group/row relative flex items-center gap-3 px-3 py-1.5 transition hover:bg-stone-50/80',
+          !isFirst && 'border-t border-stone-100',
+        )}
+      >
+        {/* Domain-accent тонкая полоска слева от строки */}
+        <div className={cn('absolute left-0 top-0 h-full w-1', visual.accent)} />
+
+        {/* Звезда слева — для быстрого pin'а при сканировании */}
+        <StarButton
+          starred={starred}
+          onToggle={onToggleStar}
+          size="sm"
+          className="ml-1 shrink-0"
+        />
+
+        {/* Имя + ID — основной clickable target */}
+        <Link
+          to={`/regulations/${reg.id}/edit`}
+          className="min-w-0 flex-1 truncate text-sm text-stone-900 hover:text-primary"
+          title={reg.name}
+        >
+          {reg.name}
+        </Link>
+
+        {/* Минимум метаданных, в одну строку. Скрываются на узких экранах. */}
+        <div className="hidden shrink-0 items-center gap-2 text-[11px] text-stone-500 md:flex">
+          {reg.priority && (
+            <Badge tone={PRIORITY_META[reg.priority].tone}>
+              {PRIORITY_META[reg.priority].label}
+            </Badge>
+          )}
+          {(() => {
+            const exp = expirationBadge(reg.valid_to)
+            return exp ? <Badge tone={exp.tone}>{exp.label}</Badge> : null
+          })()}
+          <code className="rounded bg-stone-100 px-1.5 py-0.5 font-mono text-[10px] text-stone-600">
+            {reg.id}
+          </code>
+          {reg.parameters_count !== undefined && (
+            <span className="tabular-nums">{reg.parameters_count} пар.</span>
+          )}
+          {reg.constraints_count !== undefined && (
+            <span className="tabular-nums">{reg.constraints_count} огр.</span>
+          )}
+          {!!reg.recommendations_count && reg.recommendations_count > 0 && (
+            <span className="tabular-nums">{reg.recommendations_count} рек.</span>
+          )}
+          {(reg.has_source_file || reg.has_source_url) && (
+            <span title="Прикреплён документ-основание">
+              <Paperclip size={10} className="text-emerald-500" />
+            </span>
+          )}
+        </div>
+
+        {/* Hover actions справа: иконки 7×7 без подписи (компакт). */}
+        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover/row:opacity-100">
+          <IconLink to={`/regulations/${reg.id}/flow`} icon={Workflow} title="Поток" tone="blue" />
+          <IconLink to={`/regulations/${reg.id}/constraints`} icon={Shield} title="Ограничения" tone="amber" />
+          <IconLink to={reg.domain ? `/graph?domain=${reg.domain}` : '/graph'} icon={Network} title="Граф" tone="emerald" />
+          <DuplicateButton regulationId={reg.id} regulationName={reg.name} variant="icon" />
+          <button
+            onClick={() => setConfirming(true)}
+            title="Удалить регламент"
+            aria-label={`Удалить ${reg.name}`}
+            className="inline-flex h-7 w-7 items-center justify-center rounded text-rose-500 transition hover:bg-rose-50 hover:text-rose-700"
+          >
+            <Trash2 size={13} />
+          </button>
+        </div>
+      </div>
+      {confirming && (
+        <ConfirmDeleteDialog
+          regulationId={reg.id}
+          regulationName={reg.name}
+          onClose={() => setConfirming(false)}
+        />
+      )}
+    </>
+  )
+}
+
+function IconLink({
+  to,
+  icon: Icon,
+  title,
+  tone,
+}: {
+  to: string
+  icon: LucideIcon
+  title: string
+  tone: 'blue' | 'amber' | 'emerald'
+}) {
+  const toneCls = {
+    blue: 'text-blue-600 hover:bg-blue-50',
+    amber: 'text-amber-600 hover:bg-amber-50',
+    emerald: 'text-emerald-600 hover:bg-emerald-50',
+  }[tone]
+  return (
+    <Link
+      to={to}
+      title={title}
+      aria-label={title}
+      className={cn(
+        'inline-flex h-7 w-7 items-center justify-center rounded transition',
+        toneCls,
+      )}
+    >
+      <Icon size={13} />
+    </Link>
+  )
+}
+
+function StarButton({
+  starred,
+  onToggle,
+  size,
+  className,
+}: {
+  starred: boolean
+  onToggle: () => void
+  size: 'sm' | 'md'
+  className?: string
+}) {
+  const px = size === 'sm' ? 13 : 16
+  const btnPx = size === 'sm' ? 'h-7 w-7' : 'h-8 w-8'
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      title={starred ? 'Убрать из «Мои»' : 'Добавить в «Мои» (избранное)'}
+      aria-label={starred ? 'Убрать из избранного' : 'Добавить в избранное'}
+      aria-pressed={starred}
+      className={cn(
+        'inline-flex items-center justify-center rounded transition',
+        btnPx,
+        starred
+          ? 'text-amber-500 hover:text-amber-600'
+          : 'text-stone-300 hover:bg-stone-100 hover:text-amber-400',
+        className,
+      )}
+    >
+      <Star size={px} className={starred ? 'fill-amber-400' : ''} />
+    </button>
+  )
+}
+
+function DuplicateButton({
+  regulationId,
+  regulationName,
+  variant = 'inline',
+}: {
+  regulationId: string
+  regulationName: string
+  variant?: 'inline' | 'icon'
+}) {
+  const navigate = useNavigateLocal()
+  const qc = useQueryClient()
+  const dup = useMutation({
+    mutationFn: () => api.regulations.duplicate(regulationId),
+    onSuccess: (created) => {
+      qc.invalidateQueries({ queryKey: ['datasets'] })
+      // Сразу открываем редактор копии — пользователь хочет править новую.
+      navigate(`/regulations/${encodeURIComponent(created.id)}/edit`)
+    },
+  })
+  const label = `Создать копию регламента «${regulationName}»`
+  if (variant === 'icon') {
+    return (
+      <button
+        type="button"
+        onClick={() => dup.mutate()}
+        disabled={dup.isPending}
+        title="Создать копию"
+        aria-label={label}
+        className="inline-flex h-7 w-7 items-center justify-center rounded text-stone-500 transition hover:bg-stone-100 hover:text-stone-800 disabled:opacity-40"
+      >
+        {dup.isPending ? <Loader2 size={13} className="animate-spin" /> : <Copy size={13} />}
+      </button>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={() => dup.mutate()}
+      disabled={dup.isPending}
+      title="Создать копию регламента — те же параметры/поток/SHACL, новый ID"
+      aria-label={label}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-stone-200 bg-white text-stone-600 transition hover:border-stone-300 hover:bg-stone-50 hover:text-stone-800 disabled:opacity-40"
+    >
+      {dup.isPending ? <Loader2 size={14} className="animate-spin" /> : <Copy size={14} />}
+    </button>
+  )
+}
+
+// Локальный wrapper над useNavigate чтобы не плодить импорты — react-router
+// useNavigate проще импортировать на месте.
+function useNavigateLocal() {
+  const navigate = useNavigate()
+  return navigate
 }
 
 function ConfirmDeleteDialog({
