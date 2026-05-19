@@ -31,16 +31,26 @@ def list_all() -> list[dict[str, str]]:
     Сначала идут seed-домены в порядке их объявления (heating → housing → …),
     затем пользовательские в порядке создания. Дубликатов по id не бывает —
     `create()` отвергает столкновения.
+
+    Поля `icon` и `color` — опциональные, идентификаторы выбранной аналитиком
+    SmartCity-иконки и цветовой палитры (см. frontend/src/lib/domains.ts).
+    Для seed-доменов они None — фронт смотрит DOMAIN_VISUALS по id.
     """
     seed = fixtures.list_domains()
     seed_ids = {d["id"] for d in seed}
     with regulation_store._LOCK:
         c = regulation_store._connection()
         rows = c.execute(
-            "SELECT id, label, hint FROM user_domains ORDER BY created_at"
+            "SELECT id, label, hint, icon, color FROM user_domains ORDER BY created_at"
         ).fetchall()
     user = [
-        {"id": r[0], "label": r[1], "hint": r[2] or ""}
+        {
+            "id": r[0],
+            "label": r[1],
+            "hint": r[2] or "",
+            "icon": r[3] or None,
+            "color": r[4] or None,
+        }
         for r in rows
         if r[0] not in seed_ids
     ]
@@ -59,16 +69,26 @@ def exists(domain_id: str) -> bool:
     return row is not None
 
 
-def create(label: str, hint: str = "", suggested_id: str | None = None) -> dict[str, Any]:
+def create(
+    label: str,
+    hint: str = "",
+    suggested_id: str | None = None,
+    icon: str | None = None,
+    color: str | None = None,
+) -> dict[str, Any]:
     """Создать новый пользовательский домен.
 
     - `label`: видимое название (РУС, до 80 символов).
     - `hint`: подсказка для UI (карточки доменов и т.п.), опционально.
     - `suggested_id`: если задан — нормализуется и проверяется на уникальность;
       иначе слаг строится из label.
+    - `icon`: ID иконки из SmartCity-палитры frontend'а (`construction`,
+      `healthcare`, `traffic` и т.д.). Frontend смотрит DOMAIN_ICONS_REGISTRY.
+      None = дефолтная Settings2 на фронте.
+    - `color`: ID цветовой палитры (`stone`, `orange`, `blue`, ...).
 
-    Возвращает финальную запись `{id, label, hint}`. Бросает `ValueError`
-    при пустом label, дубликате id или коллизии с seed-доменом.
+    Возвращает финальную запись `{id, label, hint, icon, color}`. Бросает
+    `ValueError` при пустом label, дубликате id или коллизии с seed-доменом.
     """
     label_clean = label.strip()
     if not label_clean:
@@ -93,14 +113,22 @@ def create(label: str, hint: str = "", suggested_id: str | None = None) -> dict[
         suffix += 1
 
     hint_clean = (hint or "").strip()[:200]
+    icon_clean = (icon or "").strip()[:40] or None
+    color_clean = (color or "").strip()[:20] or None
     with regulation_store._LOCK:
         c = regulation_store._connection()
         c.execute(
-            "INSERT INTO user_domains (id, label, hint) VALUES (?, ?, ?)",
-            [candidate, label_clean, hint_clean],
+            "INSERT INTO user_domains (id, label, hint, icon, color) VALUES (?, ?, ?, ?, ?)",
+            [candidate, label_clean, hint_clean, icon_clean, color_clean],
         )
 
-    return {"id": candidate, "label": label_clean, "hint": hint_clean}
+    return {
+        "id": candidate,
+        "label": label_clean,
+        "hint": hint_clean,
+        "icon": icon_clean,
+        "color": color_clean,
+    }
 
 
 def delete(domain_id: str) -> bool:

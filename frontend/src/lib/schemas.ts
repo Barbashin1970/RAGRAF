@@ -120,6 +120,10 @@ export const domainSchema = z.object({
   id: z.string(),
   label: z.string(),
   hint: z.string().optional(),
+  // SmartCity-палитра для user-доменов (backend сохраняет в user_domains.icon /
+  // .color). Для seed-доменов оба null — фронт смотрит DOMAIN_VISUALS по id.
+  icon: z.string().nullable().optional(),
+  color: z.string().nullable().optional(),
 })
 
 export const domainsSchema = z.array(domainSchema)

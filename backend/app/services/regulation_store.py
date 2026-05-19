@@ -219,10 +219,22 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
             id          VARCHAR PRIMARY KEY,
             label       VARCHAR NOT NULL,
             hint        VARCHAR,
+            icon        VARCHAR,
+            color       VARCHAR,
             created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+    # Идемпотентная миграция для существующих DB: icon/color добавились
+    # вторым подходом после ввода SmartCity-палитры в CreateDomainDialog
+    # (2026-05-19, фикс 038). ALTER ADD COLUMN не падает если столбец уже
+    # есть только при IF NOT EXISTS; используем PRAGMA для безопасности.
+    existing_user_dom = {
+        row[1] for row in c.execute("PRAGMA table_info('user_domains')").fetchall()
+    }
+    for col in ("icon", "color"):
+        if col not in existing_user_dom:
+            c.execute(f"ALTER TABLE user_domains ADD COLUMN {col} VARCHAR")
 
     # ── Raw Turtle (вербатимное хранилище для встроенного редактора) ─────
     # `regulation_to_turtle(reg)` — каноническая сериализация: парсер→модель→

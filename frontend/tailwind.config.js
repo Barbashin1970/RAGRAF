@@ -1,6 +1,22 @@
 /** @type {import('tailwindcss').Config} */
+const USER_DOMAIN_TONES = [
+  'orange', 'amber', 'yellow', 'emerald', 'green', 'teal',
+  'sky', 'blue', 'indigo', 'violet', 'fuchsia', 'rose', 'stone',
+]
+// Безопасный список классов которые мы конструируем динамически в
+// `buildUserDomainVisual` через `bg-${tone}-100` и т.д. Без safelist
+// Tailwind вырезает их при purge, и пользовательские домены остаются
+// бесцветными. Каждый tone × {bg, text, border, gradient}.
+const USER_DOMAIN_SAFELIST = USER_DOMAIN_TONES.flatMap((t) => [
+  `bg-${t}-50`, `bg-${t}-50/80`, `bg-${t}-100`, `bg-${t}-500`,
+  `text-${t}-700`,
+  `border-${t}-100`, `border-${t}-300`, `hover:border-${t}-300`,
+  `from-${t}-50/80`,
+])
+
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  safelist: USER_DOMAIN_SAFELIST,
   theme: {
     extend: {
       colors: {

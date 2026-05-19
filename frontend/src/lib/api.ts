@@ -565,11 +565,23 @@ export const api = {
   },
   domains: {
     list: () => request(`/api/domains`, undefined, domainsSchema),
-    create: (payload: { label: string; hint?: string; suggested_id?: string }) =>
+    create: (payload: {
+      label: string
+      hint?: string
+      suggested_id?: string
+      icon?: string | null
+      color?: string | null
+    }) =>
       request<Domain>(
         `/api/domains`,
         { method: 'POST', body: JSON.stringify(payload) },
-        z.object({ id: z.string(), label: z.string(), hint: z.string().optional() }),
+        z.object({
+          id: z.string(),
+          label: z.string(),
+          hint: z.string().optional(),
+          icon: z.string().nullable().optional(),
+          color: z.string().nullable().optional(),
+        }),
       ),
     delete: (id: string) =>
       request<{ id: string; status: string }>(

@@ -26,10 +26,17 @@ class CreateDomainRequest(BaseModel):
     Аналитик создаёт новый домен из UI — обычно из пустого состояния анализа
     документа («регламентов нет, давай заведём новый домен»). `suggested_id`
     опционален: если не задан, слаг строится из label.
+
+    `icon` и `color` — выбранная аналитиком SmartCity-иконка и цветовая
+    палитра. Соответствуют ID'ам в frontend/src/lib/domains.ts
+    DOMAIN_ICONS_REGISTRY и DOMAIN_COLORS_REGISTRY. Опциональны:
+    если None, фронт показывает Settings2 + stone.
     """
     label: str = Field(..., min_length=1, max_length=80)
     hint: str | None = Field(default=None, max_length=200)
     suggested_id: str | None = Field(default=None, max_length=40)
+    icon: str | None = Field(default=None, max_length=40)
+    color: str | None = Field(default=None, max_length=20)
 
 
 @router.get("/domains")
@@ -47,7 +54,9 @@ def create_domain(req: CreateDomainRequest):
     «Извлечь параметры» с pre-selected новым доменом — чтобы заполнить корпус.
     """
     try:
-        return domain_store.create(req.label, req.hint or "", req.suggested_id)
+        return domain_store.create(
+            req.label, req.hint or "", req.suggested_id, req.icon, req.color
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
 

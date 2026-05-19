@@ -1,6 +1,9 @@
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { Activity, Beaker, BookOpen, ExternalLink, FileJson, GitBranch, ListTree, Maximize2, Minimize2, PlayCircle, Radar } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/lib/api'
+import { registerUserDomainVisuals } from '@/lib/domains'
 import { GraphView } from '@/components/graph/GraphView'
 import { TwinDesignerScreen } from '@/components/twins/TwinDesignerScreen'
 import { LandingScreen } from '@/components/landing/LandingScreen'
@@ -185,6 +188,27 @@ export default function App() {
   // экранах — стандартная шапка с навигацией.
   const { pathname } = useLocation()
   const isLanding = pathname === '/'
+
+  // Регистр пользовательских визуалов: при загрузке списка доменов
+  // (один раз на сессию, кешируется react-query'ем) пушим icon/color
+  // user-доменов в модуль domains.ts. Это даёт `getDomainVisual(id)` во
+  // ВСЕХ местах UI учитывать пользовательскую палитру, без рефактора
+  // каждого call-site'а.
+  const { data: domainsForVisuals } = useQuery({
+    queryKey: ['domains'],
+    queryFn: () => api.domains.list(),
+  })
+  useEffect(() => {
+    if (domainsForVisuals) {
+      registerUserDomainVisuals(
+        domainsForVisuals.map((d) => ({
+          id: d.id,
+          icon: (d as { icon?: string | null }).icon ?? null,
+          color: (d as { color?: string | null }).color ?? null,
+        })),
+      )
+    }
+  }, [domainsForVisuals])
 
   return (
     <div className="flex h-full flex-col">
