@@ -1,5 +1,5 @@
 import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
-import { Activity, Beaker, BookOpen, ExternalLink, FileJson, GitBranch, ListTree, Maximize2, Minimize2, PlayCircle, Radar } from 'lucide-react'
+import { Activity, Beaker, BookOpen, ExternalLink, FileJson, GitBranch, ListTree, Maximize2, Minimize2, PlayCircle, Plug, Radar } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '@/lib/api'
@@ -15,6 +15,7 @@ import { SandboxScreen } from '@/components/sandbox/SandboxScreen'
 import { SandboxBacklog } from '@/components/sandbox/SandboxBacklog'
 import { RaguStudioScreen } from '@/components/ragu/RaguStudioScreen'
 import { SensorLibraryScreen } from '@/components/sensors/SensorLibraryScreen'
+import { ModuleLibraryScreen } from '@/components/modules/ModuleLibraryScreen'
 import { ExecuteScreen } from '@/components/execute/ExecuteScreen'
 import { RegulationExtractScreen } from '@/components/regulations/RegulationExtractScreen'
 import { cn } from '@/lib/cn'
@@ -232,6 +233,7 @@ export default function App() {
             <NavLink to="/sandbox" icon={Beaker} label="Студия аналитика" />
             <NavLink to="/regulations" icon={ListTree} label="Регламенты" />
             <NavLink to="/sensors" icon={Radar} label="Датчики" />
+            <NavLink to="/modules" icon={Plug} label="Модули" />
             <NavLink to="/graph" icon={Activity} label="Граф связей" />
             {/* Цифровой двойник — отдельная страница где собираются процессы
                 из 2+ регламентов. Не путать с /graph (карта всего корпуса)
@@ -270,6 +272,7 @@ export default function App() {
           <Route path="/regulations/:id/flow" element={<FlowEditorScreen />} />
           <Route path="/regulations/:id/constraints" element={<ConstraintEditorScreen />} />
           <Route path="/sensors" element={<SensorLibraryScreen />} />
+          <Route path="/modules" element={<ModuleLibraryScreen />} />
           <Route path="/execute" element={<ExecuteScreen />} />
           <Route path="/graph" element={<GraphView />} />
           <Route path="/twins" element={<TwinDesignerScreen />} />

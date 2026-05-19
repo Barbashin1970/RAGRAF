@@ -157,6 +157,80 @@ class Regulation(BaseModel):
     source_mime_type: str | None = None
 
 
+# --- Module passport (СИГМА § 7 «API и интеграционный контракт») --------
+#
+# «Прикладной модуль» в архитектуре СИГМА — внешняя подсистема-источник
+# событий (DAS-волокно, мониторинг шума, теплосети как поставщик ETL,
+# АДПИ GSM пожарные извещатели, видеоаналитика Нетрис, ANPR Войслинк).
+# Каждый модуль может содержать N датчиков (sensor_subtypes), но
+# рассматривается как одна точка интеграции с собственным контрактом.
+#
+# Паспорт = формальная декларация для приёмки модуля: кто владеет, какие
+# события генерирует, как подключается, какие требования к качеству,
+# статус готовности. Аналог «module manifest» из exposable platforms.
+
+
+class ModuleApiContract(BaseModel):
+    """Канал обмена с модулем — REST API / webhook / очередь."""
+
+    channel: Literal["rest", "webhook", "queue", "file_drop", "other"] = "rest"
+    url: str | None = None
+    auth_type: Literal["none", "api_key", "oauth2", "mtls", "basic"] = "none"
+    event_format: Literal["json", "xml", "csv", "binary", "other"] = "json"
+    rate_limit: str | None = None  # «100 событий/сек», «1000 событий/мин»
+    notes: str | None = None
+
+
+class ModuleQualityRules(BaseModel):
+    """Требования к качеству данных от модуля."""
+
+    completeness: str | None = None  # «≥ 99% обязательных полей заполнены»
+    max_latency_seconds: int | None = None  # «event должен прийти ≤ 60 сек после факта»
+    max_error_rate_percent: float | None = None  # «≤ 0.1% невалидных событий»
+    deduplication: bool = True  # дедуп по event_id
+
+
+class Module(BaseModel):
+    """Паспорт прикладного модуля (источника событий) — § 7 СИГМА.
+
+    Хранится в DuckDB-таблице `modules`. Каждый sensor_subtype опционально
+    привязан к модулю через FK `sensor_subtypes.module_id` — это даёт
+    обратный lookup «какой датчик принадлежит какому внешнему модулю»
+    (полезно для оператора СЦ при определении источника сбоя).
+
+    Регламенты НЕ хранят ссылку на модуль напрямую — связь идёт через
+    sensor_subtype, который указан в RegulationTrigger.sensor_subtype.
+    Это даёт композицию «модуль → датчик → триггер → регламент» без
+    жёсткого coupling'а регламентов и модулей.
+    """
+
+    id: str  # kebab-slug, например `das-fiber-monitoring`
+    name: str
+    purpose: str = ""  # для чего модуль нужен на платформе
+    owner: str | None = None  # «АО Дунай-Связь», «ЦИИНГУ НГУ», ...
+    domain: str | None = None  # связь с доменом регламентов (heating, safety, ...)
+    status: Literal["draft", "piloting", "production", "deprecated"] = "draft"
+    version: str = "1.0"
+    icon: str | None = None  # ID иконки из DOMAIN_ICONS_REGISTRY (фронт)
+    color: str | None = None  # tone (orange/blue/...)
+
+    # Контракт интеграции
+    api_contract: ModuleApiContract = Field(default_factory=ModuleApiContract)
+    quality_rules: ModuleQualityRules = Field(default_factory=ModuleQualityRules)
+
+    # Декларация событий: какие event_type'ы модуль производит
+    # (matches RegulationTrigger.event_type). Поле опциональное —
+    # не все модули формализуют типы событий заранее.
+    event_types: list[str] = Field(default_factory=list)
+
+    # Контакты / документация
+    contact_email: str | None = None
+    documentation_url: str | None = None
+
+    # Заметки / ограничения / правовые основания (152-ФЗ для медицинских)
+    notes: str | None = None
+
+
 # --- Rule DSL -----------------------------------------------------------
 
 

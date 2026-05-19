@@ -236,6 +236,93 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
         if col not in existing_user_dom:
             c.execute(f"ALTER TABLE user_domains ADD COLUMN {col} VARCHAR")
 
+    # ── Modules (паспорт прикладного модуля по СИГМА § 7) ───────────────
+    # Внешний источник событий с формальным контрактом интеграции.
+    # Sensor_subtypes связываются с модулем через FK module_id — это даёт
+    # обратный lookup «какой датчик от какого модуля».
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS modules (
+            id              VARCHAR PRIMARY KEY,
+            name            VARCHAR NOT NULL,
+            purpose         TEXT,
+            owner           VARCHAR,
+            domain          VARCHAR,
+            status          VARCHAR NOT NULL DEFAULT 'draft',
+            version         VARCHAR NOT NULL DEFAULT '1.0',
+            icon            VARCHAR,
+            color           VARCHAR,
+            api_contract    JSON,
+            quality_rules   JSON,
+            event_types     JSON,
+            contact_email   VARCHAR,
+            documentation_url VARCHAR,
+            notes           TEXT,
+            created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    c.execute("CREATE INDEX IF NOT EXISTS idx_modules_domain ON modules(domain)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_modules_status ON modules(status)")
+
+    # ── Sensor subtype → Module link (миграция) ──────────────────────────
+    # Добавляем module_id к существующей таблице sensor_subtypes если её
+    # ещё нет (таблица создаётся в sensor_schema_store.py).
+    try:
+        existing_sub = {
+            row[1] for row in c.execute("PRAGMA table_info('sensor_subtypes')").fetchall()
+        }
+        if existing_sub and "module_id" not in existing_sub:
+            c.execute("ALTER TABLE sensor_subtypes ADD COLUMN module_id VARCHAR")
+    except Exception:
+        # Таблица sensor_subtypes ещё не создана — sensor_schema_store
+        # сама добавит module_id в своей миграции.
+        pass
+
+    # ── Incident audit log (СИГМА § 2 «Объяснимость и аудит») ────────────
+    # Append-only журнал цепочки «событие → регламент → рекомендация →
+    # действие пользователя → результат». Каждая строка — один шаг цепочки;
+    # для агрегации по incident_id (UUID одного инцидента) UI собирает
+    # хронологию.
+    #
+    # Структура denormalized — все ключевые поля плоские, чтобы фронт мог
+    # один SELECT по incident_id и сразу показал timeline без JOIN'ов.
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS incident_audit_log (
+            entry_id        VARCHAR PRIMARY KEY,
+            incident_id     VARCHAR NOT NULL,
+            timestamp       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            event_type      VARCHAR NOT NULL,
+            -- event: что пришло на вход
+            source_module_id VARCHAR,
+            source_sensor_id VARCHAR,
+            source_sensor_subtype VARCHAR,
+            event_value     DOUBLE,
+            event_payload   JSON,
+            -- regulation: какой регламент применился
+            regulation_id   VARCHAR,
+            regulation_version VARCHAR,
+            -- verdict: результат обработки
+            level           INTEGER,
+            recommendation  TEXT,
+            verdict_status  VARCHAR,
+            evidence_level  VARCHAR DEFAULT 'measured',
+            -- action: действие пользователя
+            user_id         VARCHAR,
+            user_action     VARCHAR,
+            user_comment    TEXT,
+            -- result: итог
+            outcome_status  VARCHAR
+        )
+        """
+    )
+    c.execute("CREATE INDEX IF NOT EXISTS idx_audit_incident ON incident_audit_log(incident_id, timestamp)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_audit_event_type ON incident_audit_log(event_type)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_audit_regulation ON incident_audit_log(regulation_id)")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON incident_audit_log(timestamp DESC)")
+
     # ── Raw Turtle (вербатимное хранилище для встроенного редактора) ─────
     # `regulation_to_turtle(reg)` — каноническая сериализация: парсер→модель→
     # ре-сериализация теряет всё, чего нет в Regulation: rdf-комментарии,
@@ -287,6 +374,12 @@ def init_db() -> None:
         _connection()  # запустит _init_schema
         _seed_from_fixtures_if_empty()
         _run_data_migrations()
+        # Seed модулей (СИГМА § 7) — пустая таблица → 10 модулей примера.
+        try:
+            from app.services import module_store
+            module_store.seed_if_empty()
+        except Exception as e:
+            print(f"[regulation_store] module seed warning: {e}")
 
 
 def _run_data_migrations() -> None:

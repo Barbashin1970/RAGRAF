@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api import datasets, extraction_terms, flow, graph, processes, ragu, regulations, sandbox, sensor_schemas, shacl, search, validate, versions
+from app.api import audit_log, datasets, extraction_terms, flow, graph, modules, processes, ragu, regulations, sandbox, sensor_schemas, shacl, search, validate, versions
 from app.config import settings
 from app.services import process_store, regulation_store, sensor_schema_store
 
@@ -184,6 +184,8 @@ app.include_router(ragu.router, prefix="/api", tags=["ragu"])
 app.include_router(sensor_schemas.router, prefix="/api", tags=["sensor-schemas"])
 app.include_router(extraction_terms.router, prefix="/api", tags=["extraction-terms"])
 app.include_router(processes.router, prefix="/api", tags=["processes"])
+app.include_router(modules.router, prefix="/api", tags=["modules"])
+app.include_router(audit_log.router, prefix="/api", tags=["audit-log"])
 
 
 # ── SPA static serving ────────────────────────────────────────────────

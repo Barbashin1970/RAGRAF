@@ -563,6 +563,42 @@ export const api = {
         graphPayloadSchema,
       ),
   },
+  modules: {
+    list: () => request(`/api/modules`, undefined, z.array(z.any())) as Promise<Array<Record<string, unknown>>>,
+    get: (id: string) => request(`/api/modules/${encodeURIComponent(id)}`, undefined, z.any()) as Promise<Record<string, unknown>>,
+    create: (payload: Record<string, unknown>) =>
+      request(
+        `/api/modules`,
+        { method: 'POST', body: JSON.stringify(payload) },
+        z.any(),
+      ) as Promise<Record<string, unknown>>,
+    update: (id: string, payload: Record<string, unknown>) =>
+      request(
+        `/api/modules/${encodeURIComponent(id)}`,
+        { method: 'PUT', body: JSON.stringify(payload) },
+        z.any(),
+      ) as Promise<Record<string, unknown>>,
+    delete: (id: string) =>
+      request(
+        `/api/modules/${encodeURIComponent(id)}`,
+        { method: 'DELETE' },
+        z.object({ id: z.string(), status: z.string() }),
+      ),
+  },
+  auditLog: {
+    listRecent: (limit = 50) =>
+      request(
+        `/api/audit-log?limit=${limit}`,
+        undefined,
+        z.array(z.any()),
+      ) as Promise<Array<Record<string, unknown>>>,
+    getIncident: (id: string) =>
+      request(
+        `/api/audit-log/${encodeURIComponent(id)}`,
+        undefined,
+        z.array(z.any()),
+      ) as Promise<Array<Record<string, unknown>>>,
+  },
   domains: {
     list: () => request(`/api/domains`, undefined, domainsSchema),
     create: (payload: {
