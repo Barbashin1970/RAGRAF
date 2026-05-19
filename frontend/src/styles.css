@@ -116,6 +116,18 @@ body { font-family: 'Inter', system-ui, sans-serif; }
 .rf-node--sensor                 { @apply rounded-full border-orange-500 bg-orange-100; }
 .rf-node--sensor .rf-node__icon  { @apply bg-orange-600 rounded-full; }
 
+/* Sensor-нода в режиме `sourceKind='regulation'` — индиго-тон. Визуальное
+   отличие «событие из другого регламента» от «событие из физического датчика»:
+   разный тон сразу читается на канвасе, plus иконка-самолётик. */
+.rf-node--regsource              { @apply rounded-full border-indigo-500 bg-indigo-100; }
+.rf-node--regsource .rf-node__icon { @apply bg-indigo-600 rounded-full; }
+.rf-node--regsource:hover        { @apply ring-2 ring-indigo-300 cursor-pointer; }
+
+/* Sensor-нода со «сломанной» ссылкой (source_output удалён в источнике) —
+   красная обводка, чтобы аналитик сразу видел проблему. */
+.rf-node--regsource.rf-node--broken { @apply border-rose-500 bg-rose-100; }
+.rf-node--regsource.rf-node--broken .rf-node__icon { @apply bg-rose-600; }
+
 /* Подсветка «сработавшего» узла после Run (Execute) — мягкий зелёный glow.
    Применяется через className на react-flow__node wrapper'е (см. дериватив
    `displayNodes` в FlowEditorScreen): обрамляем внутренний .rf-node.

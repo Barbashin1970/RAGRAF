@@ -22,10 +22,11 @@ interface PaletteSection {
 }
 
 const SECTIONS: PaletteSection[] = [
-  // Sensor — точка входа из ETL/IoT. Поставили первым, чтобы при сборке
-  // регламента «снаружи внутрь» (от датчика к рекомендации) аналитик начинал
-  // взгляд отсюда. Это же — основной вход для режима «Исполнение».
-  { title: 'Датчик ETL', items: ['sensor'] },
+  // Event (technical NodeKind: 'sensor') — точка входа в поток. Источник:
+  // физический датчик ETL ИЛИ output другого регламента (sourceKind toggle
+  // в PropertyPanel). Поставили первым, чтобы при сборке «снаружи внутрь»
+  // (от события к рекомендации) аналитик начинал взгляд отсюда.
+  { title: 'Событие', items: ['sensor'] },
   { title: 'Вход', items: ['input'] },
   { title: 'Логика', items: ['threshold', 'compare', 'formula', 'switch'] },
   { title: 'Выход', items: ['output'] },

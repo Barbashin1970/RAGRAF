@@ -75,6 +75,10 @@ def save_flow(regulation_id: str, dsl: RuleDSL, author: str = "anonymous", comme
     (_versions_dir(regulation_id) / f"{version_id}.json").write_text(
         version.model_dump_json(indent=2), encoding="utf-8"
     )
+    # Note: Flow→Triggers sync для sensor[sourceKind='regulation'] вызывается
+    # ВЫШЕ по стеку — в `api/flow.py:put_flow` ПОСЛЕ `regulation_store.save()`.
+    # Если бы хук стоял здесь, save() с reg.triggers (не содержащим regsource-
+    # триггеров) тут же бы их удалил DELETE-NOT-IN'ом. См. sync_triggers_from_flow.
     return version
 
 

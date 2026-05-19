@@ -157,9 +157,20 @@ export function RegulationEditorScreen() {
   // регенерится канон). Если правился Turtle — baseline уже знаем, не
   // делаем лишний raw-fetch.
   const syncRegulationFromServer = async (resetTurtleFromServer: boolean) => {
+    // BUG-FIX 2026-05-19 (баг «первый сейв возвращает старое имя»):
+    // глобальный staleTime=30s (см. main.tsx) делал кэш ['regulation', id]
+    // «свежим» сразу после save'а — fetchQuery возвращал старое значение из
+    // кэша, и setDraft(fresh) затирал только что введённое пользователем имя.
+    // На второй сейв кэш успевал обновиться через фоновую инвалидацию из
+    // соседних запросов, и баг «исчезал» — отсюда симптом «первый сейв
+    // ломает, второй работает». Принудительно invalidate + refetch стабилизирует.
+    await qc.invalidateQueries({ queryKey: ['regulation', id] })
     const fresh = await qc.fetchQuery({
       queryKey: ['regulation', id],
       queryFn: () => api.regulations.get(id),
+      // staleTime: 0 — дополнительная подстраховка на случай если invalidate
+      // выше всё-таки не сделал данные stale (race с другим observer).
+      staleTime: 0,
     })
     if (fresh) setDraft(structuredClone(fresh) as Regulation)
     qc.invalidateQueries({ queryKey: ['datasets'] })

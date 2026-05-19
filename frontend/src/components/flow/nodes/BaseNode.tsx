@@ -11,6 +11,10 @@ interface BaseNodeProps extends NodeProps<FlowNode> {
   iconOverride?: LucideIcon
   /** Перекрытие текста-метки. Если задан — рисуется вместо `meta.label`. */
   labelOverride?: string
+  /** Доп. CSS-класс контейнера. Используется sensor-нодой в режиме
+   *  `sourceKind='regulation'`: индиго-тон отличает «вход из регламента» от
+   *  «вход из физического датчика» (бирюзовый тон по умолчанию). */
+  classNameOverride?: string
 }
 
 /**
@@ -33,6 +37,7 @@ export function BaseNode({
   outputs = [],
   iconOverride,
   labelOverride,
+  classNameOverride,
 }: BaseNodeProps) {
   const kind = (type ?? data.type) as NodeKind
   const meta = NODE_KIND_META[kind]
@@ -50,7 +55,9 @@ export function BaseNode({
     <div
       className={cn(
         'rf-node',
-        meta?.className,
+        // classNameOverride важнее meta.className: sensor в режиме 'regulation'
+        // должен выглядеть индиго, а не teal, даже хотя type === 'sensor'.
+        classNameOverride ?? meta?.className,
         selected && 'rf-node--selected',
         hasError && 'rf-node--error',
       )}

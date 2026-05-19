@@ -25,7 +25,7 @@ from typing import Any
 import duckdb
 
 from app.config import settings
-from app.schemas.domain import Parameter, Recommendation, Regulation, RegulationTrigger
+from app.schemas.domain import Parameter, Recommendation, Regulation, RegulationTrigger, RuleDSL
 
 # DuckDB allows multiple cursors over one connection — но для предсказуемости
 # в multi-threaded FastAPI используем один process-wide connection + reentrant
@@ -1129,6 +1129,159 @@ def delete(source_id: str) -> bool:
             c.rollback()
             raise
     return True
+
+
+# ---- Flow → Triggers sync ---------------------------------------------
+
+
+def sync_triggers_from_flow(source_id: str, dsl: RuleDSL) -> dict[str, int]:
+    """Обновить regulation_triggers по sensor-нодам с sourceKind='regulation'.
+
+    Закрывает контракт «Flow ведёт — triggers зеркалит» для композиции
+    регламентов через канвас: аналитик переключил sensor-пилюлю в режим
+    «слушаю регламент X / выход Y» — после save flow.json мы материализуем
+    эту связь в regulation_triggers, чтобы `/triggered-by` reverse-lookup
+    моментально стал её видеть.
+
+    Стратегия (зеркалит UPSERT в `save()` triggers):
+      1. Сканируем flow.nodes — собираем sensor-ноды с sourceKind='regulation'
+         + sourceRegulationId + bindsTo (без bindsTo триггер бессмыслен —
+         мы не знаем какой input наполнять).
+      2. Для каждого:
+           - Лукапим input-ноду (bindsTo) → её paramRef = trigger.param_ref.
+           - Генерим стабильный trigger_id = `regsrc-<param_ref>` —
+             идемпотентность по последующим save'ам.
+      3. UPSERT в regulation_triggers (sensor_subtype/event_type=NULL,
+         source_regulation/source_output из ноды).
+      4. УДАЛЯЕМ regulation-source триггеры (где source_regulation IS NOT NULL),
+         которых больше нет во flow — это значит пользователь снёс sensor
+         или переключил его обратно в режим 'sensor'.
+
+    ВАЖНО: НЕ трогаем триггеры с sensor_subtype (физический датчик) — они
+    управляются через вкладку «Триггеры» в Edit. Sync строго односторонний:
+    flow ↔ regulation-source triggers, без касания sensor-subtype triggers.
+
+    Возвращает `{"upserted": N, "removed": M}` — для логов / тестов.
+    """
+    # Собираем регуляции-источники из flow.
+    desired: list[tuple[str, str, str | None]] = []  # (param_ref, source_reg, source_out)
+    seen_param_refs: set[str] = set()
+    # Индексируем input-ноды по id чтобы достать paramRef через bindsTo.
+    input_paramref_by_id = {n.id: n.paramRef for n in dsl.nodes if n.type == "input" and n.paramRef}
+    for n in dsl.nodes:
+        if n.type != "sensor":
+            continue
+        if (n.sourceKind or "sensor") != "regulation":
+            continue
+        if not n.sourceRegulationId:
+            continue
+        if not n.bindsTo:
+            continue
+        param_ref = input_paramref_by_id.get(n.bindsTo)
+        if not param_ref:
+            continue
+        # Защита от двух sensor-нод на один input: первая побеждает.
+        if param_ref in seen_param_refs:
+            continue
+        seen_param_refs.add(param_ref)
+        desired.append((param_ref, n.sourceRegulationId, n.sourceOutputAction))
+
+    upserted = 0
+    removed = 0
+    with _LOCK:
+        c = _connection()
+        # Проверим что у нас вообще есть запись регламента — без неё триггер
+        # повиснет orphan'ом (FK не enforced в DuckDB, но логически вредно).
+        exists = c.execute(
+            "SELECT 1 FROM regulations WHERE source_id = ?", [source_id]
+        ).fetchone()
+        if not exists:
+            # Возможный кейс: save_flow на регламент, который только что
+            # удалили в другой вкладке. Не ронялим — пропускаем.
+            return {"upserted": 0, "removed": 0}
+
+        # Сначала вычислим набор существующих regulation-source триггеров,
+        # чтобы понять что удалять (которых нет в desired).
+        existing_regsrc = c.execute(
+            """
+            SELECT trigger_id, param_ref
+            FROM regulation_triggers
+            WHERE source_id = ? AND source_regulation IS NOT NULL
+            """,
+            [source_id],
+        ).fetchall()
+        existing_ids = {r[0] for r in existing_regsrc}
+
+        desired_ids: set[str] = set()
+        # Найти max(position) среди существующих, чтобы новые добавлять в конец.
+        max_pos_row = c.execute(
+            "SELECT COALESCE(MAX(position), -1) FROM regulation_triggers WHERE source_id = ?",
+            [source_id],
+        ).fetchone()
+        next_pos = (max_pos_row[0] if max_pos_row else -1) + 1
+
+        for param_ref, src_reg, src_out in desired:
+            trigger_id = f"regsrc-{param_ref}"
+            desired_ids.add(trigger_id)
+            # Перед UPSERT: на этот param_ref может висеть «физический» триггер
+            # (sensor_subtype IS NOT NULL) с другим trigger_id — он логически
+            # конфликтует (один parameter = один источник). Удаляем его, чтобы
+            # save регламента не превратил наш regsrc-триггер в дубликат.
+            c.execute(
+                """
+                DELETE FROM regulation_triggers
+                WHERE source_id = ?
+                  AND param_ref = ?
+                  AND trigger_id != ?
+                """,
+                [source_id, param_ref, trigger_id],
+            )
+            c.execute(
+                """
+                INSERT INTO regulation_triggers (
+                    source_id, trigger_id, label, param_ref,
+                    sensor_subtype, event_type,
+                    source_regulation, source_output,
+                    description, position
+                )
+                VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?)
+                ON CONFLICT (source_id, trigger_id) DO UPDATE SET
+                    param_ref = EXCLUDED.param_ref,
+                    sensor_subtype = NULL,
+                    event_type = NULL,
+                    source_regulation = EXCLUDED.source_regulation,
+                    source_output = EXCLUDED.source_output
+                """,
+                [
+                    source_id,
+                    trigger_id,
+                    f"← {src_reg}",  # label для UI
+                    param_ref,
+                    src_reg,
+                    src_out,
+                    f"Авто-синк из flow: sensor sourceKind=regulation",
+                    next_pos,
+                ],
+            )
+            next_pos += 1
+            upserted += 1
+
+        # Удаляем regulation-source триггеры, которых больше нет в desired.
+        stale_ids = existing_ids - desired_ids
+        if stale_ids:
+            placeholders = ",".join("?" for _ in stale_ids)
+            c.execute(
+                f"""
+                DELETE FROM regulation_triggers
+                WHERE source_id = ?
+                  AND source_regulation IS NOT NULL
+                  AND trigger_id IN ({placeholders})
+                """,
+                [source_id, *stale_ids],
+            )
+            removed = len(stale_ids)
+
+    return {"upserted": upserted, "removed": removed}
 
 
 # ---- Triggers reverse-lookup ------------------------------------------

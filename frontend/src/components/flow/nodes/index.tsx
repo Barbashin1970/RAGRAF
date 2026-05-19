@@ -1,16 +1,21 @@
+import { useMemo } from 'react'
 import { Position, type NodeProps, type NodeTypes } from 'reactflow'
+import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import {
   AudioWaveform,
   Camera,
+  ExternalLink,
   Gauge,
   Radar,
+  Send,
   Thermometer,
   Volume2,
   Waves,
   Wind,
   type LucideIcon,
 } from 'lucide-react'
-import { SENSOR_TYPE_META, type FlowNode, type SensorType } from '@/lib/api'
+import { api, SENSOR_TYPE_META, type FlowNode, type SensorType } from '@/lib/api'
 import { BaseNode } from './BaseNode'
 
 // Иконка по типу физического датчика. Когда юзер собирает поток в духе
@@ -99,17 +104,28 @@ function ShaclConstraintNode(p: NodeProps<FlowNode>) {
   return <BaseNode {...p} inputs={[{ position: Position.Left }]} />
 }
 
-// Sensor — точка входа из ETL: только выход, без входов. Визуально кружок
-// (см. .rf-node--sensor в styles.css), отличающий «внешний сигнал» от
-// «внутреннего параметра регламента» (input-rect).
+// Sensor (technical NodeKind, user-facing label «Событие») — точка входа в
+// поток. Это либо физический датчик из ETL, либо output другого регламента
+// (sourceKind='regulation'). Визуально:
+//   • sensor mode  — кружок-Radar/манометр/термометр/… в orange тоне.
+//   • regulation mode — кружок-самолётик (Send) в indigo тоне; на правом углу
+//     overlay-кнопка перехода в регламент-источник. Click-through ведёт в
+//     /regulations/{sourceRegulationId}/edit.
 //
-// Иконка и подпись зависят от sensorType: «манометр», «термометр»,
-// «расходомер» и т.д. (см. SENSOR_TYPE_ICON / SENSOR_TYPE_META). Если тип
-// не выбран — обобщённый Radar и метка «Датчик».
+// Иконка и подпись sensor-режима зависят от sensorType: «манометр»,
+// «термометр», «расходомер» и т.д. Если тип не выбран — обобщённый Radar и
+// метка «Событие».
 function SensorNode(p: NodeProps<FlowNode>) {
+  const kind = p.data.sourceKind ?? 'sensor'
+  if (kind === 'regulation') {
+    return <RegulationSourceNode {...p} />
+  }
   const stype = p.data.sensorType
   const icon = stype ? SENSOR_TYPE_ICON[stype] : Radar
-  const label = stype ? SENSOR_TYPE_META[stype].label : 'Датчик'
+  // В sensor-режиме label = название класса датчика; если класс не задан —
+  // нейтральное «Событие» (раньше было «Датчик»; нода теперь обобщённая —
+  // любая событийность, не только физический сигнал).
+  const label = stype ? SENSOR_TYPE_META[stype].label : 'Событие'
   return (
     <BaseNode
       {...p}
@@ -117,6 +133,82 @@ function SensorNode(p: NodeProps<FlowNode>) {
       iconOverride={icon}
       labelOverride={label}
     />
+  )
+}
+
+/**
+ * Sensor-нода в режиме «событие из регламента». Резолвит имя регламента-
+ * источника через /api/datasets (react-query кэширует, один запрос на сессию)
+ * и рендерит:
+ *   • метка: «← <Имя регламента> / <action>» (или «← <Имя регламента>» если
+ *     action не выбран = «слушаю любой output источника»).
+ *   • цвет: индиго; иконка-самолётик.
+ *   • overlay-кнопка ↗ для перехода в /regulations/{id}/edit.
+ *
+ * Битые ссылки (action удалён в источнике) детектятся /output-actions, но
+ * красная подсветка пока живёт только в PropertyPanel — на канвасе оставляем
+ * чисто визуальный режим «регламент-источник». Расширим если попросят.
+ */
+function RegulationSourceNode(p: NodeProps<FlowNode>) {
+  const navigate = useNavigate()
+  const sourceId = p.data.sourceRegulationId
+  const action = p.data.sourceOutputAction
+  const { data: datasets = [] } = useQuery({
+    queryKey: ['datasets-for-picker'],
+    queryFn: () => api.datasets.list(),
+    enabled: !!sourceId,
+  })
+  const srcName = useMemo(() => {
+    if (!sourceId) return null
+    const found = (datasets as Array<{ id?: string; name?: string }>).find(
+      (d) => d?.id === sourceId,
+    )
+    return found?.name || sourceId
+  }, [datasets, sourceId])
+
+  // Текст-метка. Не задан источник → подсказка о необходимости настройки.
+  let label = 'Событие из регламента'
+  if (sourceId) {
+    label = action
+      ? `← ${srcName} · ${action}`
+      : `← ${srcName}`
+  }
+
+  return (
+    <div
+      className="relative"
+      onDoubleClick={(e) => {
+        // Двойной клик = быстрый переход в регламент-источник. Одиночный
+        // оставляем для select+редактирование в PropertyPanel (стандартное
+        // поведение react-flow).
+        if (sourceId) {
+          e.stopPropagation()
+          navigate(`/regulations/${encodeURIComponent(sourceId)}/edit`)
+        }
+      }}
+      title={sourceId ? 'Двойной клик — открыть регламент-источник' : 'Выберите регламент-источник в PropertyPanel'}
+    >
+      <BaseNode
+        {...p}
+        outputs={[{ position: Position.Right }]}
+        iconOverride={Send}
+        labelOverride={label}
+        classNameOverride="rf-node--regsource"
+      />
+      {sourceId && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            navigate(`/regulations/${encodeURIComponent(sourceId)}/edit`)
+          }}
+          className="absolute -right-2 -top-2 rounded-full border border-indigo-300 bg-white p-0.5 text-indigo-700 shadow-sm hover:bg-indigo-50"
+          title="Открыть регламент-источник"
+        >
+          <ExternalLink size={10} />
+        </button>
+      )}
+    </div>
   )
 }
 

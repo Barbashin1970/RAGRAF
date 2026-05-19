@@ -157,8 +157,8 @@ export function ExecutePanel({ regulationId, currentDsl, nodes, onResult }: Prop
       <div className="flex flex-col gap-2 px-3 py-3">
         {channels.length === 0 && (
           <div className="rounded-md border border-stone-200 bg-stone-50 p-2 text-xs text-stone-500">
-            На канвасе нет ни датчиков, ни input-узлов — добавьте «Датчик ETL» из палитры слева
-            и привяжите его к input-ноде через поле «ID input-узла».
+            На канвасе нет ни событий, ни input-узлов — добавьте «Событие» из палитры слева
+            и привяжите его к input-ноде.
           </div>
         )}
         {channels.map((c) => {

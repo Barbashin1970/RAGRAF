@@ -298,6 +298,21 @@ class FlowNode(BaseModel):
     sensorSubtype: str | None = None
     bindsTo: str | None = None
     externalId: str | None = None
+    # Композиция регламентов через канвас (зеркалит RegulationTrigger.source_*):
+    #   sourceKind          — переключатель «слушаю датчик ИЛИ выход другого регламента».
+    #                         None / 'sensor' = обычный датчик (старое поведение).
+    #                         'regulation' = sensorType/sensorSubtype/externalId игнорятся,
+    #                         вместо них значение подаётся output-action'ом другого регламента.
+    #   sourceRegulationId  — FK на Regulation.id другого регламента (cross-domain допустим).
+    #   sourceOutputAction  — action из output-ноды того регламента (как 'smart_valve_close').
+    #                         Если строка не найдена в /output-actions источника — UI показывает
+    #                         red badge «связь сломана» (см. PropertyPanel sensor-секция).
+    # На save_flow() backend синхронизирует RegulationTrigger-записи: для каждого
+    # sensor с sourceKind='regulation' создаётся/обновляется триггер на регламенте,
+    # которому принадлежит flow, чтобы reverse-lookup `/triggered-by` работал.
+    sourceKind: Literal["sensor", "regulation"] | None = None
+    sourceRegulationId: str | None = None
+    sourceOutputAction: str | None = None
 
 
 class FlowEdge(BaseModel):

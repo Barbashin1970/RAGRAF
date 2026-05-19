@@ -52,6 +52,17 @@ export interface FlowNode {
   sensorSubtype?: string | null   // конкретный подтип (vd-anpr / fiber-vibration / ...)
   bindsTo?: string | null
   externalId?: string | null
+  // Композиция: режим работы sensor-пилюли.
+  //   'sensor' / null — обычный физический датчик (sensorType/Subtype/externalId работают).
+  //   'regulation'    — пилюля слушает output другого регламента;
+  //                     sourceRegulationId + sourceOutputAction задают связь,
+  //                     сенсор-поля игнорятся, пилюля рисуется самолётиком,
+  //                     клик ведёт в редактор регламента-источника.
+  // Backend на save_flow() зеркалит это в RegulationTrigger таблицу, чтобы
+  // `/triggered-by` reverse-lookup видел связь.
+  sourceKind?: 'sensor' | 'regulation' | null
+  sourceRegulationId?: string | null
+  sourceOutputAction?: string | null
 }
 export interface FlowEdge {
   source: string
@@ -1053,8 +1064,10 @@ export const NODE_KIND_META: Record<
   switch:            { label: 'Развилка', className: 'rf-node--switch',    description: 'Маршрут по значениям',        icon: GitBranch },
   output:            { label: 'Выход',    className: 'rf-node--output',    description: 'Действие / рекомендация',     icon: Send },
   shacl_constraint:  { label: 'SHACL',    className: 'rf-node--shacl_constraint', description: 'Внешнее ограничение SHACL', icon: Shield },
-  // Датчик — точка привязки к внешнему сигналу ETL. Кружок, ETL-индикатор.
-  sensor:            { label: 'Датчик',   className: 'rf-node--sensor',    description: 'Точка ввода с датчика ETL',   icon: Radar },
+  // Событие — точка входа в поток. Источник — либо физический датчик (ETL),
+  // либо output другого регламента (sourceKind='regulation'). Технический
+  // NodeKind остаётся 'sensor' для обратной совместимости со старыми flow.json.
+  sensor:            { label: 'Событие',  className: 'rf-node--sensor',    description: 'Вход в поток: датчик или выход регламента', icon: Radar },
 }
 
 // Палитра цветов для каждого типа физического датчика — используется и в

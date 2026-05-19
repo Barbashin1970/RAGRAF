@@ -242,6 +242,20 @@ def put_flow(regulation_id: str, dsl: RuleDSL) -> dict[str, object]:
         # Sync — best-effort: если упал, flow всё равно сохранён.
         pass
 
+    # Flow→regsource-triggers sync. ВАЖНО: после `regulation_store.save()` —
+    # его UPSERT-логика на reg.triggers стирает регламент-триггеры с
+    # неизвестным trigger_id (через DELETE NOT IN). Если бы синк стоял до
+    # save'а, он бы тут же затёрся. После save() свободно UPSERT'им
+    # regsource-триггеры со стабильным trigger_id `regsrc-<param_ref>`.
+    # Это закрывает контракт «Flow ведёт — triggers зеркалит» для композиции
+    # регламентов через канвас (sensor.sourceKind='regulation').
+    try:
+        regulation_store.sync_triggers_from_flow(regulation_id, dsl)
+    except Exception:
+        # Sync — best-effort. Flow уже в файле, регламент сохранён;
+        # отсутствие /triggered-by записи — мягкая деградация UX, не data loss.
+        pass
+
     return {
         "ok": "true",
         "version": version.version_id,

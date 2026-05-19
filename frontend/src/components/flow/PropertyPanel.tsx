@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronLeft, ChevronRight, Trash2 } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, ChevronRight, ExternalLink, Radar, Send, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { Node } from 'reactflow'
 import { api, NODE_KIND_META, type FlowNode, type NodeKind, type Parameter, type SensorFieldSchema, type ValidationError } from '@/lib/api'
@@ -316,83 +316,121 @@ function ByType({ type, data, parameters, allNodes, constraints, regulationId, s
         </>
       )
     }
-    case 'sensor':
+    case 'sensor': {
+      // Режим работы пилюли: 'sensor' (физический датчик) или 'regulation'
+      // (слушаю output другого регламента). null трактуется как 'sensor' —
+      // обратная совместимость со старыми flow.json.
+      const kind = data.sourceKind ?? 'sensor'
+      // Общий «вход» — bindsTo и список input-нод — нужен обоим режимам.
+      const inputs = (allNodes ?? []).filter(
+        (n) => (n.data as FlowNode)?.type === 'input',
+      )
+      const bindsToBlock = inputs.length === 0 ? (
+        <div className="rounded-md border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-[11px] text-stone-500">
+          Нет input-узлов на канвасе — нечему отдавать значение. Добавьте
+          параметр в Edit/«Поля» или drop'ните Input-пилюлю слева.
+        </div>
+      ) : (
+        <FieldSelect
+          label="Привязать к параметру"
+          value={data.bindsTo ?? ''}
+          onChange={(v) => set({ bindsTo: v || null })}
+          options={[
+            { value: '', label: '— не привязан (auto-bind при save) —' },
+            ...inputs.map((n) => {
+              const fn = n.data as FlowNode
+              return {
+                value: n.id,
+                label: fn.label || fn.paramRef || n.id,
+              }
+            }),
+          ]}
+        />
+      )
+
       return (
         <>
-          <FieldSelect
-            label="Класс датчика"
-            value={data.sensorType ?? ''}
-            onChange={(v) => set({
-              sensorType: v === '' ? null : (v as 'p' | 't' | 'flow' | 'noise' | 'detector' | 'fiber' | 'air'),
-              // При смене класса очищаем подтип — он привязан к классу.
-              sensorSubtype: null,
-            })}
-            options={[
-              { value: '', label: '— не задан —' },
-              { value: 'p', label: 'Давление (p)' },
-              { value: 't', label: 'Температура (t)' },
-              { value: 'flow', label: 'Расход м³/ч (Q)' },
-              { value: 'noise', label: 'Шум' },
-              { value: 'detector', label: 'Видеодетектор' },
-              { value: 'fiber', label: 'Волокно DAS' },
-              { value: 'air', label: 'Качество воздуха (CO2/PM)' },
-            ]}
+          <SourceKindToggle
+            kind={kind}
+            onChange={(next) => {
+              if (next === 'regulation') {
+                // Переключение sensor → regulation: чистим sensor-поля, чтобы
+                // в flow.json не висел мусор + чтобы валидация и SIGMA-export
+                // не считали мёртвые ссылки.
+                set({
+                  sourceKind: 'regulation',
+                  sensorType: null,
+                  sensorSubtype: null,
+                  externalId: null,
+                })
+              } else {
+                // Обратно в sensor mode — чистим regulation-поля.
+                set({
+                  sourceKind: 'sensor',
+                  sourceRegulationId: null,
+                  sourceOutputAction: null,
+                })
+              }
+            }}
           />
-          {/* Селектор подтипа — список читается из реестра sensor_subtypes
-              для выбранного класса. Если sensorType пуст — селектор пустой. */}
-          <SensorSubtypeSelect
-            sensorType={data.sensorType ?? null}
-            subtypeId={data.sensorSubtype ?? null}
-            onChange={(sub) => set({ sensorSubtype: sub })}
-          />
-          {/* Привязка к input-ноде регламента. Раньше тут был free-text — юзер
-              должен был знать ID input-узла, без подсказки. Теперь dropdown
-              из реальных input'ов канваса: label = параметр (или ID если нет
-              label). Backend на save'e дополнительно auto-bind'ит sensor с
-              sensorSubtype но без bindsTo к ближайшему по Y input'у — так
-              что пропустить этот шаг не критично, но явный выбор лучше. */}
-          {(() => {
-            const inputs = (allNodes ?? []).filter(
-              (n) => (n.data as FlowNode)?.type === 'input',
-            )
-            if (inputs.length === 0) {
-              return (
-                <div className="rounded-md border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-[11px] text-stone-500">
-                  Нет input-узлов на канвасе — sensor не к чему привязать. Добавьте
-                  параметр в Edit/«Поля» или drop'ните Input-пилюлю слева.
-                </div>
-              )
-            }
-            return (
+          {kind === 'regulation' ? (
+            <>
+              <RegulationSourcePicker
+                currentRegulationId={regulationId ?? null}
+                sourceRegulationId={data.sourceRegulationId ?? null}
+                sourceOutputAction={data.sourceOutputAction ?? null}
+                onChangeRegulation={(id) => set({
+                  sourceRegulationId: id,
+                  // При смене регламента-источника старый action заведомо
+                  // невалиден (это action другого регламента). Чистим.
+                  sourceOutputAction: null,
+                })}
+                onChangeOutput={(action) => set({ sourceOutputAction: action })}
+              />
+              {bindsToBlock}
+            </>
+          ) : (
+            <>
               <FieldSelect
-                label="Привязать к параметру"
-                value={data.bindsTo ?? ''}
-                onChange={(v) => set({ bindsTo: v || null })}
+                label="Класс датчика"
+                value={data.sensorType ?? ''}
+                onChange={(v) => set({
+                  sensorType: v === '' ? null : (v as 'p' | 't' | 'flow' | 'noise' | 'detector' | 'fiber' | 'air'),
+                  // При смене класса очищаем подтип — он привязан к классу.
+                  sensorSubtype: null,
+                })}
                 options={[
-                  { value: '', label: '— не привязан (auto-bind при save) —' },
-                  ...inputs.map((n) => {
-                    const fn = n.data as FlowNode
-                    return {
-                      value: n.id,
-                      label: fn.label || fn.paramRef || n.id,
-                    }
-                  }),
+                  { value: '', label: '— не задан —' },
+                  { value: 'p', label: 'Давление (p)' },
+                  { value: 't', label: 'Температура (t)' },
+                  { value: 'flow', label: 'Расход м³/ч (Q)' },
+                  { value: 'noise', label: 'Шум' },
+                  { value: 'detector', label: 'Видеодетектор' },
+                  { value: 'fiber', label: 'Волокно DAS' },
+                  { value: 'air', label: 'Качество воздуха (CO2/PM)' },
                 ]}
               />
-            )
-          })()}
-          <FieldText
-            label="External ID (ETL)"
-            value={data.externalId ?? ''}
-            onChange={(v) => set({ externalId: v || null })}
-            monospaced
-          />
-          <SensorSchemaPreview
-            sensorType={data.sensorType ?? null}
-            sensorSubtype={data.sensorSubtype ?? null}
-          />
+              <SensorSubtypeSelect
+                sensorType={data.sensorType ?? null}
+                subtypeId={data.sensorSubtype ?? null}
+                onChange={(sub) => set({ sensorSubtype: sub })}
+              />
+              {bindsToBlock}
+              <FieldText
+                label="External ID (ETL)"
+                value={data.externalId ?? ''}
+                onChange={(v) => set({ externalId: v || null })}
+                monospaced
+              />
+              <SensorSchemaPreview
+                sensorType={data.sensorType ?? null}
+                sensorSubtype={data.sensorSubtype ?? null}
+              />
+            </>
+          )}
         </>
       )
+    }
     default:
       return null
   }
@@ -456,6 +494,176 @@ function FieldSelect({ label, value, onChange, options }: { label: string; value
         ))}
       </select>
     </label>
+  )
+}
+
+/**
+ * Двух-позиционный toggle для выбора режима «события»: пилюля event-ноды
+ * слушает либо физический датчик, либо output другого регламента. Визуально
+ * — две кнопки-вкладки рядом, выбранная заполнена цветом.
+ *
+ * Решение зафиксировано в `FlowNode.sourceKind` (см. backend schema).
+ * Дефолт — 'sensor' (обратная совместимость со старыми flow.json).
+ */
+function SourceKindToggle({
+  kind, onChange,
+}: { kind: 'sensor' | 'regulation'; onChange: (next: 'sensor' | 'regulation') => void }) {
+  return (
+    <div className="mt-2">
+      <div className="text-xs text-stone-500">Источник события</div>
+      <div className="mt-1 inline-flex w-full overflow-hidden rounded-md border border-stone-200 bg-stone-50">
+        <button
+          type="button"
+          onClick={() => onChange('sensor')}
+          className={cn(
+            'flex-1 px-2 py-1 text-xs font-medium transition',
+            kind === 'sensor'
+              ? 'bg-teal-600 text-white'
+              : 'text-stone-600 hover:bg-stone-100',
+          )}
+        >
+          <Radar size={11} className="-mt-0.5 mr-1 inline" />
+          Датчик
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange('regulation')}
+          className={cn(
+            'flex-1 border-l border-stone-200 px-2 py-1 text-xs font-medium transition',
+            kind === 'regulation'
+              ? 'bg-indigo-600 text-white'
+              : 'text-stone-600 hover:bg-stone-100',
+          )}
+        >
+          <Send size={11} className="-mt-0.5 mr-1 inline" />
+          Регламент
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Подбор регламента-источника + его output-action для режима 'regulation'.
+ *
+ * UX-логика:
+ *   1. Dropdown «Регламент-источник» — список ВСЕХ регламентов через
+ *      /api/datasets (cross-domain, user явно просил). Self-исключается.
+ *   2. Когда регламент выбран — fetch /output-actions того регламента.
+ *      Dropdown «Output» рендерим его action'ами.
+ *   3. Если у выбранного регламента вообще нет output-нод → отдельная
+ *      подсказка с linkout «открыть Flow Editor X и добавить action».
+ *   4. Если sourceOutputAction задан, но action не находится в списке —
+ *      красный badge «связь сломана»: показываем сохранённое значение,
+ *      позволяем выбрать замену из доступных.
+ *   5. Линк-кнопка «Открыть регламент-источник →» — для клика-перехода.
+ */
+function RegulationSourcePicker({
+  currentRegulationId,
+  sourceRegulationId,
+  sourceOutputAction,
+  onChangeRegulation,
+  onChangeOutput,
+}: {
+  currentRegulationId: string | null
+  sourceRegulationId: string | null
+  sourceOutputAction: string | null
+  onChangeRegulation: (id: string | null) => void
+  onChangeOutput: (action: string | null) => void
+}) {
+  // Список регламентов для dropdown. Кэшируется react-query — много open'ов
+  // PropertyPanel в одном сеансе не повторно дёргают /api/datasets.
+  const { data: datasets = [] } = useQuery({
+    queryKey: ['datasets-for-picker'],
+    queryFn: () => api.datasets.list(),
+  })
+  // Output-action'ы выбранного регламента-источника.
+  const { data: outputData } = useQuery({
+    queryKey: ['output-actions', sourceRegulationId],
+    queryFn: () => api.regulations.outputActions(sourceRegulationId!),
+    enabled: !!sourceRegulationId,
+  })
+  const availableActions = outputData?.actions ?? []
+  const actionExists = sourceOutputAction
+    ? availableActions.some((a) => a.action === sourceOutputAction)
+    : true
+
+  const regulationOptions = useMemo(() => {
+    const list = (datasets as Array<{ id?: string; name?: string }>).filter(
+      (d): d is { id: string; name: string } =>
+        typeof d?.id === 'string' && d.id !== currentRegulationId,
+    )
+    return list.map((d) => ({ value: d.id, label: d.name || d.id }))
+  }, [datasets, currentRegulationId])
+
+  return (
+    <>
+      <FieldSelect
+        label="Регламент-источник"
+        value={sourceRegulationId ?? ''}
+        onChange={(v) => onChangeRegulation(v || null)}
+        options={[
+          { value: '', label: '— выберите регламент —' },
+          ...regulationOptions,
+        ]}
+      />
+      {sourceRegulationId && availableActions.length === 0 && (
+        <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] leading-snug text-amber-900">
+          У регламента «{regulationOptions.find((o) => o.value === sourceRegulationId)?.label ?? sourceRegulationId}»
+          нет output-нод. <Link
+            to={`/regulations/${encodeURIComponent(sourceRegulationId)}/flow`}
+            className="font-medium underline hover:text-amber-700"
+          >
+            Открыть Flow Editor →
+          </Link>
+        </div>
+      )}
+      {sourceRegulationId && availableActions.length > 0 && (
+        <>
+          <FieldSelect
+            label="Output (action)"
+            value={sourceOutputAction ?? ''}
+            onChange={(v) => onChangeOutput(v || null)}
+            options={[
+              { value: '', label: '— любой output —' },
+              ...availableActions.map((a) => ({
+                value: a.action,
+                label: a.label && a.label !== a.action ? `${a.action} · ${a.label}` : a.action,
+              })),
+              // Если action сохранён, но в списке его нет — добавляем как
+              // явную «битую» опцию, чтобы пользователь видел что выбрано.
+              ...(!actionExists && sourceOutputAction
+                ? [{ value: sourceOutputAction, label: `${sourceOutputAction} (нет в источнике)` }]
+                : []),
+            ]}
+          />
+          {!actionExists && sourceOutputAction && (
+            <div className="mt-1 flex items-start gap-1 rounded-md border border-rose-300 bg-rose-50 px-2 py-1.5 text-[11px] leading-snug text-rose-900">
+              <AlertTriangle size={12} className="mt-0.5 shrink-0 text-rose-600" />
+              <div>
+                <b>Связь сломана:</b> action <code>{sourceOutputAction}</code> не
+                найден в outputs регламента-источника. Возможно его удалили
+                или переименовали. Выберите замену из dropdown выше.
+              </div>
+            </div>
+          )}
+        </>
+      )}
+      {sourceRegulationId && (
+        <Link
+          to={`/regulations/${encodeURIComponent(sourceRegulationId)}/edit`}
+          className="mt-2 inline-flex items-center gap-1 text-[11px] text-indigo-700 underline hover:text-indigo-900"
+        >
+          Открыть регламент-источник <ExternalLink size={11} />
+        </Link>
+      )}
+      <div className="mt-2 rounded-md border border-stone-200 bg-stone-50 px-2 py-1.5 text-[10px] leading-relaxed text-stone-600">
+        <b>Что это даёт:</b> ваш регламент будет реагировать на срабатывание
+        регламента-источника как на событие — событийная композиция в одной
+        цепочке. На save потока backend синхронизирует <code>RegulationTrigger</code>,
+        чтобы reverse-lookup (кто кого слушает) работал.
+      </div>
+    </>
   )
 }
 
