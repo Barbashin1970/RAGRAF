@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { api } from '@/lib/api'
 import {
   Activity,
   ArrowDown,
@@ -13,6 +15,7 @@ import {
   Clock,
   Coins,
   Database,
+  Download,
   ExternalLink,
   FileText,
   Flame,
@@ -595,6 +598,8 @@ export function LandingScreen() {
                   </a>
                 </div>
               </div>
+              <DownloadInstallers />
+
               <div className="mt-4 text-xs text-slate-500">
                 Кампус НГУ · Кольцово · Мэрия города Новосибирска · 2026
               </div>
@@ -632,6 +637,97 @@ export function LandingScreen() {
         </div>
       </footer>
     </div>
+  )
+}
+
+// ── Download installers ──────────────────────────────────────────────
+// Раздел в footer'е: «Скачайте локальную версию» + 2 кнопки macOS/Windows.
+// Бэкенд: GET /api/download/installer/{platform} раздаёт ZIP, GET
+// /api/download/stats возвращает счётчики (на Volume Railway).
+function DownloadInstallers() {
+  // Счётчик в footer'е — не блокирующий, грузится параллельно с остальным
+  // landing'ом. `staleTime: 60s` — для социалки нет смысла лить запросы чаще.
+  const { data: stats } = useQuery({
+    queryKey: ['download-stats'],
+    queryFn: () => api.downloads.stats(),
+    staleTime: 60_000,
+  })
+
+  return (
+    <div className="mt-5">
+      <div className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
+        Скачайте локальную версию
+      </div>
+      <p className="mb-3 max-w-sm text-[11px] leading-relaxed text-slate-400">
+        Кликни — скачается ZIP с installer-скриптами. Распакуй, запусти
+        стартовый файл — скрипт сам поднимет RAGRAF на твоей машине,
+        все данные останутся локально.
+      </p>
+      <div className="flex flex-wrap items-stretch gap-2">
+        <DownloadButton
+          href="/api/download/installer/macos"
+          icon={<AppleGlyph />}
+          label="macOS"
+          count={stats?.macos}
+        />
+        <DownloadButton
+          href="/api/download/installer/windows"
+          icon={<WindowsGlyph />}
+          label="Windows"
+          count={stats?.windows}
+        />
+      </div>
+    </div>
+  )
+}
+
+function DownloadButton({
+  href,
+  icon,
+  label,
+  count,
+}: {
+  href: string
+  icon: React.ReactNode
+  label: string
+  count: number | undefined
+}) {
+  return (
+    <a
+      href={href}
+      className="group inline-flex items-center gap-2.5 rounded-md border border-slate-700 bg-slate-800/60 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-blue-500 hover:bg-slate-800 hover:text-white"
+      title={`Скачать installer для ${label} (ZIP)`}
+    >
+      <span className="text-slate-300 transition group-hover:text-white">{icon}</span>
+      <span className="flex flex-col items-start leading-tight">
+        <span className="text-[11px] uppercase tracking-wide text-slate-400">скачать</span>
+        <span>{label}</span>
+      </span>
+      <span className="ml-1 flex items-center gap-1 border-l border-slate-700 pl-2 pr-0.5 text-slate-400 transition group-hover:text-slate-300">
+        <Download size={12} />
+        <span className="tabular-nums text-[11px]">
+          {count === undefined ? '—' : count}
+        </span>
+      </span>
+    </a>
+  )
+}
+
+// Apple-логотип — упрощённый SVG, узнаваемый с 16px.
+function AppleGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+    </svg>
+  )
+}
+
+// Windows-логотип — 4 квадрата flag-style.
+function WindowsGlyph() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M3 5.7L11 4.5v7H3V5.7zm0 12.6V13h8v6.5L3 18.3zm9-13.94L21 3v9h-9V4.36zM12 13h9v8l-9-1.26V13z"/>
+    </svg>
   )
 }
 

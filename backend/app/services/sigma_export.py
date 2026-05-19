@@ -11,11 +11,17 @@ RAGRAF уже хранит данные в семантически совмес
 
 Структура bundle одного регламента:
     <source_id>/
-        data.ttl       — OWL-инстанс + property declarations
-        shapes.ttl     — SHACL-форма валидации под состав параметров
-        manifest.json  — RAGRAF-метадата (версия, история, домен)
+        data.ttl         — OWL-инстанс + property declarations (для Apache Jena)
+        shapes.ttl       — SHACL-форма валидации под состав параметров
+        regulation.json  — Pydantic-дамп Regulation (для round-trip / не-СИГМА систем)
+        flow.json        — Rule DSL граф (input/threshold/output/sensor; опционально)
+        source.<ext>     — прикреплённый документ-основание (PDF/DOCX; опционально)
+        manifest.json    — RAGRAF-метадата (версия, история, домен, флаги артефактов)
 
-Batch-экспорт = архив с папкой на каждый регламент.
+Batch-экспорт = архив с папкой на каждый регламент + `corpus_manifest.json` сверху.
+Цель — аналитик одним ZIP-ом забирает ВСЕ артефакты регламента для загрузки
+в СИГМУ или в свою целевую систему без необходимости отдельно дёргать /flow,
+/raw, /source-document — всё в одном архиве.
 """
 from __future__ import annotations
 
@@ -25,7 +31,7 @@ import zipfile
 from datetime import datetime, timezone
 from typing import Any
 
-from app.services import regulation_store
+from app.services import flow_storage, regulation_store
 from app.services.regulation_client import client
 from app.services.turtle_bridge import regulation_to_shacl_shapes, regulation_to_turtle
 
@@ -130,6 +136,48 @@ async def _resolve_shapes_ttl(source_id: str, reg) -> str:
     return regulation_to_shacl_shapes(reg)
 
 
+def _add_flow_and_regulation_json(zf, source_id: str, reg, manifest: dict[str, Any]) -> None:
+    """Добавляет в bundle два дополнительных артефакта:
+
+    1. `regulation.json` — Pydantic-сериализация Regulation (параметры,
+       рекомендации, ограничения, триггеры, источник, период действия).
+       Полезно для round-trip обратно в RAGRAF (быстрее чем парсить Turtle),
+       и для подключения к не-СИГМА системам, которые ожидают JSON-контракт.
+
+    2. `flow.json` — Rule DSL граф из flow_storage. Это runtime-логика
+       реагирования: input/threshold/compare/formula/switch/output узлы +
+       sensor-биндинги. Без этого СИГМА видит ТОЛЬКО параметры + SHACL,
+       но не видит как именно регламент превращается в level + рекомендацию
+       при поступлении события.
+
+    Если flow отсутствует (регламент без визуальной логики) — flow.json
+    не пишется, в manifest добавляется флаг `flow_included=false`. Manifest
+    также получает `regulation_json_included=true` всегда (Regulation
+    Pydantic дамп есть всегда).
+    """
+    # 1. regulation.json — Pydantic дамп через model_dump_json (включает
+    # default-значения, обрабатывает datetime → str). Без exclude — пусть
+    # downstream-system видит полный контракт.
+    zf.writestr(
+        f"{source_id}/regulation.json",
+        reg.model_dump_json(indent=2),
+    )
+    manifest["regulation_json_included"] = True
+
+    # 2. flow.json — опционально, если flow существует.
+    flow = flow_storage.load_flow(source_id)
+    if flow is not None and flow.nodes:
+        zf.writestr(
+            f"{source_id}/flow.json",
+            flow.model_dump_json(indent=2),
+        )
+        manifest["flow_included"] = True
+        manifest["flow_nodes_count"] = len(flow.nodes)
+        manifest["flow_edges_count"] = len(flow.edges)
+    else:
+        manifest["flow_included"] = False
+
+
 async def build_regulation_bundle(source_id: str) -> bytes:
     """Собрать ZIP-bundle одного регламента: data.ttl + shapes.ttl + manifest.json.
 
@@ -150,8 +198,10 @@ async def build_regulation_bundle(source_id: str) -> bytes:
         zf.writestr(f"{source_id}/data.ttl", data_ttl)
         zf.writestr(f"{source_id}/shapes.ttl", shapes_ttl)
         _add_source_file(zf, source_id, reg, manifest)
-        # manifest пишем ПОСЛЕ source-файла — потому что _add_source_file
-        # обновляет в нём `source_attachment.file` если файл есть.
+        _add_flow_and_regulation_json(zf, source_id, reg, manifest)
+        # manifest пишем ПОСЛЕ source-файла + flow/json — потому что обе
+        # функции обновляют в нём флаги/счётчики (source_attachment.file,
+        # flow_included, regulation_json_included).
         zf.writestr(
             f"{source_id}/manifest.json",
             json.dumps(manifest, ensure_ascii=False, indent=2),
@@ -205,6 +255,7 @@ async def build_corpus_bundle(
                 zf.writestr(f"{sid}/data.ttl", data_ttl)
                 zf.writestr(f"{sid}/shapes.ttl", shapes_ttl)
                 _add_source_file(zf, sid, reg, manifest)
+                _add_flow_and_regulation_json(zf, sid, reg, manifest)
                 zf.writestr(
                     f"{sid}/manifest.json",
                     json.dumps(manifest, ensure_ascii=False, indent=2),

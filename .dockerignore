@@ -37,6 +37,10 @@ frontend/coverage/
 # Не нужны runtime'у. Если кому понадобятся — есть git.
 *.md
 !backend/data/fixtures/INDEX.md
+# installer/INSTALL-MACOS.md и INSTALL-WINDOWS.md нужны на проде —
+# раздаются вместе с installer-скриптами через /api/download/installer/*.
+!installer/INSTALL-MACOS.md
+!installer/INSTALL-WINDOWS.md
 *.pdf
 docs/
 event-data-examples/

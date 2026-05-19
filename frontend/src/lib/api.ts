@@ -594,6 +594,20 @@ export const api = {
         z.object({ id: z.string(), status: z.string() }),
       ),
   },
+  downloads: {
+    /** Счётчики скачиваний installer'ов по платформам. Для footer-социалки.
+     *  Persistent в JSON на Volume Railway → переживает редеплои. */
+    stats: () =>
+      request(
+        `/api/download/stats`,
+        undefined,
+        z.object({ macos: z.number(), windows: z.number() }),
+      ),
+    /** URL для прямой ссылки на ZIP — кнопки в footer'е делают `<a href>`,
+     *  не fetch — браузер сам инициирует скачивание + Save dialog. */
+    installerUrl: (platform: 'macos' | 'windows') =>
+      `/api/download/installer/${platform}`,
+  },
   auditLog: {
     listRecent: (limit = 50) =>
       request(

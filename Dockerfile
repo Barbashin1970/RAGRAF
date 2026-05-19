@@ -77,6 +77,13 @@ RUN mkdir -p /srv/_seed_data
 COPY backend/data/fixtures /srv/_seed_data/fixtures
 COPY backend/data/demo_documents /srv/_seed_data/demo_documents
 
+# Installer-скрипты (start-ragraf.command/.bat + ragraf-mac.sh/.ps1 +
+# INSTALL-*.md). Backend на проде раздаёт их через `/api/download/installer/*`
+# для landing-странички с кнопками «Скачать для macOS/Windows».
+# Путь хардкожен в downloads.py: `Path(__file__).resolve().parents[3] / "installer"`
+# = /srv/installer на проде.
+COPY installer /srv/installer
+
 # Vite-build из stage 1.
 COPY --from=frontend-builder /app/dist /srv/frontend_dist
 
