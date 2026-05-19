@@ -13,7 +13,15 @@ from pydantic import BaseModel, Field
 
 from app.adapters.cytoscape_adapter import to_cytoscape
 from app.schemas.domain import GraphPayload
-from app.services import domain_store, fixtures, graph_builder, ragu_service
+from app.services import (
+    domain_store,
+    fixtures,
+    graph_builder,
+    module_store,
+    ragu_service,
+    regulation_store,
+    sensor_schema_store,
+)
 from app.services.regulation_client import client
 from app.services.turtle_bridge import parse_regulation_turtle, parse_shapes_turtle
 
@@ -59,6 +67,74 @@ def create_domain(req: CreateDomainRequest):
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
+
+
+@router.get("/domains/{domain_id}/overview")
+def domain_overview(domain_id: str) -> dict[str, object]:
+    """Сводка по домену: регламенты + модули-источники + датчики.
+
+    Закрывает обратный поиск «домен → его компоненты». Используется на
+    карточке домена (DomainDetailScreen) и для бейджей покрытия (N/M/K).
+
+    Возвращает плоские списки — без вложенных счётчиков, фронт сам рендерит.
+    Sensor_subtypes — те, что подключены к модулям этого домена (через
+    `sensor_subtypes.module_id → modules.id → modules.domain`). Подтипы
+    без `module_id` сюда не попадают (по дизайну — мы хотим показать
+    «подключённые», а не «потенциально доступные»).
+    """
+    # Проверка существования домена не строгая: для seed-доменов и user-доменов
+    # одинаково отдаём пустой overview если их нет — UI не падает.
+    domain_meta = next(
+        (d for d in domain_store.list_all() if d["id"] == domain_id),
+        None,
+    )
+
+    regs = [
+        r for r in regulation_store.list_all() if r.get("domain") == domain_id
+    ]
+    mods = [
+        m.model_dump() for m in module_store.list_all() if m.domain == domain_id
+    ]
+
+    # Sensor-subtypes этого домена = подтипы, привязанные к модулям домена.
+    # `list_subtypes` не отдаёт module_id (легаси, см. sensor_schema_store
+    # строки 702-715), читаем напрямую из БД через шаренный connection.
+    module_ids = {m["id"] for m in mods}
+    subs = []
+    if module_ids:
+        with regulation_store._LOCK:
+            c = regulation_store._connection()
+            rows = c.execute(
+                """
+                SELECT subtype_id, class_id, label, description, module_id
+                FROM sensor_subtypes
+                WHERE module_id IN ({})
+                ORDER BY class_id, subtype_id
+                """.format(",".join("?" * len(module_ids))),
+                list(module_ids),
+            ).fetchall()
+        subs = [
+            {
+                "subtype_id": r[0],
+                "class_id": r[1],
+                "label": r[2],
+                "description": r[3],
+                "module_id": r[4],
+            }
+            for r in rows
+        ]
+
+    return {
+        "domain": domain_meta,
+        "regulations": regs,
+        "modules": mods,
+        "sensor_subtypes": subs,
+        "coverage": {
+            "regulations_count": len(regs),
+            "modules_count": len(mods),
+            "sensor_subtypes_count": len(subs),
+        },
+    }
 
 
 @router.delete("/domains/{domain_id}")

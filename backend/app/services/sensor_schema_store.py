@@ -80,7 +80,8 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
             class_id     VARCHAR NOT NULL,
             label        VARCHAR NOT NULL,
             description  VARCHAR,
-            position     INTEGER NOT NULL DEFAULT 0
+            position     INTEGER NOT NULL DEFAULT 0,
+            module_id    VARCHAR  -- FK к modules.id (мягкий, для overview-запросов «домен → датчики»)
         )
         """
     )
@@ -107,6 +108,16 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
     if "sensor_type" in existing_cols and "subtype_id" not in existing_cols:
         # Идемпотентный миграционный шаг: переименовать колонку.
         c.execute("ALTER TABLE sensor_field_schemas RENAME COLUMN sensor_type TO subtype_id")
+
+    # Идемпотентная миграция module_id в sensor_subtypes — для БД, созданных
+    # до того как колонка попала в CREATE TABLE выше. Параллельная попытка
+    # ALTER в regulation_store._init_schema выполняется до создания таблицы,
+    # поэтому дублируем здесь — гарантирует наличие колонки на любой версии.
+    existing_sub_cols = {
+        row[1] for row in c.execute("PRAGMA table_info('sensor_subtypes')").fetchall()
+    }
+    if "module_id" not in existing_sub_cols:
+        c.execute("ALTER TABLE sensor_subtypes ADD COLUMN module_id VARCHAR")
 
 
 # ── Seed: классы и их подтипы ─────────────────────────────────────────

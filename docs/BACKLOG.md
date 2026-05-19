@@ -2,484 +2,346 @@
 
 Идеи и фичи в очереди. Реализуем когда станет ясно что нужно, не пытаемся завершить весь список.
 
----
-
-## 🏛️ Архитектурная программа: Author / Execute split
-
-**Идея.** В RAGRAF два разных типа ИИ с разными ролями: **ИИ-аналитик** (LLM+RAGU, работает редко, разбирает документы) и **ИИ-исполнитель** (детерминированные Rule DSL Flow + параметры, работает на каждое событие, без LLM). UI должен это явно отражать — иначе руководитель видит «непредсказуемая AI-игрушка» вместо «enterprise-tool с понятной экономикой».
-
-**Прецеденты в индустрии:** Camunda (Modeler/Cockpit/Tasklist), Node-RED (Designer/Runtime/Dashboard), Power Automate, Siemens TIA Portal. Везде — раздельные интерфейсы для **дизайна** и **исполнения**.
-
-### Phase 1 · Переименование + субшапка (быстро, ~30 мин)
-*Complexity: низкая*
-
-- «Песочница» → «Студия аналитика» в навигации (`App.tsx`, текущая `/sandbox` route)
-- В шапке Песочницы — короткое позиционирование: «здесь ИИ помогает аналитику разобрать документы и собрать структурированные регламенты. Сами регламенты живут и исполняются в разделе „Регламенты"»
-- Добавить заглушку-таб «Исполнение» (disabled, tooltip «coming soon — симулятор событий, привязка датчиков, webhooks»)
-
-**Цель:** через 5 секунд глядя на UI пользователь понимает что есть **студия** (Author) и **исполнение** (Execute).
-
-### Phase 1.5 · Design System ✅ DONE
-*Complexity: средняя*
-
-Сейчас каждый экран в своём стиле — разные шапки, разные цвета кнопок, разные отступы. Перед тем как делать левый sidebar (Phase 2), фиксируем единый визуальный язык.
-
-**Идея цветовой роли (соответствует Author/Execute split):**
-- Author Layer (Студия аналитика) → `accent.purple` (#6B46C1, violet) — «здесь работает ИИ»
-- Model Layer (Регламенты) → `primary` (#2C7A7B, teal) — «структурированные данные»
-- Execute Layer (Исполнение, в будущем) → `accent.blue` (#3182CE, blue) — «runtime, поток сигналов»
-- Domain-цвета на карточках регламентов остаются (heating=orange, housing=blue, safety=rose, environment=emerald) — у них семантика
-
-**Что делаем:**
-
-1. **Tokens — уже есть в `tailwind.config.js` (Nexus-палитра)**, но используются хаотично. Фиксируем дисциплину: никаких прямых `bg-violet-*` / `bg-stone-*` в продуктовом коде, только через семантические токены или ui-примитивы.
-
-2. **Базовые примитивы в `src/components/ui/`:**
-   - `<PageShell>` — внешний контейнер (bg, padding, scroll)
-   - `<PageHeader>` — иконка + title + бейджи + хлебные крошки + actions-slot справа
-   - `<Section>` — bordered-card area с опциональным заголовком
-   - `<Button>` — варианты `primary | secondary | ghost | danger`, размеры `sm | md`
-   - `<Badge>` — тона `info | success | warning | danger | neutral | author | execute`
-   - `<Tabs>` — горизонтальные табы
-   - `<EmptyState>` — для «нет данных»
-   - `<KeyValue>` — inspector-row (`label : value`)
-   - `<Toolbar>` — bordered bar для action-кнопок (используется в editor'ах)
-
-3. **Reference screen:** SandboxScreen — рефакторим первым, показывает все паттерны.
-
-4. **Документ** `frontend/DESIGN_SYSTEM.md` — конвенции, примеры, do/don't.
-
-5. **Migration queue (последующие сессии, по одному экрану в раз):**
-   - RegulationList (приоритет: самая видимая страница)
-   - RegulationEditorScreen + RegulationHeader
-   - FlowEditorScreen
-   - ConstraintEditorScreen
-   - GraphView
-   - SandboxBacklog
-
-**Принципы:**
-- Не ломаем функциональность — только визуал
-- Каждый экран мигрируется атомарно, в одном коммите
-- После миграции — обновляем DESIGN_SYSTEM.md если паттерн уточнился
-
-### Phase 2 · Левый sidebar с тремя разделами (средне, ~2-3 ч)
-*Complexity: средняя*
-
-Переделать навигацию из плоских табов в шапке на левый sidebar (как Camunda Cockpit / Node-RED / TIA):
-
-```
-RAGRAF
-├─ 🧠 СТУДИЯ АНАЛИТИКА           (Author Layer, "ИИ-помощник")
-│  ├─ Диалог с базой           ← /sandbox?tab=search (chat)
-│  ├─ Извлечь из документа     ← /sandbox?tab=extract
-│  ├─ Поиск по корпусу         ← (будущее, отделить от чата)
-│  └─ Сравнение регламентов    ← (бэклог: #4 compare)
-│
-├─ 📚 РЕГЛАМЕНТЫ                 (Model Layer, "Структура")
-│  ├─ Список / по доменам      ← /regulations
-│  ├─ Карта связей             ← /graph
-│  └─ <Регламент>              ← редактор с табами Поля/Поток/Ограничения
-│
-└─ ⚙️ ИСПОЛНЕНИЕ                  (Execute Layer, "Runtime") — заглушка с roadmap
-   ├─ Симулятор события        ← coming-soon (Phase 3 ниже)
-   ├─ Привязка датчиков        ← coming-soon
-   ├─ Действия / Webhooks      ← coming-soon
-   ├─ Журнал срабатываний      ← coming-soon
-   └─ Мониторинг порогов       ← coming-soon
-```
-
-Шапка остаётся для проекта/пользователя/глобального поиска (Cmd-K в будущем). Чек-боксы из доменов / фильтры — в самом разделе «Регламенты».
-
-### Phase 3 · Execute Layer (большая работа, неделя+)
-*Complexity: высокая*
-
-См. отдельный пункт ниже «Event-driven execution» — это и есть Phase 3, но детально расписанный по компонентам.
-
-**Заимствуем из Node-RED:**
-- Палитра датчиков слева (как drag-and-drop nodes в Node-RED Designer): MQTT, HTTP webhook, OPC-UA, Modbus
-- При drag на INPUT-узел регламента — авто-сопоставление по типу (давление → датчики типа `pressure`)
-- Цветовая кодировка: input=зелёный (есть сейчас), processing=жёлтый, output=красный, sensor binding=голубой
-- Status badge на узлах: ✓ connected / ⚠ no signal / ⛔ error
-
-**Заимствуем из Camunda Cockpit:**
-- **Process instance view** — каждое сработавшее правило = «инстанс», с историей шагов
-- **Incidents list** — список текущих отклонений, отсортированный по `level`
-- **Heatmap** на Flow — какие узлы срабатывают чаще, где задержки
-- **Audit log** — кто, когда, какой регламент, какие данные, какое решение
-
-### Phase 4 · Enterprise polish (после Phase 3)
-*Complexity: средняя*
-
-- Status bar внизу (БД, время отклика, режим mock/real, текущий пользователь) — есть частично в LLMStatusBar, поднять на уровень приложения
-- User menu (профиль, роль, выйти) — нет
-- Глобальный поиск Cmd-K (как Linear, Notion) — нет
-- Role-based UI: «Аналитик» видит только Студию, «Оператор» только Исполнение, «Методист» всё — нет
+Последняя ревизия — **2026-05-19** (после аудита против двух ТЗ СИГМА: «Платформа Сигма» 2025 и уточнённое ТЗ Фреймворка 2026).
 
 ---
 
-## 🇷🇺 SIGMA-compliance (ТЗ НГУ ЦИИ 2026)
+## ✅ Закрыто (декабрь 2025 — май 2026)
 
-**Контекст.** Свериваем RAGRAF с уточнённым ТЗ фреймворка СИГМА (НГУ ЦИИ 2026, ИИ-01-01-01-1/1-ЛУ). Для роли «разработчики и аналитики» (раздел 4.3.1) мы покрываем ≈70-75%: уже есть редактор регламентов как блок-схем (СИГМА табл. 7.2 «июнь»), LLM-извлечение знаний (4.1.5), ИИ-ассистент (4.2.4 #1), семантическая база RDF/OWL/SHACL (4.1.3), история правок с diff. Не хватает следующего:
+Большой блок задач из прошлой версии backlog'а закрыт. Кратко, чтобы было видно прогресс:
 
-### Done (декабрь 2025)
-- ✅ Нормативное основание (`source_document`, `source_clause`) — §4.1.3 «связь правила с источником».
-- ✅ Период действия (`valid_from`, `valid_to`) — §4.1.3 «применение правил действовавших на момент события».
+### Архитектура и навигация
+- ✅ **Phase 1 · Переименование** — «Песочница» → «Студия аналитика», субшапка с позиционированием Author/Execute.
+- ✅ **Phase 1.5 · Design System** — токены в `tailwind.config.js`, примитивы `<PageShell>/<PageHeader>/<Section>/<Button>/<Badge>/<Tabs>/<EmptyState>` в `components/ui/`, конвенции в `frontend/DESIGN_SYSTEM.md`.
+- ✅ **Phase 2 · Левый sidebar** — Студия аналитика / Регламенты / Датчики / Модули / Аудит / Граф связей / Цифровой двойник.
+
+### SIGMA-compliance (закрыто из таблицы 2025)
+- ✅ Нормативное основание (`source_document`, `source_clause`, `source_url`, `source_excerpt`, `source_file_path`, `source_checksum`, `source_mime_type`) + UI «Документ-основание» в `RegulationEditorScreen.FormView` + бейдж «📎 источник прикреплён» — §4.1.3.
+- ✅ Период действия (`valid_from`, `valid_to`) — §4.1.3.
 - ✅ Бейдж критичности на карточке регламента — §4.2.2 #1.
-- ✅ Терминологическое выравнивание «цифровой регламент» — словарь СИГМЫ стр. 3.
+- ✅ Терминологическое выравнивание «цифровой регламент».
+- ✅ **Семантическая БЗ (RDF/OWL/SHACL)** — `turtle_bridge.py` с полной сериализацией, авто-генерация SHACL-форм через `regulation_to_shacl_shapes(reg)`, raw-turtle хранилище для верзимного редактирования.
+- ✅ **Editor «Поля/Поток/Ограничения»** — паттерн перенесён из NSK Studio: YAML/Tree/Sliders + Flow на React Flow + SHACL constraint editor.
+- ✅ **Версионирование регламентов** — immutable snapshots в `regulation_history` + diff между версиями (`regulation_diff.py`) + restore.
+- ✅ **Domain creation dialog** — пользовательские домены (`CreateDomainDialog.tsx`) с SmartCity-палитрой иконок (40 шт. в 7 группах) и tone-палитрой.
 
-### ETL-модуль UI (§4.1.1, §4.1.2 — табл. 7.2 «январь»)
-*Complexity: высокая · идёт в паре с нашим Phase 3 «Event-driven execution».*
+### Event-driven execution (Phase 3, частично)
+- ✅ **Sensor-нода во Flow Editor** + `bindsTo` к input-узлам (фикс 047 — реконсиляция триггеров с null subtype).
+- ✅ **`flow_executor.py`** — детерминированный интерпретатор Rule DSL, возвращает `ExecutionResult` с `level`, `recommendation`, `trace`.
+- ✅ **POST `/api/regulations/{sid}/execute`** + UI-панель «Запуск» в `ExecuteScreen` с пресетами, подсветкой сработавшего пути, журналом.
+- ✅ **Kleene 3-valued logic** (true/false/unknown) — `formula_eval.py` + `evidence_level=unknown` бейдж в audit (фикс 043).
+- ✅ **Audit log с полной цепочкой** «событие → регламент → действие → результат» — `audit_log_store.py` + `incident_audit_log` таблица + `AuditLogScreen.tsx` (дашборд руководителя, фикс 048).
+- ✅ **Триггеры регламента** (event-driven сцепка) — `regulation_triggers` таблица + `RegulationTrigger` модель + reverse-lookup по `sensor_subtype`.
 
-Каталог источников событий: тип события, JSON-схема валидации, маршрутизация в ядро. UI-аналог Node-RED-сайдбара с adapter-палитрой. Без этого нельзя закрыть требование §4.3.1 «убедиться что для любых данных приходящих из внешних источников в базе знаний существует регламент».
+### Прикладные модули и датчики
+- ✅ **Sensor library** с типами + подтипами — `sensor_schema_store.py`, типы p/t/flow/noise/detector/fiber/air, ~40 подтипов в seed'е, поля датчиков (фикс уровень подтипов).
+- ✅ **Module passport (СИГМА § 7)** — таблица `modules`, схема `Module` (api_contract/quality_rules/event_types/контакты), ModuleLibraryScreen с фильтрами по домену/статусу (фикс 046).
+- ✅ **Module CRUD UI** — `ModuleEditorDialog` со всеми полями: статус жизненного цикла (черновик/пилот/промэксплуатация/снят), контракт интеграции (канал/формат/auth/URL/rate-limit), требования к качеству, типы событий, иконка/цвет, контакты, заметки. Кнопки «Создать»/«Изменить»/«Удалить».
+- ✅ **11 seed-модулей** из пояснительной записки «Описание архитектуры» (14.04.2026): heating-network (ЦИИ НГУ — теплоснабжение), noise-monitoring (ШУМ-ИИ — Baykal-8/SeedLink/MiniSEED), air-quality, traffic-management, das-fiber-monitoring (Python/PyTorch/SSLAE), medical-imaging-diagnostics (МРТ/туберкулёз, U-Net/nnU-Net, DICOM/NIfTI), urban-health-impact-assessment (граф знаний + GNN + Concrete Autoencoder), nsu-adpi-gsm, nsu-video-analytics, nsu-anpr-parking, nsu-bms-engineering. Идемпотентный seed (per-id).
 
-### Notification configurator (§4.2.1 #4)
-*Complexity: средняя.*
+### Цифровые двойники процессов
+- ✅ **Process store** — таблица `processes`, M:N связь регламентов в один контур (`/api/processes`), UI Twins screen с подграфом Cytoscape только для регламентов процесса.
+- ✅ **WAL race fix** (фикс 051) — `process_store` шарит DuckDB-singleton с `regulation_store`, чтобы регламенты+процессы переживали редеплой.
 
-UI «кого, по какому каналу (Telegram/email), при какой критичности». Таблица правил уведомлений на регламент. СИГМА табл. 7.2 «уведомления — июль».
+### ИИ-стек
+- ✅ **GraphRAG-интеграция (graph_ragu)** — `ragu_service.py` + `/api/ragu`, локальная Ollama (qwen2.5 / bge-m3), `LocalSearchEngine` для Q&A.
+- ✅ **Студия аналитика — Chat + Extract** — `SandboxScreen` с диалогом по корпусу, извлечением параметров, классификацией домена нового регламента, импорт PDF/DOCX в `document_store`.
+- ✅ **18 RAGU-промптов override через DuckDB** — `ragu_prompt_overrides` таблица, UI редактирования промптов.
 
-### Карточка события / event card (§4.3.2)
-*Complexity: средняя · требует Phase 3 runtime.*
+### Локальная инсталляция
+- ✅ **Windows-инсталлер** (фикс 049) — `installer/start-ragraf.bat` + `installer/ragraf.ps1`, проверка git/python/node, клон с GitHub, авто-update.
+- ✅ **macOS-инсталлер** (фикс 050) — `installer/start-ragraf.command` + `installer/ragraf-mac.sh`, Homebrew-suggest, Gatekeeper-инструкция, `_run-server.sh` для прямого старта.
+- ✅ **Документация по установке** — `installer/INSTALL-WINDOWS.md`, `installer/INSTALL-MACOS.md`.
+- ✅ **Реорганизация документов** — все `.md`/`.pdf` из корня перенесены в `/docs/`, ссылки в README/демо-документах/коде обновлены.
 
-Нарушенные параметры, основание (ссылка на нормативный документ + пункт — у нас уже есть в схеме), предлагаемые шаги, статус обработки, фиксация решения оператора. Дополняется автоматическим назначением `level` по `recommendation.priority`.
+### Граф связей
+- ✅ **Cytoscape KG регламентов** — `/api/graph` + `GraphView` с cross-domain entity detection (параметры, упоминаемые в нескольких регламентах).
+- ✅ **Real data fixtures** — извлечено из `Rules-Management.pdf` в `backend/data/fixtures/`, реальная Turtle-схема (плоские scalar-свойства), Postановление № 001/2023 (`pressure-diameter`).
 
-### Контроль полноты оцифровки (§4.3.1)
-*Complexity: средняя · требует ETL.*
+---
 
-«Дашборд аналитика»: список типов входящих событий, для которых нет регламента, с CTA «оцифровать». Связан с ETL-модулем.
+## 🎯 SIGMA-интеграция (топ-10 из аудита ТЗ 2026)
 
-### Тесты на знание регламентов (§4.2.4 #3 — табл. 7.2 «август»)
+Аудит RAGRAF против двух ТЗ — «Платформа Сигма» (22 листа, 2025) и «Фреймворк Сигма уточнённое» (31 лист, 2026) — показал **38% покрытия** требований. RAGRAF позиционирован как **Author Layer** (среда разработчика-аналитика), не ядро+платформа, поэтому полное покрытие не цель. Но для лёгкой интеграции с ядром СИГМА нужны точки сопряжения. Приоритеты ниже отсортированы по «насколько без этого нельзя подключить RAGRAF к runtime СИГМА».
+
+### #1 · ETL-эндпоинт `POST /api/events/ingest` (§4.1.1, табл. 7.2 «январь»)
+*Complexity: высокая. Critical для интеграции.*
+
+Принимает SIGMA-event (`{description, timestamp, payload}` по [event-data-examples/schema.json](../event-data-examples/schema.json)), валидирует против JSON-схемы типизированных событий, маппит `payload.<field>` в `SensorReading[]`, решает какие регламенты применять, возвращает `{matched: [{regulation_id, level, recommendation, trace}], skipped: [...]}`.
+
+**Подзадачи:**
+1. Реестр JSON-схем по `sensor_type` (текущий `sensor_field_schemas` расширить до полноценной валидации).
+2. Маршрутизация: «по `payload.source_id` → модули → датчики → регламенты» (использовать существующие связи `modules` → `sensor_subtypes` → `regulation_triggers`).
+3. Запись инцидента в `incident_audit_log` (event-step) автоматически — частично уже сделано в `/execute`, нужно унифицировать.
+4. Sandbox-mode (preview без записи) vs production-mode (живая запись и webhook'и).
+
+**Архитектурная ценность:** RAGRAF становится не просто «студией аналитика», а полноценным узлом event-routing'а — можно подключать как fallback при недоступности ядра СИГМА.
+
+### #2 · API Gateway с JWT + ролевой моделью (§4.1.2)
 *Complexity: высокая.*
 
-Авто-генерация QA-вопросов по регламенту через LLM + KG, прохождение операторами, фиксация результата. Хорошая нагрузка на RAGU `LocalSearchEngine` по подграфу регламента.
+Сейчас RAGRAF single-user без auth (по замыслу TZ_RAGRAF §1.2 — локальная среда аналитика). Для интеграции с ядром СИГМА (multi-tenant, ролевая модель «разработчики/аналитики», «диспетчеры/операторы», «руководители») нужна обёртка:
 
-### Шаблоны управленческих документов (§4.2.2 #5)
+1. Опциональный JWT-middleware: при `RAGRAF_AUTH_MODE=jwt` проверка токена из `Authorization: Bearer …`.
+2. Ролевая модель 3 ролей из ТЗ: `analyst` (read/write регламенты, sensor library, modules), `operator` (read-only регламенты, write audit-actions), `manager` (read all + reports).
+3. Intеграция с Keycloak или OAuth2-провайдером СИГМЫ (когда определится). До этого — статические токены + per-source API-key.
+4. Не ломать single-user dev-experience: по умолчанию `RAGRAF_AUTH_MODE=none`.
+
+### #3 · Webhook-медиатор и подписка на срабатывания (§4.1.2 «webhook-механизмы, очереди»)
 *Complexity: средняя.*
 
-Jinja-генерация приказа / акта / уведомления из регламента + параметров события. Расширение OUTPUT-ноды Flow с `text` → `document_template`.
+Сейчас при `/execute` результат только возвращается на запрос. Для интеграции с СИГМА нужна push-семантика:
 
-### Сценарии моделирования (§4.2.3 — табл. 7.2 «сентябрь»)
+1. Таблица `webhook_subscriptions` — `{id, url, secret, event_filter (regulation_id|domain|level), retry_policy}`.
+2. После каждого `match-event` — отправка POST на все подписанные URL, exponential backoff на ошибки, журнал доставки.
+3. UI «Подписки» в Studio — настройка webhook'ов аналитиком.
+4. Альтернатива: server-sent events (SSE) канал для live-fan-out — проще для UI-клиентов.
+
+### #4 · Bi-directional sync с upstream СИГМА API
 *Complexity: средняя.*
 
-«Прокатать» виртуальное событие через все активные регламенты, посмотреть какие сработали и в каком порядке. Half-step к Phase 3 — не требует runtime, можно реализовать чисто в backend как pure function.
+Сейчас экспорт one-way (`sigma_export.py` → ZIP-bundle). Нужен pull:
 
-### Расширение объяснимости: контекст решения (§4.2.2 #3)
-*Complexity: низкая · требует Phase 3 runtime.*
+1. `regulation_client.py` → метод `pull_from_upstream(source_id) -> Regulation` (uplink к `/api/v1/regulations/{id}` СИГМЫ, Turtle на входе).
+2. Конфликт-резолюшн при rare-condition «локальная редакция конфликтует с upstream» — UI диалог diff и `ours/theirs/merge`.
+3. Кнопка «Синхронизировать с СИГМОЙ» в RegulationList — для каждого регламента маркер «🟢 in sync / 🟡 modified locally / 🔴 conflict».
+4. Опциональная авто-синхронизация по cron (раз в сутки).
 
-При срабатывании регламента фиксировать «контекст решения» — какая версия регламента действовала, какие параметры события, какие правила применились. У нас уже есть `version_id` + `valid_from/to` (только что добавили) — осталось склеить в snapshot при матчинге события.
+### #5 · Notification configurator (§4.2.1 #4, табл. 7.2 «июнь»)
+*Complexity: средняя.*
+
+UI «кого, по какому каналу, при какой критичности» (Telegram + email — прямо из ТЗ).
+
+1. Таблица `notification_rules` — `{id, regulation_id|null, level_threshold, channel: telegram|email, target, body_template}`.
+2. Backend-сервис `notification_service.py` — Telegram Bot API (token из env) + SMTP-клиент.
+3. UI в Studio: вкладка «Уведомления» в Module passport (кому шлёт этот источник при срабатывании регламента) + глобальные правила.
+4. Регистрация факта доставки в `notification_log` (для аудита, §4.2.1 #4 «регистрация факта доставки»).
+
+### #6 · WebSocket / SSE для real-time ленты инцидентов (§4.2.1)
+*Complexity: низкая. Quick-win.*
+
+Сейчас `AuditLogScreen` поллит `/api/audit-log?limit=50` каждые 30 сек. Для дашборда диспетчера (когда придёт время) — нужен push:
+
+1. Endpoint `GET /api/events/stream` (SSE) — broadcast при каждом новом incident_audit_log entry.
+2. Frontend hook `useAuditLogStream()` — добавляет события к локальному кэшу react-query.
+3. Сохранить fallback на polling если SSE недоступен.
+
+### #7 · Модуль контроля знаний (§4.2.4 #3, табл. 7.2 «первая половина августа»)
+*Complexity: средняя.*
+
+Тестирование операторов на знание регламентов. По описанию ТЗ:
+
+1. Auto-генерация тестов по регламенту через RAGU (`LocalSearchEngine` по подграфу регламента → LLM формирует MCQ-вопросы).
+2. Таблица `knowledge_tests` (id, regulation_id, questions JSON, version) + `test_results` (user_id, test_id, score, answers, ts).
+3. UI «Тренажёр»: режим тестирования + история прохождения.
+4. **Уже есть прецедент**: тренажёр операторов <https://sigma-operator.vercel.app/operator> — можно интегрировать или взять как образец.
+
+### #8 · Генератор управленческих документов (§4.2.2 #5)
+*Complexity: средняя.*
+
+Сейчас `backend/app/services/templates.py` — пустой/TODO. Нужен:
+
+1. Шаблоны (Jinja2) приказа / распоряжения / акта / уведомления — отдельная таблица `document_templates` (название, текст, какие переменные требует).
+2. Расширение OUTPUT-ноды Flow: `kind = "text" | "document"`, привязка к template_id.
+3. После срабатывания регламента — `POST /api/incidents/{id}/generate-document?template=…` рендерит документ из контекста инцидента + параметров события + регламента.
+4. UI «Документы инцидента» в карточке audit-entry с кнопкой «Создать приказ» (выбор шаблона → preview → правка → save в хранилище).
+
+### #9 · Фикстуры для остальных прикладных модулей
+*Complexity: низкая–средняя.*
+
+Сейчас регламенты есть только для теплосети (`pressure-diameter`, `heat-inlet-breach`) и экологии (`air-quality-smog-trap`). По Платформа ТЗ §4.1 должно быть **6 доменов**. Не хватает:
+
+1. **Шум** (noise) — пороги шумовых уровней по СанПиН, регламент «превышение ночью», источник `noise-monitoring` (Baykal-8).
+2. **Дорожная ситуация** (traffic) — у нас есть `nsu-anpr-parking` + `traffic-management` модуль, нужны регламенты «несанкционированный въезд», «затор», «инцидент».
+3. **DAS / оптоволокно** — есть `das-fiber-monitoring` модуль с `step_human/digging_human/noise_event` событиями, нужны регламенты-обработчики (например, «попытка вскрытия охраняемой зоны»).
+4. **Медицина** — есть 2 модуля (МРТ-диагностика + оценка городской среды), нужно по 1–2 типовых регламента на каждый.
+
+Источник: NSK_OpenData_Bot YAML на `traffic` / `industrial` / `power` домены уже есть в `~/NSK_OpenData_Bot/config/rules/`.
+
+### #10 · Event-to-Regulation matching dashboard (§4.3.1)
+*Complexity: средняя.*
+
+«Контроль полноты оцифровки» из ТЗ: список типов входящих событий, для которых нет регламента, с CTA «оцифровать». Зависит от #1 ETL.
+
+1. Backend-сервис `coverage_analyzer.py` — пробегает события из `incident_audit_log` за период, группирует по `event_type` + `source_module`, флагит те, для которых не нашлось регламента.
+2. Отдельный экран «Покрытие» в Studio — таблица «тип события / частота / есть регламент?», кнопка «Оцифровать» открывает CreateRegulationDialog с префиллом домена.
+3. Метрика для технико-экономических показателей (ТЗ §6): «доля типов событий, покрытых регламентами».
 
 ---
 
-## RAGU-песочница: следующие демо
+## 🗺️ Платформа руководителя (§4.2.4 Платформа ТЗ)
 
-### #3 · Knowledge Graph всех регламентов
-*Complexity: средняя*
+Это компетенция отдельного компонента «Платформа Сигма» (не RAGRAF), но RAGRAF может покрыть часть — текущий `AuditLogScreen` уже close к «единой ленте инцидентов с фильтрами». Что добавить если решим расширить:
 
-Cytoscape-карта где регламенты связаны общими параметрами / action-типами / доменами. Например `temperature` упоминается в 4 регламентах разных доменов — это **cross-domain entity**. RAGU `GlobalSearchEngine` (community detection) находит такие кластеры.
+### Сводный дашборд по доменам
+Карточки доменов с метриками: «N инцидентов за 24ч / M критичных / K в работе». Drill-down → лента инцидентов этого домена.
 
-**RAGU features:** `GlobalSearchEngine`, community detection, graph traversal.
+### Отчёты по критичности и времени устранения
+Сравнение служб по доле обработанных в нормативный срок (§6 техн.-эконом. показатели ТЗ).
 
-**Mock без RAGU:** статический `graph_builder` на parameter-name overlap.
+### Прогноз аварийности
+Сценарии «с вмешательством / без» (§4.2.3). Требует подключения внешних моделей машинного обучения — за пределами текущего скоупа RAGRAF. Возможная интеграция: тонкий клиент для модуля `heating-network` (ЦИИ НГУ, FastAPI/PyTorch/TorchGeometric).
+
+---
+
+## 🔌 Связь Модули ↔ Домены ↔ Регламенты (новый сценарий)
+
+**Что есть.** Модули и регламенты независимо хранят строковый `domain` slug. Sensor_subtypes жёстко связаны с модулем через `module_id`. UI показывает плашку домена на карточке модуля и фильтр по домену.
+
+**Чего не хватает.** Обратного поиска «домен → его модули и регламенты». Нет API-endpoint'а, нет UI-экрана.
+
+### Endpoint `GET /api/domains/{id}/overview`
+*Complexity: низкая.*
+
+Возвращает `{regulations: [...], modules: [...], sensor_subtypes: [...]}` для домена. По сути SQL-JOIN'ы по slug'у.
+
+### Экран «Домен» (Domain Detail Screen)
+*Complexity: средняя.*
+
+Когда пользователь кликает на домен в списке доменов (или фильтре) — открывается страница:
+- Шапка домена (иконка, цвет, описание).
+- Секция «Регламенты» — список карточек этого домена.
+- Секция «Модули-источники» — список карточек подключённых модулей (с их статусами).
+- Секция «Датчики» — типы и подтипы датчиков из подключённых модулей.
+- Граф связей в этом домене (sensor → trigger → regulation).
+- Бейдж покрытия в самой карточке домена в Studio: «N регламентов · M модулей · K датчиков».
+
+### Покрытие домена модулями
+*Complexity: низкая.*
+
+Подсветка «домен закрыт модулем (есть подключённый источник)» vs «домен не закрыт». Помогает методологу видеть, для каких регламентов нет источника событий.
+
+---
+
+## 🏛️ Phase 4 · Enterprise polish
+
+После закрытия SIGMA-интеграции (топ-10 выше) — финишинг под enterprise-use:
+
+### User menu + ролевая UI
+Уже выйдет из #2 «API Gateway + RBAC». Доп.: переключатель ролей в шапке (debug-режим: «посмотреть как оператор»), профиль пользователя, выход.
+
+### Глобальный поиск Cmd-K
+Как в Linear/Notion. Поиск по регламентам, модулям, датчикам, инцидентам через единый popup. RAGU-семантика как backend.
+
+### Status bar
+Внизу: БД, время отклика, режим mock/real, LLM-статус (есть частично в `LLMStatusBar`).
+
+### Code-splitting
+Vite warning > 500kB (текущий чанк 1.4MB). Lazy-loaded routes: `/sandbox`, `/graph`, `/twins`, `/audit-log`.
+
+---
+
+## 🧠 RAGU-песочница: следующие демо
+
+### #3 · KG регламентов с community detection
+*Complexity: средняя.*
+
+`GlobalSearchEngine` → кластеризация регламентов по общим параметрам/action-типам/доменам. Cross-domain entity detection (есть в Cytoscape-графе, нужно расширить с RAGU-силой).
 
 ### #4 · Сравнение двух регламентов
-*Complexity: средняя*
+*Complexity: средняя.*
 
-Выбираешь два — RAGU подсвечивает «эти параметры общие», «эти противоречат», «эта рекомендация в первом перекрывает действия из второго». Полезно при унификации регламентов из разных источников (Sigma + ТСЖ + кампусные).
-
-**RAGU features:** embedding similarity, `LocalSearchEngine` cross-query, semantic overlap.
+«Эти параметры общие», «эти противоречат», «эта рекомендация перекрывает». Парно с side-by-side diff viewer (см. ниже).
 
 ### #5 · Авто-классификация домена нового регламента
-*Complexity: низкая*
+*Complexity: низкая.*
 
-При создании регламента (или импорте из текста) RAGU предсказывает домен — `heating` / `housing` / `safety` / `environment` / другой — по embeddings и сравнению с центроидами существующих регламентов. Помогает в Scenario B (flow-first сборка).
-
-**RAGU features:** `embedder`, cosine similarity к центроидам.
+При импорте из PDF — `embedder` + cosine similarity к центроидам существующих регламентов. Помогает Scenario B.
 
 ### #6 · Q&A над одним регламентом
-*Complexity: средняя*
+*Complexity: средняя.*
 
-Открываешь регламент → панель «Спроси у RAGU». «Какие параметры наиболее критичные?», «На что ссылается этот регламент?», «Что делать если pressure упал на 2 атм?». `LocalSearchEngine` по KG этого регламента (узлы = параметры + рекомендации).
+Панель «Спроси у RAGU» в RegulationEditor. `LocalSearchEngine` по подграфу регламента (узлы = параметры + рекомендации + триггеры).
 
-**RAGU features:** `LocalSearchEngine`, `QueryPlanEngine`, subgraph extraction.
+### #7 · RAGU-ассистент в создании регламентов (табл. 7.3 «октябрь»)
+*Complexity: средняя.*
+
+«Помощник в наполнении регламентов» — диалог типа «У меня есть PDF: какие параметры стоит вытянуть? Какие триггеры предложить? Чего не хватает по сравнению с похожими регламентами?». Сверх extract: проактивные подсказки.
+
+### #8 · Проверка регламента на непротиворечивость и полноту (табл. 7.3 «октябрь»)
+*Complexity: высокая.*
+
+LLM-проход по регламенту: «Параметр Pressure имеет deviation=1.5 атм, но min_inclusive=0 — допускается отрицательное давление? Кажется ошибка»; «Рекомендация ссылается на параметр который не объявлен»; «Триггер sensor_subtype=ph-meter, но в модуле нет такого датчика». Использует SHACL + LLM-проверку.
 
 ---
 
-## Основной функционал
+## 🔧 Основной функционал (хвост)
 
-### Versioning #2 · Diff для flow-версий
-Уже есть для regulation (см. `regulation_diff.py`); для flow-snapshots `FlowVersion.diff_summary` объявлен в спеке но не считается. Нужна аналогичная функция `compute_flow_diff(old, new)` с подсчётом added/removed nodes, изменённых edges, переименований.
+### Versioning · Diff для flow-версий
+*Complexity: низкая.*
 
-### Versioning #3 · Side-by-side diff viewer
-Сейчас unified diff (before → after). Можно сделать визуальный side-by-side: два регламента (или две версии) рядом, изменения подсвечены. Идёт хорошо парой с #4 RAGU «Сравнение двух регламентов».
+`FlowVersion.diff_summary` объявлен в спеке но не считается. Нужна `compute_flow_diff(old, new)` с подсчётом added/removed nodes, изменённых edges, переименований. Парно с side-by-side viewer.
+
+### Versioning · Side-by-side diff viewer
+*Complexity: средняя.*
+
+Сейчас unified diff. Side-by-side в духе GitHub. Хорошо парой с #4 RAGU «Сравнение».
 
 ### Approval workflow · review-статус
-Сейчас 3 статуса (`draft` / `active` / `archived`). Добавить `review` между draft и active, с системой комментариев и approval'ов (по аналогии с PR-ревью). Status уже в схеме DuckDB, легко расширить.
+*Complexity: низкая.*
+
+Сейчас `draft / active / archived`. Добавить `review` между draft и active с системой комментариев и approvals (по аналогии с PR-ревью).
 
 ### Импорт регламента из YAML / JSON
-По аналогии с upload SHACL. Загружаешь Pydantic-совместимый JSON или YAML — backend парсит, создаёт регламент. Полезно для миграции с других систем.
+*Complexity: низкая.*
 
-### Code-splitting (Vite warning > 500 kB chunk)
-React Flow + Cytoscape + rest тянут ~1.05 MB JS-чанк. Сделать lazy-loaded routes: `/sandbox`, `/graph`, `/regulations/:id/flow` — каждый в свой chunk через React.lazy.
+По аналогии с upload SHACL. Pydantic-совместимый JSON/YAML → backend парсит → создаёт регламент. Полезно для миграции с других систем.
 
-### Scenario B (flow-first сборка регламента)
-Пользователь сначала собирает Rule DSL flow (input + threshold + compare + output узлы), потом backend выводит из него `Regulation` (parameters extracted from inputs/thresholds, recommendation from output). Альтернативный entry-point в дополнение к текущему «POST /regulations с шаблоном».
+### Scenario B · flow-first сборка регламента
+*Complexity: средняя.*
 
-### «Сбросить к исходнику» для регламента
-Кнопка в Regulation Editor: удалить все правки этого регламента из DuckDB store и пере-засеять из фикстуры. Сейчас можно только удалив весь файл `regulations.duckdb`.
+Пользователь сначала собирает Flow (input + threshold + output), потом backend выводит `Regulation` (parameters из inputs, recommendation из outputs).
+
+### «Сбросить к исходнику»
+*Complexity: низкая.*
+
+Кнопка в RegulationEditor: удалить правки этого регламента из DuckDB и пересеять из фикстуры. Сейчас можно только удалив весь файл `regulations.duckdb`.
 
 ### Регуляторное расширение
-Из существующих NSK_OpenData_Bot YAML-файлов есть черновики на `traffic`, `industrial`, `power` домены. Можно конвертировать в наш формат и расширить покрытие.
+*Complexity: средняя.*
 
-### Event-driven execution (Sigma-style) + датчики на INPUT + API на OUTPUT
-*Complexity: средняя–высокая · частично сделано (май 2026)*
-
-> **Что сделано:** `sensor`-нода во Flow Editor (визуально кружок, привязка
-> к input через `bindsTo`), [flow_executor.py](../backend/app/services/flow_executor.py)
-> с интерпретатором флоу, endpoint `POST /api/regulations/{sid}/execute`,
-> панель «Запуск» в UI с пресетами/подсветкой сработавшего пути.
-> Это закрывает пункт 3 списка ниже (engine `match-event`) и большую
-> часть пункта 4 (UI-симулятор). Подробнее в разделе **«📡 Приёмник
-> событий СИГМЫ»** — там описан следующий шаг.
-
-Описано в Rules-Management.pdf, раздел «Исполнение регламента»: Sigma принимает sensor-события через ETL, делает SPARQL-запрос к онтологии, возвращает обогащённое событие с `level` критичности и `recommendation`.
-
-У нас вся структура для этого УЖЕ есть (Regulation + Parameter + Rule DSL Flow + Recommendation), но не хватает runtime-слоя. Без SPARQL — через DuckDB SQL + Python-thresholding (нам так проще и быстрее, ~10мс vs RDF/SPARQL).
-
-**Что добавить:**
-
-1. **Sensor binding на узлах INPUT** во Flow Editor. Сейчас INPUT-нода только мапит на `paramRef` (имя параметра). Добавить поле `sensor_binding`:
-   ```
-   {
-     "kind": "ollama" | "mqtt" | "http_poll" | "webhook",
-     "endpoint": "http://...",
-     "topic": "sensors/teploset/edge-1/pressure",
-     "polling_interval_sec": 5
-   }
-   ```
-   В property-panel правого сайдбара — селект `kind` + URL/topic.
-
-2. **Action на узлах OUTPUT.** Сейчас output только возвращает текст рекомендации. Добавить `api_action`:
-   ```
-   {
-     "method": "POST",
-     "url": "https://operator.local/notify",
-     "headers": { "Authorization": "Bearer ..." },
-     "body_template": {
-       "level": "{{level}}",
-       "recommendation": "{{recommendation}}",
-       "edge_id": "{{context.edge_id}}"
-     }
-   }
-   ```
-   Jinja-like templating с контекстом события.
-
-3. **Engine `/api/sandbox/match-event`** (без LLM):
-   - Вход: `{ type, value, reference?, context? }`
-   - Lookup регламент(ов) с этим параметром через DuckDB
-   - Применить threshold-логику (`level = 1 if |Δ| ≤ dev else 2 if |Δ| ≤ 2*dev else 3`)
-   - Вернуть enriched event с регламентом, level, рекомендацией
-   - Опционально: если у output-ноды задан `api_action`, выполнить webhook (sandbox-режим: только preview, в проде — реально вызывать)
-
-4. **UI: вкладка «Симулятор события»** в Песочнице — форма с input'ами type/value/reference, превью enriched event с подсветкой какие узлы Flow сработали, dry-run webhook'а.
-
-5. **Production mode (бэклог-уровень-2): live-stream listener** — backend держит постоянное соединение по MQTT/SSE к ETL Sigmы, обрабатывает поток событий, эскалирует через webhooks.
-
-**Архитектурная ценность:** показывает «Sigma делает то же самое, но через SPARQL и RDF-store; у нас типизированные Pydantic-регламенты + DuckDB → ровно та же семантика без онтологического оверхеда». Это **наш ключевой архитектурный аргумент** против полного RDF-стека.
-
-**Tradeoff:** webhook'и из chat-режима — security risk если не контролировать URL'ы. В sandbox-режиме делать только dry-run + явный allowlist на проде.
+Конвертация NSK_OpenData_Bot YAML (`traffic`, `industrial`, `power`) в наш формат. Покрывает #9 SIGMA-интеграция.
 
 ---
 
-## 📡 Приёмник событий СИГМЫ (event ingestion)
+## 🔬 NER / извлечение
 
-**Контекст.** СИГМА развёрнута на серверах вне НГУ. ETL/edge-устройства
-шлют события POST'ом в формате `{description, timestamp, payload}` —
-формальный контракт в [event-data-examples/schema.json](event-data-examples/schema.json),
-живые сэмплы — в [event-data-examples/sensors/](event-data-examples/sensors/)
-по типам датчиков (`pressure/`, `temperature/`, `flow/`, `noise/`,
-`video-detector/`). Эмулятор-источник на Triton — в [sigma_event_generator/](event-data-examples/sigma_event_generator/).
+### NER-обогащение через Natasha
+*Complexity: средняя.*
 
-Сейчас (май 2026) RAGRAF не принимает события напрямую — это в очередь.
-Реализация ждёт сборки ядра СИГМЫ и понимания задачи от заказчика по
-фактическому endpoint'у/авторизации.
+Дополнить rules-based извлечение русским NER-слоем (DATE/TIME/LAW/ORG/MONEY). Цель — автоматическая привязка регламента к нормативной базе («согласно ГОСТ 22270-2018», «ФЗ-261») и извлечение периодичности.
 
-### Endpoint `POST /api/events/ingest`
-*Complexity: средняя*
+1. `pip install natasha` в requirements.
+2. `backend/app/services/ner_temporal.py` — обёртка над `NamesExtractor` + `DatesExtractor` + regex на LAW.
+3. В `sandbox.extract_parameters` — дополнительный проход, `validity_period`/`source_law_refs`/`periodicity` как мета-атрибуты.
+4. UI: секция «Нормативные ссылки и сроки» в RegulationEditor.
 
-Принимает SIGMA-event, маппит `payload.<field>` в `SensorReading[]`
-([flow_executor.py](../backend/app/services/flow_executor.py)) по
-эвристике: `pressure→p`, `temperature→t`, `flow→flow`, и т.д. Решает
-какие регламенты применять — варианты:
+Если Natasha не зайдёт по качеству — fine-tune `rubert-base-cased` на NEREL (2–4 GPU-часа). Отдельная задача.
 
-1. **По `payload.source_id`** (UUID источника из СИГМЫ → один или
-   несколько регламентов в реестре)
-2. **По домену события** (`description` или `payload.event` → SPARQL/LLM-классификация → domain → регламенты домена)
-3. **По всем активным регламентам** (брутфорс — для прототипа)
+### PostgreSQL видеодетекторов
+*Complexity: средняя.*
 
-Возвращает `{matched: [{regulation_id, level, recommendation}], skipped: [...]}`.
-
-### UI: журнал событий
-*Complexity: средняя · требует ingest endpoint'а*
-
-Вкладка «События» в навигации — timeline с фильтрами по уровню /
-домену / временному окну. На каждое событие — popover с payload, какие
-регламенты сработали, какой level. Аналитик видит «что прилетало и что
-сработало». Аналог Camunda Cockpit «Process instances».
-
-Хранение в DuckDB: таблица `events` (event_id, received_at, description,
-payload JSON, matched_regulations JSON, levels JSON).
-
-### Реестр источников
-*Complexity: низкая · требует ingest endpoint'а*
-
-Таблица «источник UUID → список регламентов / типов датчиков». В СИГМЕ
-это `sources/<uuid>/events/` — каждый UUID знает свою конфигурацию.
-У нас то же самое: UI «Источники» где аналитик прописывает «датчик
-такой-то шлёт давление с edge_id=12, маппи в регламент pressure-diameter».
-
-### Граф связей × Библиотека датчиков × ETL match-event
-*Complexity: средняя*
-
-Сейчас граф (`/api/graph`, [graph_builder.py](../backend/app/services/graph_builder.py)) показывает только `Regulation → Parameter / Constraint / Recommendation`. Каждый регламент — изолированный остров. Это документация структуры, а не runtime-инструмент.
-
-**Гэп**: когда в СИГМУ прилетает событие (например `{"event":"digging","x":3946,"confidence":0.88}`), ETL должен ответить «какой регламент применить». Сейчас связь от полей payload до регламента нигде не материализована — она разбросана по четырём хранилищам:
-- `sensor_field_schemas` знает «у `fiber` есть поля `event`, `x`, `confidence`»
-- `flow.json` знает «регламент R слушает `fiber`-датчик» (FlowNode `type=sensor`)
-- `flow.json` знает «sensor.bindsTo→input.paramRef цепочку»
-- `regulations.parameters` знает «у регламента есть параметр X»
-
-**Что делать**:
-
-1. Расширить `graph_builder` двумя новыми типами вершин и тремя рёбрами:
-   - `SensorClass` (p / t / flow / detector / fiber / noise / air)
-   - `SensorField` (event, pressure, concentration, …)
-   - `SensorClass --has_field--> SensorField`
-   - `Regulation --listens_to--> SensorClass` — собрать через `flow_storage.load_flow(reg.id)`, найти FlowNode типа sensor
-   - `Parameter --fed_by--> SensorClass` — протянуть через `sensor.bindsTo → input.paramRef`
-
-2. UI: toggle «показать датчики» в шапке GraphView. Без него — старая картина. С ним — поверх рисуются sensor-узлы и связи; SensorField'ы свёрнуты по умолчанию (раскрываются кликом по SensorClass).
-
-3. Рантайм-эндпоинт `POST /api/etl/match-event` body=`{description, payload}` → `[{regulation_id, matched_fields, score}]`. Алгоритм:
-   - По ключам payload (`event`, `concentration`, …) найти подходящие `SensorField`
-   - От них поднять на `SensorClass`
-   - Найти регламенты с FlowNode `sensor.sensorType == X`
-   - Вернуть отсортированный список по совпадению полей + required
-
-**Польза**:
-- Методист видит «что в системе связано»: один регламент слушает два датчика, два регламента слушают один датчик, у этого класса датчиков нет ни одного регламента (gap).
-- Оператор при разборе «почему событие не сработало» сразу видит на графе: подходящих регламентов нет.
-- ETL/СИГМА получает HTTP-точку для рутинга событий без знания внутренней структуры RAGRAF.
-
-**Tradeoff**: граф быстро разрастётся (7 SensorClass + ~50 SensorField + cross-edges). Без двух мер станет нечитаемым — нужен collapse/expand по умолчанию и toggle-слой. По сути это означает, что **граф нельзя строить «всё в куче»** — нужно ввести зум-уровни (a-la Camunda Cockpit).
-
-### «Зеркальный» режим вместо СИГМЫ
-*Complexity: низкая*
-
-Выставить тот же endpoint что у СИГМЫ (`/api/v1/sources/<uuid>/events/`)
-чтобы [sigma_event_generator/](event-data-examples/sigma_event_generator/)
-мог слать в RAGRAF без правок. Удобно для разработки/демо.
-
-### Auth-слой
-*Complexity: средняя*
-
-Bearer-token или API-key per source. Без авторизации публичный endpoint
-не выставляем. Минимум — `X-RAGRAF-Source-Key` в headers + проверка
-по таблице `sources`.
-
-### Привязка datatypes к payload-полям
-*Complexity: низкая*
-
-Сейчас в `SensorReading` тип определяется по `sensor_type` ('p'/'t'/…).
-Нужен маппинг «название поля payload» → `sensor_type`:
-`pressure → p`, `temperature → t`, `flow → flow`, `level (dB) → noise`,
-`event=digging → detector`. Хранить как таблицу `payload_field_aliases`
-или захардкодить в коде — обсудим когда дойдёт до реализации.
-
-### Интеграция с PostgreSQL видеодетекторов
-*Complexity: средняя*
-
-ORM-схемы продакшна — в [event-data-examples/videodetectors/](event-data-examples/videodetectors/):
-`EventPerson` (76+ атрибутов человека) и `EventNumberPlate`/ANPR
-(номер, марка, цвет, направление). СИГМА уже индексирует туда поток,
-**свой генератор писать не нужно** — RAGRAF просто читает строки и
-мапит в SIGMA-event формат:
-
-```python
-# Псевдокод адаптера
-row = session.query(EventPerson).filter(updated_at > since).limit(100)
-for r in row:
-    yield {
-      "description": f"Человек на {r.camera_name or r.camera_id}",
-      "timestamp": datetime.fromtimestamp(r.timestamp).isoformat(),
-      "payload": {
-        "event_type": "person",
-        "camera_id": r.camera_id,
-        "track_id": r.track_id,
-        "confidence": r.confidence,
-        "bbox": r.bbox,
-        "attributes": _top_n_attributes(r),  # порог 0.5 + argmax по группам
-      }
-    }
-```
-
-**Decision needed:**
-- Полл-модель (RAGRAF опрашивает БД каждые N сек) или push (триггер в Postgres → callback)?
-- Прямой коннект к их Postgres или они выставят REST-обёртку?
-- Где живёт `_top_n_attributes`-логика (сжатие 76 float'ов в top-категории)?
-
-См. сэмпл маппинга в [event-data-examples/sensors/video-detector/](event-data-examples/sensors/video-detector/)
-— `person-detection.json` / `vehicle-anpr.json` иллюстрируют целевую форму.
+Продакшн-схема `EventPerson` (76+ атрибутов) + `EventNumberPlate` в [event-data-examples/videodetectors/](../event-data-examples/videodetectors/). Адаптер-источник (polling или push) → SIGMA-event формат → ETL. Зависит от #1.
 
 ---
 
-### Локальная LLM-интеграция для RAGU (Ollama / llama-server)
-*Complexity: средняя*
+## 📚 Документация / DX
 
-Сейчас `RAGU_ENABLED=true` всё ещё требует облачного OpenAI-ключа или совместимого прокси. На M2 16GB можно крутить локально через Ollama без облака:
+### Юнит-тесты на `templates.py`
+Сейчас покрыто только через `test_create_regulation.py`. После реализации #8 (генератор документов) — отдельные тесты.
 
-**Стек:**
-- LLM: `qwen2.5:7b-instruct-q4_K_M` (~4.4 GB, ~20 tok/s на M2, хорошо знает русский)
-- Embedder: `bge-m3` (~1.2 GB, мультиязычный)
-- Runtime: Ollama (нативный Metal-бэкенд, OpenAI-совместимый API на `localhost:11434/v1`)
+### E2E тест на полный цикл
+POST → GET → PUT → publish → archive → restore. Сейчас покрыто фрагментарно.
 
-**Что нужно сделать:**
-1. `docs/LOCAL_LLM.md` со step-by-step (`brew install ollama` → `ollama pull qwen2.5:7b-instruct-q4_K_M` → `ollama pull bge-m3` → правки в `.env`)
-2. `.env.example` — закомментированный ollama-блок: `OPENAI_BASE_URL=http://localhost:11434/v1`, `OPENAI_API_KEY=ollama`
-3. Health-check endpoint `/api/sandbox/llm-status` — пингует настроенную LLM, в шапке Песочницы зелёный/красный индикатор «LLM достижима»
-4. Связать `/api/sandbox/search` с реальным `ragu_service.search()` при `ragu_enabled=true` (сейчас всегда mock, даже при включённом флаге)
+### Storybook-альбом UI-компонентов
+RegulationHeader, CreateDialog, SliderRow, ModuleEditorDialog, AuditLogScreen — для быстрого визуального ревью без поднятия backend'а.
 
-**Тайминги (оценка):**
-- первичная индексация 10 регламентов: 1–2 минуты
-- LocalSearch query: ~2–4 сек
-- GlobalSearch query (сравнение, кросс-домены): ~10–20 сек
-
-**Tradeoff:** 16 GB unified memory впритык; параллельно с Claude Code и десятком Chrome-табов может уйти в swap. Перед индексацией стоит закрывать тяжёлое.
+### `docs/LOCAL_LLM.md`
+Уже есть Ollama-стек в продакшене, но нет связного doc-туториала. Step-by-step: `brew install ollama` → `ollama pull qwen2.5:7b-instruct-q4_K_M` → `ollama pull bge-m3` → правки в `.env`. Health-check endpoint `/api/sandbox/llm-status` уже есть.
 
 ---
 
-## 🧠 NER-обогащение через Natasha (русский NER без обучения)
+## 🚫 Снято / не делаем
 
-**Идея.** Дополнить rules-based извлечение параметров (numeric + unit) лёгким русским NER-слоем, который ловит `DATE / TIME / LAW / ORG / MONEY` — те классы, что наш regex-парсер игнорирует. Цель — автоматическая привязка регламента к нормативной базе («согласно ГОСТ 22270-2018», «ФЗ-261», «по СНиП 41-01») и извлечение периодичности («проверка каждые 30 минут», «не менее одного раза в смену»).
-
-**Почему Natasha, а не NEREL fine-tune.** Natasha — pip-пакет `pip install natasha`, pre-trained на русском, без GPU и без обучения. F1 ~80 на новостях, для наших технических текстов скорее всего сопоставимо или чуть ниже. Альтернатива (fine-tune `rubert-base-cased` на [NEREL](https://github.com/nerel-ds/NEREL) dataset) даёт +5 F1, но требует 2-4 GPU-часа и пайплайн обучения. Для MVP это лишнее.
-
-**Что делаем (за полдня):**
-1. `pip install natasha` в [backend/requirements.txt](../backend/requirements.txt).
-2. Новый сервис `backend/app/services/ner_temporal.py` — обёртка над `natasha.NamesExtractor` + `DatesExtractor` + регулярки на LAW (`ГОСТ \d`, `ФЗ-\d`, `СНиП [\d.-]+`).
-3. В [sandbox.extract_parameters](../backend/app/services/sandbox.py) — после числового извлечения, дополнительный проход NER, найденные `DATE/TIME/LAW` подцепляются как мета-атрибуты регламента:
-   - `validity_period: {from, to}` если есть date-диапазон
-   - `source_law_refs: [...]` массив строк
-   - `periodicity: "каждые 30 минут"` свободный текст
-4. UI: новая секция «Нормативные ссылки и сроки» в RegulationEditor рядом с параметрами.
-5. Тесты на 5-10 примеров из `Rules-Management.pdf`: ловим минимум ГОСТ-ссылки и временные периоды.
-
-**Если Natasha не зайдёт по качеству** — апгрейд через NEREL fine-tune `DeepPavlov/rubert-base-cased`. Это уже отдельная задача со своим GPU-бюджетом.
-
-**Чего НЕ делаем:** Natasha не помогает с `pressure / temperature / flowRate` — это останется на словаре стемов + regex. Natasha дополняет, не заменяет.
-
----
-
-## Документация / DX
-
-- Юнит-тесты на `templates.py` (сейчас покрыто только через `test_create_regulation.py`).
-- E2E тест на полный цикл создания: POST → GET → PUT → publish → archive → restore.
-- Storybook-альбом UI компонентов (RegulationHeader, CreateDialog, SliderRow, ...).
+- ~~«Зеркальный» режим вместо СИГМЫ~~ — стало нерелевантно после фикса 049/050 (запускается локально, СИГМА уже не нужна для демо).
+- ~~Авто-генератор регламентов из чистого RAGU без human-in-the-loop~~ — противоречит ключевому требованию объяснимости (§4.2.2 #4 ТЗ Фреймворка).

@@ -407,7 +407,17 @@ function DomainSection({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-800">{label}</h2>
+            {domain?.id ? (
+              <Link
+                to={`/domains/${encodeURIComponent(domain.id)}`}
+                className="text-sm font-semibold uppercase tracking-wide text-stone-800 hover:text-primary hover:underline"
+                title="Открыть сводку по домену — регламенты, модули, датчики"
+              >
+                {label}
+              </Link>
+            ) : (
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-stone-800">{label}</h2>
+            )}
             <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', v.chipBg, v.chipFg)}>
               {items.length}
             </span>
@@ -429,6 +439,14 @@ function DomainSection({
             <div className="mt-0.5 text-xs text-stone-500">{domain.hint}</div>
           )}
         </div>
+        {domain?.id && (
+          <Link
+            to={`/domains/${encodeURIComponent(domain.id)}`}
+            className="shrink-0 text-xs text-blue-700 hover:underline"
+          >
+            обзор домена →
+          </Link>
+        )}
       </header>
 
       <div className="grid grid-cols-1 gap-2">

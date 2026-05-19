@@ -625,6 +625,28 @@ export const api = {
         { method: 'DELETE' },
         z.object({ id: z.string(), status: z.string() }),
       ),
+    overview: (id: string) =>
+      request(
+        `/api/domains/${encodeURIComponent(id)}/overview`,
+        undefined,
+        z.any(),
+      ) as Promise<{
+        domain: { id: string; label: string; hint?: string; icon?: string | null; color?: string | null } | null
+        regulations: Array<Record<string, unknown>>
+        modules: Array<Record<string, unknown>>
+        sensor_subtypes: Array<{
+          subtype_id: string
+          class_id: string
+          label: string
+          description: string | null
+          module_id: string | null
+        }>
+        coverage: {
+          regulations_count: number
+          modules_count: number
+          sensor_subtypes_count: number
+        }
+      }>,
   },
   search: {
     query: (q: string, mode: 'local' | 'global' | 'naive' = 'local') =>

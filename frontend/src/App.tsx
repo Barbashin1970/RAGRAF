@@ -19,6 +19,7 @@ import { ModuleLibraryScreen } from '@/components/modules/ModuleLibraryScreen'
 import { AuditLogScreen } from '@/components/audit/AuditLogScreen'
 import { ExecuteScreen } from '@/components/execute/ExecuteScreen'
 import { RegulationExtractScreen } from '@/components/regulations/RegulationExtractScreen'
+import { DomainDetailScreen } from '@/components/domains/DomainDetailScreen'
 import { cn } from '@/lib/cn'
 
 function NavLink({ to, icon: Icon, label }: { to: string; icon: typeof Activity; label: string }) {
@@ -278,6 +279,7 @@ export default function App() {
           <Route path="/audit-log" element={<AuditLogScreen />} />
           <Route path="/execute" element={<ExecuteScreen />} />
           <Route path="/graph" element={<GraphView />} />
+          <Route path="/domains/:id" element={<DomainDetailScreen />} />
           <Route path="/twins" element={<TwinDesignerScreen />} />
           <Route path="/twins/:id" element={<TwinDesignerScreen />} />
           <Route path="/sandbox" element={<SandboxScreen />} />
