@@ -189,11 +189,22 @@ def reconcile_triggers_with_flow(
     for node in dsl.nodes:
         if node.type == "input" and node.paramRef:
             input_params[node.id] = (node.paramRef, node.label)
-    # Индекс sensor: input_id → sensor_subtype
-    sensor_by_input: dict[str, str] = {}
+    # Индекс sensor: input_id → (sensor_subtype, has_sensor).
+    # Раньше требовали sensorSubtype обязательно — это давало баг
+    # «дропнул пилюлю + привязал к input, но не выбрал подтип →
+    # триггера нет». Теперь любой sensor с bindsTo — это сигнал
+    # «вход питается от датчика»; sensor_subtype может быть None
+    # (юзер выбрал класс датчика, но не подтип) либо вообще
+    # отсутствовать (юзер просто привязал пилюлю и забыл).
+    # Fallback: если subtype не задан — используем sensorType
+    # (класс) как имя подтипа. Так trigger всё равно создаётся,
+    # видим в Edit/«Поля» и Turtle, юзер может уточнить subtype позже.
+    sensor_by_input: dict[str, str | None] = {}
     for node in dsl.nodes:
-        if node.type == "sensor" and node.bindsTo and node.sensorSubtype:
-            sensor_by_input[node.bindsTo] = node.sensorSubtype
+        if node.type != "sensor" or not node.bindsTo:
+            continue
+        subtype = node.sensorSubtype or node.sensorType or None
+        sensor_by_input[node.bindsTo] = subtype
 
     # Множество допустимых param_ref'ов: всё что есть в parameters + всё что
     # есть в flow inputs. Триггеры с param_ref вне этого множества — orphans,
@@ -209,7 +220,8 @@ def reconcile_triggers_with_flow(
     handled_param_refs: set[str] = set()
     for input_id, (param_ref, label) in input_params.items():
         handled_param_refs.add(param_ref)
-        explicit_subtype = sensor_by_input.get(input_id)
+        has_sensor_in_flow = input_id in sensor_by_input
+        explicit_subtype = sensor_by_input.get(input_id)  # может быть None если subtype не указан
         prior = existing_by_param.get(param_ref)
         if prior is not None:
             # Обновляем существующий триггер. Не затираем ручной ввод:
@@ -238,20 +250,27 @@ def reconcile_triggers_with_flow(
                 )
             )
         else:
-            # Новый триггер. Создаём ТОЛЬКО если sensor привязан в flow
-            # явно (sensor.bindsTo на этот input). Без явной привязки
-            # пользователь сам решит, какой источник нужен — иначе мы
-            # бы пре-заполнили триггеры эвристикой и засорили редактор.
-            if explicit_subtype is None:
+            # Новый триггер. Создаём только если на flow есть привязанный
+            # sensor (bindsTo указывает на этот input). sensor_subtype
+            # может быть None — это значит «sensor pill дроп'нута, но
+            # подтип ещё не выбран». Триггер всё равно создаём, чтобы
+            # юзер видел его в Edit/«Поля» и Turtle и мог уточнить
+            # подтип потом. Без этого был баг «дропнул пилюлю → сохранил
+            # → нигде не виден» (нашли в air-quality-smog-trap 2026-05-19).
+            if not has_sensor_in_flow:
                 continue
             out.append(
                 RegulationTrigger(
                     id=f"trig-{param_ref}",
                     label=label or param_ref,
                     param_ref=param_ref,
-                    sensor_subtype=explicit_subtype,
+                    sensor_subtype=explicit_subtype,  # может быть None
                     event_type=None,
-                    description="Создан из flow: sensor привязан явно",
+                    description=(
+                        "Создан из flow: sensor привязан явно"
+                        if explicit_subtype
+                        else "Создан из flow: sensor привязан, подтип не выбран"
+                    ),
                 )
             )
 
