@@ -69,22 +69,26 @@ fi
 
 if [ -f "$DUCKDB_FILE" ]; then
     echo "==> DuckDB integrity check: ${DUCKDB_FILE}"
-    # Probe — ТОЛЬКО read-only. Раньше делали write-roundtrip с UPDATE/COMMIT
-    # на parameters чтобы поймать повреждённый PRIMARY KEY index. Это давало
-    # **false-positive ротацию на каждый деплой** при transient COMMIT-ошибке
-    # (например, версия DuckDB чуть-чуть отличается между dev и prod) →
-    # файл ротировался в .broken-* → сид-блок копировал dev-snapshot
-    # поверх прод-данных → **цифровые двойники пользователя терялись**.
+    # Двухстадийный probe + двухстадийное recovery, чтобы при corruption WAL
+    # сохранить главный DB-файл и не терять закоммиченные данные пользователя.
     #
-    # Новая логика:
-    #   1) open + SELECT 1 — базовая читаемость.
-    #   2) CHECKPOINT — force-flush WAL, лечит transient несоответствия.
-    # БЕЗ write-probe. Если индексы повреждены при работе приложения, FastAPI
-    # сам обработает ошибку и вернёт 500 на конкретный запрос — это лучше
-    # чем тихо потерять данные. Crashes из-за SIGABRT в нативном DuckDB
-    # ловятся первым же `SELECT 1` (нативный crash происходит на read
-    # corrupted page, не на write).
-    if python -c "
+    # Раньше при ЛЮБОЙ ошибке открытия мы ротировали main + WAL вместе,
+    # потом init_db() пересоздавал БД из фикстур — **все twins / правки /
+    # audit пользователя терялись**. На Railway это видно из лога:
+    #   Failure while replaying WAL file ... GetDefaultDatabase
+    # — это типичный сценарий «контейнер убит SIGKILL в момент ALTER TABLE,
+    # WAL содержит partial-entry, при replay падает». Главный .duckdb при
+    # этом валиден; corrupted только WAL.
+    #
+    # Стратегия:
+    #   1. open + SELECT 1 + CHECKPOINT — если ок, ничего не делаем.
+    #   2. Если ошибка И есть WAL — ротируем ТОЛЬКО WAL, retry open.
+    #   3. Если retry прошёл — данные сохранены (минус незакоммиченные
+    #      транзакции, которые лежали в WAL).
+    #   4. Если retry тоже упал — главный файл реально битый, ротируем его
+    #      (последнее средство, данные теряются).
+    probe_db() {
+        python -c "
 import duckdb, sys
 try:
     c = duckdb.connect('${DUCKDB_FILE}')
@@ -98,17 +102,30 @@ try:
 except Exception as e:
     print(f'duckdb probe failed: {type(e).__name__}: {e}', file=sys.stderr)
     sys.exit(1)
-" 2>&1; then
+" 2>&1
+    }
+
+    if probe_db; then
         echo "==> DuckDB OK (read + checkpoint)"
     else
-        EXIT_CODE=$?
         TS=$(date +%s)
-        echo "==> WARN: DuckDB-файл повреждён (exit ${EXIT_CODE} — SIGABRT=134/SIGSEGV=139/Python=1) — ротируем в .broken-${TS}"
-        mv "${DUCKDB_FILE}" "${DUCKDB_FILE}.broken-${TS}" 2>/dev/null || true
         if [ -f "${DUCKDB_FILE}.wal" ]; then
+            echo "==> WARN: open упал, есть WAL — пробуем стратегию «WAL-only recovery»"
+            echo "==> WAL → ${DUCKDB_FILE}.wal.broken-${TS} (главный файл оставляем)"
             mv "${DUCKDB_FILE}.wal" "${DUCKDB_FILE}.wal.broken-${TS}" 2>/dev/null || true
+            if probe_db; then
+                echo "==> ✓ Главный DB-файл валиден — данные пользователя сохранены"
+                echo "==> (потеряны только незакоммиченные транзакции из удалённого WAL)"
+            else
+                echo "==> ✗ Главный DB-файл тоже повреждён — ротируем в .broken-${TS}"
+                mv "${DUCKDB_FILE}" "${DUCKDB_FILE}.broken-${TS}" 2>/dev/null || true
+                echo "==> init_db() пересоздаст БД из фикстур (twins/правки пользователя потеряны)"
+            fi
+        else
+            echo "==> WARN: open упал, WAL отсутствует — главный файл повреждён"
+            mv "${DUCKDB_FILE}" "${DUCKDB_FILE}.broken-${TS}" 2>/dev/null || true
+            echo "==> init_db() пересоздаст БД из фикстур (twins/правки пользователя потеряны)"
         fi
-        echo "==> ротация выполнена; init_db() сейчас создаст свежий файл из фикстур"
     fi
 fi
 

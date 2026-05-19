@@ -9,6 +9,32 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  build: {
+    // Поднимаем порог чтобы Vite не ругался — основной чанк ниже 500kB
+    // после splitting, но vendor-чанки крупных библиотек (cytoscape, reactflow)
+    // выйдут за порог. Это OK — они lazy-loaded и кэшируются браузером
+    // после первого захода.
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        // Разделяем bundle на логические чанки чтобы:
+        //   1) Initial load был минимальным (~150-200kB вместо 1.4MB) —
+        //      пользователь видит landing/список регламентов мгновенно.
+        //   2) Тяжёлые libs (reactflow, cytoscape) лоадились ТОЛЬКО при
+        //      входе в редактор потока / граф связей.
+        //   3) Vendor-чанки кэшировались между деплоями — изменение app-кода
+        //      не инвалидирует кэш react/react-dom/lucide.
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'query-vendor': ['@tanstack/react-query'],
+          'flow-vendor': ['reactflow'],
+          'cytoscape-vendor': ['cytoscape', 'cytoscape-cola'],
+          'dnd-vendor': ['@dnd-kit/core', '@dnd-kit/sortable'],
+          'icons-vendor': ['lucide-react'],
+        },
+      },
+    },
+  },
   server: {
     port: Number(process.env.VITE_PORT) || 5173,
     proxy: {

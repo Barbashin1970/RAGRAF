@@ -42,6 +42,20 @@ async def lifespan(_: FastAPI):
     except Exception as e:
         print(f"[lifespan] demo documents seed failed: {e}")
     yield
+    # ── Graceful shutdown: flush WAL ───────────────────────────────────
+    # Critical для Railway: SIGTERM на редеплой → uvicorn пытается выйти
+    # gracefully. Если WAL содержит uncommitted ALTER TABLE / INSERT,
+    # на следующем старте `duckdb.connect()` сегфолтится при replay
+    # (см. лог: «Failure while replaying WAL file ... GetDefaultDatabase»).
+    # Явный CHECKPOINT перед exit'ом форсит флаш всех transactions
+    # в главный файл и удаляет WAL — следующий старт открывается без
+    # replay-фазы → нет шанса на corruption.
+    try:
+        c = regulation_store._connection()
+        c.execute("CHECKPOINT")
+        print("[lifespan] CHECKPOINT on shutdown — WAL flushed")
+    except Exception as e:
+        print(f"[lifespan] CHECKPOINT on shutdown failed (non-fatal): {e}")
 
 
 TAGS_METADATA = [
