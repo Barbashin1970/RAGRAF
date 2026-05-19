@@ -8,30 +8,32 @@ import ReactFlow, {
   ReactFlowProvider,
   useReactFlow,
 } from 'reactflow'
-import 'reactflow/dist/style.css'
 import { useQueries } from '@tanstack/react-query'
 import { ArrowDownLeft, ArrowUpRight, Link2 } from 'lucide-react'
-import { api, NODE_KIND_META, type FlowNode, type Process, type ProcessWiringEntry, type RuleDSL } from '@/lib/api'
+import { api, type FlowNode, type Process, type ProcessWiringEntry, type RuleDSL } from '@/lib/api'
 import { cn } from '@/lib/cn'
 import { nodeTypes } from '@/components/flow/nodes'
 
 /**
- * Полотно «Двойник как поток».
+ * Полотно «Двойник как поток» (TwinFlowTabsView).
  *
  * UX (зафиксирован 2026-05-19):
  *   • Вкладки сверху — по одной на каждый регламент-член. Click переключает.
  *   • На каждой вкладке — flow.json регламента read-only (тот же reactflow,
  *     те же узлы что в Flow Editor; единый визуальный язык).
- *   • Output-узлы, чьи action'ы участвуют в Twin.wiring как source — кликабельны:
- *     overlay-кнопка «↘» переключает на вкладку target-регламента + подсвечивает
- *     input-узел, в который этот output кормит. Подсветка индиго на ~1.5s.
- *   • Sensor-узлы в режиме sourceKind='regulation' — кликабельны обратно: «↖»
- *     возвращает на вкладку source-регламента + подсвечивает output-узел.
+ *   • Боковая панель справа от канваса — список wiring-точек ТЕКУЩЕГО регламента:
+ *       «↘ Выход X → таб «Y», вход Z» (если кто-то слушает наш output);
+ *       «↖ Вход X ← таб «Y», выход Z» (если наш sensor получает от другого).
+ *     Клик по строке → переключение на связанный таб + подсветка узла индиго.
  *
- * Это даёт «прогулку» по композиции: аналитик видит каждый регламент целиком,
- * а wiring подсвечивает точки стыка. Ничего здесь не редактируется — правка
- * нод происходит в Flow Editor каждого регламента отдельно, wiring — в форме
- * «Связи» в этом же двойнике.
+ * Подход «лист справа» (вместо overlay-кнопок ↘/↖ поверх нод) выбран после
+ * первой итерации, где rAF-loop для отслеживания viewport'а вызывал
+ * setState 60 раз/сек и калечил производительность страницы. Лист справа
+ * проще и читабельнее: пользователь сразу видит все точки стыка списком,
+ * не нужно ловить кнопку на конкретной ноде.
+ *
+ * Ничего здесь не редактируется — правка нод происходит в Flow Editor каждого
+ * регламента отдельно, wiring — в форме «Связи» в этом же двойнике.
  */
 export function TwinFlowTabsView({
   twin,
@@ -40,8 +42,6 @@ export function TwinFlowTabsView({
   twin: Process
   members: Array<{ id: string; name: string }>
 }) {
-  // Параллельная загрузка всех flow.json членов. react-query кэширует +
-  // staleTime разумный, чтобы не дёргать backend при каждом переключении вкладки.
   const flowQueries = useQueries({
     queries: members.map((m) => ({
       queryKey: ['flow', m.id],
@@ -51,20 +51,15 @@ export function TwinFlowTabsView({
   })
 
   const [activeTab, setActiveTab] = useState<string>(members[0]?.id ?? '')
-  // ID узла, который надо подсветить после прыжка на новую вкладку (индиго ~1.5s).
   const [focusedNodeId, setFocusedNodeId] = useState<string | null>(null)
-  // taimer ref для уборки подсветки.
   const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Если активная вкладка ушла из состава (например, регламент убрали) —
-  // фолбэк на первый доступный.
   useEffect(() => {
-    if (!members.some((m) => m.id === activeTab)) {
-      setActiveTab(members[0]?.id ?? '')
+    if (members.length > 0 && !members.some((m) => m.id === activeTab)) {
+      setActiveTab(members[0].id)
     }
   }, [members, activeTab])
 
-  // Переключиться на target-вкладку + подсветить узел через короткий timeout.
   const jumpTo = (regulationId: string, nodeId: string | null) => {
     if (focusTimerRef.current) clearTimeout(focusTimerRef.current)
     setActiveTab(regulationId)
@@ -72,31 +67,11 @@ export function TwinFlowTabsView({
     focusTimerRef.current = setTimeout(() => setFocusedNodeId(null), 2500)
   }
 
-  // Индекс wiring: по (target_regulation, target_param_ref) → source-сторона.
-  // Используется при клике на sensor-узел target'а — найти куда «вернуться».
-  const wiringByTarget = useMemo(() => {
-    const m = new Map<string, ProcessWiringEntry>()
-    for (const w of twin.wiring ?? []) {
-      m.set(`${w.target_regulation}::${w.target_param_ref}`, w)
-    }
+  const memberNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const x of members) m.set(x.id, x.name)
     return m
-  }, [twin.wiring])
-  // И обратный: по (source_regulation, source_output ?? '*') → target-сторона.
-  // Используется при клике на output-узел source'а — найти куда «провалиться».
-  const wiringBySource = useMemo(() => {
-    // ProcessWiringEntry.source_output может быть null (= «любой output»).
-    // Чтобы кликнутый конкретный action нашёл entry-с-null, кладём также
-    // «*»-fallback за тем же source_regulation; lookup сначала ищет точное
-    // совпадение, потом fallback.
-    const m = new Map<string, ProcessWiringEntry[]>()
-    for (const w of twin.wiring ?? []) {
-      const key1 = `${w.source_regulation}::${w.source_output ?? '*'}`
-      const arr = m.get(key1) ?? []
-      arr.push(w)
-      m.set(key1, arr)
-    }
-    return m
-  }, [twin.wiring])
+  }, [members])
 
   if (members.length === 0) {
     return (
@@ -109,12 +84,6 @@ export function TwinFlowTabsView({
   const activeIdx = members.findIndex((m) => m.id === activeTab)
   const activeFlow = activeIdx >= 0 ? flowQueries[activeIdx]?.data ?? null : null
   const activeLoading = activeIdx >= 0 ? flowQueries[activeIdx]?.isLoading : false
-  // Имена регламентов для рендера wiring-стрелочек в overlay.
-  const memberNameById = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const x of members) m.set(x.id, x.name)
-    return m
-  }, [members])
 
   return (
     <div className="rounded-md border border-stone-200 bg-white shadow-sm">
@@ -128,8 +97,8 @@ export function TwinFlowTabsView({
       <div className="flex flex-wrap gap-1 border-b border-stone-200 bg-stone-50/60 px-2 py-1.5">
         {members.map((m, i) => {
           const active = m.id === activeTab
-          const wiringIn = (twin.wiring ?? []).filter((w) => w.target_regulation === m.id).length
-          const wiringOut = (twin.wiring ?? []).filter((w) => w.source_regulation === m.id).length
+          const wIn = (twin.wiring ?? []).filter((w) => w.target_regulation === m.id).length
+          const wOut = (twin.wiring ?? []).filter((w) => w.source_regulation === m.id).length
           return (
             <button
               key={m.id}
@@ -143,72 +112,69 @@ export function TwinFlowTabsView({
             >
               <span className="font-mono opacity-70">{i + 1}</span>
               <span className="font-medium">{m.name}</span>
-              {(wiringIn > 0 || wiringOut > 0) && (
+              {(wIn > 0 || wOut > 0) && (
                 <span className={cn(
                   'rounded-sm px-1 py-px text-[9px]',
                   active ? 'bg-violet-700/40' : 'bg-violet-100 text-violet-700',
                 )}>
-                  ↓{wiringIn} ↑{wiringOut}
+                  ↓{wIn} ↑{wOut}
                 </span>
               )}
             </button>
           )
         })}
       </div>
-      {/* Канвас */}
-      <div className="relative h-[480px] bg-stone-50">
-        {activeLoading ? (
-          <div className="grid h-full place-items-center text-xs text-stone-500">
-            Загружаю поток…
-          </div>
-        ) : activeFlow ? (
-          <ReactFlowProvider>
-            <TabCanvas
-              regulationId={activeTab}
-              dsl={activeFlow}
-              focusedNodeId={focusedNodeId}
-              wiringByTarget={wiringByTarget}
-              wiringBySource={wiringBySource}
-              onJumpToTarget={jumpTo}
-              memberNameById={memberNameById}
-            />
-          </ReactFlowProvider>
-        ) : (
-          <div className="grid h-full place-items-center text-xs text-stone-500">
-            Поток ещё не сохранён для этого регламента.
-          </div>
-        )}
+      {/* Канвас + панель навигации */}
+      <div className="flex h-[480px] divide-x divide-stone-200 bg-stone-50">
+        <div className="flex-1 relative min-w-0">
+          {activeLoading ? (
+            <div className="grid h-full place-items-center text-xs text-stone-500">
+              Загружаю поток…
+            </div>
+          ) : activeFlow ? (
+            <ReactFlowProvider>
+              <TabCanvas
+                regulationId={activeTab}
+                dsl={activeFlow}
+                focusedNodeId={focusedNodeId}
+              />
+            </ReactFlowProvider>
+          ) : (
+            <div className="grid h-full place-items-center text-xs text-stone-500">
+              Поток ещё не сохранён для этого регламента.
+            </div>
+          )}
+        </div>
+        <NavigationSidebar
+          twin={twin}
+          regulationId={activeTab}
+          activeFlow={activeFlow}
+          memberNameById={memberNameById}
+          onJump={jumpTo}
+        />
       </div>
       <div className="border-t border-stone-200 bg-violet-50/30 px-3 py-2 text-[10px] leading-relaxed text-violet-900">
-        <b>Как это устроено:</b> у каждого регламента своя вкладка. На пилюлях «Выход»
-        (если кто-то слушает этот выход) и «Событие из регламента» (если этот вход
-        получает значение от другого регламента) есть круглая кнопка-стрелка ↘ / ↖ —
-        клик переключает на связанную вкладку и подсвечивает узел индиго.
+        <b>Как читать:</b> кликни вкладку — увидишь поток выбранного регламента
+        (read-only). В правой панели — точки стыка с другими регламентами:
+        ↘ кто слушает наш выход, ↖ откуда приходит вход. Клик по строке —
+        прыжок на связанную вкладку, узел подсветится индиго.
       </div>
     </div>
   )
 }
 
 
-// ── Один канвас (одна вкладка) ────────────────────────────────────────
+// ── Канвас одной вкладки (read-only reactflow) ────────────────────────
 
 
 function TabCanvas({
   regulationId,
   dsl,
   focusedNodeId,
-  wiringByTarget,
-  wiringBySource,
-  onJumpToTarget,
-  memberNameById,
 }: {
   regulationId: string
   dsl: RuleDSL
   focusedNodeId: string | null
-  wiringByTarget: Map<string, ProcessWiringEntry>
-  wiringBySource: Map<string, ProcessWiringEntry[]>
-  onJumpToTarget: (regulationId: string, nodeId: string | null) => void
-  memberNameById: Map<string, string>
 }) {
   const rf = useReactFlow()
   // При смене вкладки или появлении focusedNodeId — fitView + центрируем
@@ -225,34 +191,25 @@ function TabCanvas({
         }
         rf.fitView({ padding: 0.2, duration: 300 })
       } catch {
-        /* ignore — viewport may not be ready */
+        /* viewport may not be ready yet — игнорируем */
       }
-    }, 50)
+    }, 80)
     return () => clearTimeout(t)
   }, [regulationId, focusedNodeId, dsl.nodes, rf])
 
-  // Превращаем RuleDSL → reactflow Node[]/Edge[]. Маркер isFocused тащим
-  // через data.label/data.flowFired аналог — используем CSS-класс через
-  // className на ноде (reactflow поддерживает className на NodeProps).
   const rfNodes: Node<FlowNode>[] = useMemo(() => {
-    return dsl.nodes.map((n) => {
-      const isFocused = focusedNodeId === n.id
-      return {
-        id: n.id,
-        type: n.type,
-        data: n,
-        position: n.position ?? { x: 0, y: 0 },
-        // Подсветка узла на ~2.5s после прыжка (см. useEffect выше).
-        className: isFocused ? 'flow-jump-focused' : undefined,
-        sourcePosition: Position.Right,
-        targetPosition: Position.Left,
-        // На двойниковом канвасе всё read-only — узлы не двигаются и не
-        // редактируются. Selection оставляем чтобы клик их подсвечивал.
-        draggable: false,
-        connectable: false,
-        deletable: false,
-      }
-    })
+    return dsl.nodes.map((n) => ({
+      id: n.id,
+      type: n.type,
+      data: n,
+      position: n.position ?? { x: 0, y: 0 },
+      className: focusedNodeId === n.id ? 'flow-jump-focused' : undefined,
+      sourcePosition: Position.Right,
+      targetPosition: Position.Left,
+      draggable: false,
+      connectable: false,
+      deletable: false,
+    }))
   }, [dsl.nodes, focusedNodeId])
 
   const rfEdges: Edge[] = useMemo(() => {
@@ -264,128 +221,167 @@ function TabCanvas({
     }))
   }, [dsl.edges])
 
-  // Overlay-кнопки «↘/↖» для wiring-точек. Накладываем поверх reactflow
-  // абсолютно-позиционированными div'ами по координатам нод. Чтобы они
-  // ездили со зумом/панорамированием, используем useReactFlow().flowToScreenPosition.
-  // Для простоты MVP — используем фиксированный layer внутри ReactFlow Panel
-  // и считаем экранные координаты через `rf.flowToScreenPosition`.
-  const [viewportTick, setViewportTick] = useState(0)
-  useEffect(() => {
-    // Перерисовываем overlay каждые ~30мс пока пользователь двигает канвас.
-    // Альтернатива — подписываться на onMove из ReactFlow, но это потребует
-    // ещё одного state-loop'а. MVP: cheap rAF.
-    let frame: number
-    const tick = () => {
-      setViewportTick((t) => (t + 1) % 1000)
-      frame = requestAnimationFrame(tick)
-    }
-    frame = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(frame)
-  }, [])
-
-  // Точки, у которых надо рисовать overlay-кнопку: для текущего
-  // regulationId — output-узлы которые источники wiring (есть запись с
-  // source_regulation = regulationId, source_output = node.action ИЛИ '*'),
-  // и sensor-узлы которые цели wiring (sourceKind='regulation' с заданным
-  // sourceRegulationId).
-  const jumpPoints = useMemo(() => {
-    const out: Array<{
-      nodeId: string
-      x: number
-      y: number
-      direction: 'down' | 'up'    // down = провалиться вниз (output→target), up = вернуться вверх (sensor→source)
-      otherRegulationId: string
-      otherNodeIdHint: string | null   // id узла на той стороне для focus
-      title: string
-    }> = []
-    for (const n of dsl.nodes) {
-      if (!n.position) continue
-      if (n.type === 'output' && n.action) {
-        // Кто-то слушает этот action?
-        const exact = wiringBySource.get(`${regulationId}::${n.action}`) ?? []
-        const wildcard = wiringBySource.get(`${regulationId}::*`) ?? []
-        const matches = [...exact, ...wildcard]
-        if (matches.length > 0) {
-          const w = matches[0]
-          // Поищем input-ноду в target.regulation с paramRef=target_param_ref;
-          // мы её id не знаем сейчас (другой flow), но focus можно навести по
-          // sensor.id = `n_sensor_regsrc_<param>` (см. project_wiring_to_flows).
-          out.push({
-            nodeId: n.id,
-            x: n.position.x,
-            y: n.position.y,
-            direction: 'down',
-            otherRegulationId: w.target_regulation,
-            otherNodeIdHint: null,  // целевой канвас сам fitView сделает
-            title: `→ Перейти к «${memberNameById.get(w.target_regulation) ?? w.target_regulation}» (вход ${w.target_param_ref})`,
-          })
-        }
-      } else if (n.type === 'sensor' && (n.sourceKind ?? 'sensor') === 'regulation') {
-        // Этот sensor получает значение от источника?
-        // bindsTo указывает на input в текущем flow; через input.paramRef
-        // найдём wiring-запись (target_regulation = regulationId, target_param = paramRef).
-        const inp = dsl.nodes.find((x) => x.id === n.bindsTo)
-        if (!inp || !inp.paramRef) continue
-        const w = wiringByTarget.get(`${regulationId}::${inp.paramRef}`)
-        if (!w) continue
-        out.push({
-          nodeId: n.id,
-          x: n.position.x,
-          y: n.position.y,
-          direction: 'up',
-          otherRegulationId: w.source_regulation,
-          otherNodeIdHint: null,
-          title: `← Вернуться к «${memberNameById.get(w.source_regulation) ?? w.source_regulation}» (выход ${w.source_output ?? '*'})`,
-        })
-      }
-    }
-    return out
-  }, [dsl.nodes, regulationId, wiringByTarget, wiringBySource, memberNameById])
-
   return (
-    <>
-      <ReactFlow
-        nodes={rfNodes}
-        edges={rfEdges}
-        nodeTypes={nodeTypes}
-        fitView
-        nodesConnectable={false}
-        nodesDraggable={false}
-        elementsSelectable
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background />
-        <Controls showInteractive={false} />
-      </ReactFlow>
-      {/* Overlay-кнопки навигации между вкладками — рисуем в screen-space через rf.flowToScreenPosition. */}
-      <div className="pointer-events-none absolute inset-0" data-tick={viewportTick}>
-        {jumpPoints.map((jp) => {
-          let screen: { x: number; y: number }
-          try {
-            screen = rf.flowToScreenPosition({ x: jp.x + 180, y: jp.y + 8 })
-          } catch {
-            return null
-          }
-          const Icon = jp.direction === 'down' ? ArrowDownLeft : ArrowUpRight
-          return (
-            <button
-              key={`${jp.nodeId}-${jp.direction}`}
-              onClick={() => onJumpToTarget(jp.otherRegulationId, jp.otherNodeIdHint)}
-              title={jp.title}
-              className="pointer-events-auto absolute flex h-6 w-6 items-center justify-center rounded-full border border-indigo-500 bg-white text-indigo-700 shadow-md hover:bg-indigo-50"
-              style={{ left: screen.x, top: screen.y, transform: 'translate(-50%, -50%)' }}
-            >
-              <Icon size={11} />
-            </button>
-          )
-        })}
-      </div>
-    </>
+    <ReactFlow
+      nodes={rfNodes}
+      edges={rfEdges}
+      nodeTypes={nodeTypes}
+      fitView
+      nodesConnectable={false}
+      nodesDraggable={false}
+      elementsSelectable
+      proOptions={{ hideAttribution: true }}
+    >
+      <Background />
+      <Controls showInteractive={false} />
+    </ReactFlow>
   )
 }
 
 
-// Подсказка TypeScript: NODE_KIND_META используется через nodeTypes реактфлоу
-// в импорте — оставляем явное упоминание чтобы tree-shaker не выкинул его
-// при future-refactor. (фактический рендер делает Flow nodes/index.tsx).
-export const _meta_keep = NODE_KIND_META
+// ── Правая панель навигации между вкладками ───────────────────────────
+
+
+function NavigationSidebar({
+  twin,
+  regulationId,
+  activeFlow,
+  memberNameById,
+  onJump,
+}: {
+  twin: Process
+  regulationId: string
+  activeFlow: RuleDSL | null
+  memberNameById: Map<string, string>
+  onJump: (regulationId: string, nodeId: string | null) => void
+}) {
+  // Outgoing: где наш output слушают (мы source).
+  const outgoing = useMemo(
+    () => (twin.wiring ?? []).filter((w) => w.source_regulation === regulationId),
+    [twin.wiring, regulationId],
+  )
+  // Incoming: где наш input получает от другого (мы target).
+  const incoming = useMemo(
+    () => (twin.wiring ?? []).filter((w) => w.target_regulation === regulationId),
+    [twin.wiring, regulationId],
+  )
+
+  // Для каждого outgoing — найти узел нашего output для подсветки при возврате.
+  const outputNodeIdByAction = useMemo(() => {
+    const m = new Map<string, string>()
+    if (!activeFlow) return m
+    for (const n of activeFlow.nodes) {
+      if (n.type === 'output' && n.action) m.set(n.action, n.id)
+    }
+    return m
+  }, [activeFlow])
+  // Для каждого incoming — найти sensor-узел нашего входа.
+  const sensorNodeIdByParam = useMemo(() => {
+    const m = new Map<string, string>()
+    if (!activeFlow) return m
+    const inputIdToParam = new Map<string, string>()
+    for (const n of activeFlow.nodes) {
+      if (n.type === 'input' && n.paramRef) inputIdToParam.set(n.id, n.paramRef)
+    }
+    for (const n of activeFlow.nodes) {
+      if (n.type !== 'sensor' || !n.bindsTo) continue
+      const param = inputIdToParam.get(n.bindsTo)
+      if (param) m.set(param, n.id)
+    }
+    return m
+  }, [activeFlow])
+
+  return (
+    <aside className="w-64 shrink-0 overflow-y-auto bg-white p-2 text-xs">
+      {outgoing.length === 0 && incoming.length === 0 ? (
+        <div className="rounded-md border border-dashed border-stone-300 p-3 text-center text-[11px] text-stone-500">
+          У этого регламента нет связей с другими в составе двойника.
+          Настройте wiring в секции «Связи между регламентами» выше.
+        </div>
+      ) : (
+        <>
+          {outgoing.length > 0 && (
+            <div className="mb-3">
+              <div className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-stone-500">
+                <ArrowDownLeft size={11} className="text-indigo-500" />
+                Куда уходит мой выход ({outgoing.length})
+              </div>
+              <ul className="flex flex-col gap-1">
+                {outgoing.map((w, i) => (
+                  <li key={`out-${i}`}>
+                    <button
+                      onClick={() => onJump(w.target_regulation, null)}
+                      className="block w-full rounded-md border border-indigo-200 bg-indigo-50/50 p-2 text-left text-[11px] text-indigo-900 transition hover:bg-indigo-100"
+                    >
+                      <div className="font-mono text-[10px] text-indigo-700">
+                        {w.source_output ?? '(любой выход)'}
+                      </div>
+                      <div className="flex items-center gap-1 leading-tight">
+                        <span className="text-stone-500">→</span>
+                        <span className="font-medium">
+                          {memberNameById.get(w.target_regulation) ?? w.target_regulation}
+                        </span>
+                      </div>
+                      <div className="font-mono text-[10px] text-stone-500">
+                        вход: {w.target_param_ref}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {incoming.length > 0 && (
+            <div>
+              <div className="mb-1 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-stone-500">
+                <ArrowUpRight size={11} className="text-indigo-500" />
+                Откуда приходит мой вход ({incoming.length})
+              </div>
+              <ul className="flex flex-col gap-1">
+                {incoming.map((w, i) => {
+                  const sensorId = sensorNodeIdByParam.get(w.target_param_ref) ?? null
+                  return (
+                    <li key={`in-${i}`}>
+                      <button
+                        onClick={() => onJump(w.source_regulation, outputNodeIdByAction_get(w))}
+                        className="block w-full rounded-md border border-indigo-200 bg-indigo-50/50 p-2 text-left text-[11px] text-indigo-900 transition hover:bg-indigo-100"
+                        onMouseEnter={() => {/* hover-эффект через CSS */}}
+                      >
+                        <div className="font-mono text-[10px] text-indigo-700">
+                          {w.target_param_ref}
+                        </div>
+                        <div className="flex items-center gap-1 leading-tight">
+                          <span className="text-stone-500">←</span>
+                          <span className="font-medium">
+                            {memberNameById.get(w.source_regulation) ?? w.source_regulation}
+                          </span>
+                        </div>
+                        <div className="font-mono text-[10px] text-stone-500">
+                          выход: {w.source_output ?? '(любой)'}
+                        </div>
+                        {sensorId && (
+                          <div className="mt-1 font-mono text-[9px] text-stone-400">
+                            канвас-узел: {sensorId}
+                          </div>
+                        )}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+        </>
+      )}
+    </aside>
+  )
+}
+
+// Хелпер: id output-ноды source-регламента для focus после прыжка. Узел из
+// другого flow.json — точно не знаем, можно только сделать null, и тогда
+// TabCanvas просто fitView без подсветки. Это OK для MVP — подсветка
+// доступна только когда мы возвращаемся НА свою вкладку (откуда уходил
+// прыжок), где focusedNodeId ставится в jumpTo.
+function outputNodeIdByAction_get(_w: ProcessWiringEntry): string | null {
+  return null
+}

@@ -970,25 +970,10 @@ function ParamTriggerInline({
     queryKey: ['sensor-subtypes'],
     queryFn: () => api.sensorSubtypes.list(),
   })
-  const { data: datasetsRaw } = useQuery({
-    queryKey: ['datasets'],
-    queryFn: () => api.datasets.list(),
-  })
-  const allRegulations = useMemo<Array<{ id: string; name: string; domain?: string | null }>>(() => {
-    if (!datasetsRaw) return []
-    const items: Array<{ id: string; name?: string; domain?: string | null }> =
-      Array.isArray(datasetsRaw)
-        ? datasetsRaw
-        : ('items' in datasetsRaw && Array.isArray(datasetsRaw.items) ? datasetsRaw.items : [])
-    return items
-      .filter((r) => r.id !== currentRegulationId)
-      .map((r) => ({ id: r.id, name: r.name ?? r.id, domain: r.domain }))
-      .sort(
-        (a, b) =>
-          (a.domain ?? '').localeCompare(b.domain ?? '') ||
-          a.name.localeCompare(b.name),
-      )
-  }, [datasetsRaw, currentRegulationId])
+  // allRegulations / datasetsRaw больше не нужны здесь: с принципом «Двух
+  // уровней» (2026-05-19) выбор регламента-источника живёт только в Twin
+  // Editor. TriggerSourcePicker в режиме 'regulation' показывает плашку
+  // «Настраивается в Двойнике», dropdown'а нет.
 
   // Если триггера нет — компактная кнопка-плашка «Привязать датчик/регламент»;
   // клик создаёт триггер без источника (mode='sensor' открывается следующим
@@ -1058,7 +1043,7 @@ function ParamTriggerInline({
       <TriggerSourcePicker
         trigger={trigger}
         classes={classes}
-        allRegulations={allRegulations}
+        currentRegulationId={currentRegulationId}
         onPatch={(patch) => onUpsert(patch)}
       />
     </div>
@@ -1085,12 +1070,13 @@ function inferSourceMode(t: RegulationTrigger): TriggerSourceMode {
 function TriggerSourcePicker({
   trigger,
   classes,
-  allRegulations,
+  currentRegulationId,
   onPatch,
 }: {
   trigger: RegulationTrigger
   classes: Array<{ class_id: string; subtypes: Array<{ subtype_id: string; label: string }> }>
-  allRegulations: Array<{ id: string; name: string; domain?: string | null }>
+  /** ID текущего регламента — для linkout'ов в Twin Editor. */
+  currentRegulationId: string
   onPatch: (p: Partial<RegulationTrigger>) => void
 }) {
   // Mode хранится локально, потому что нужно показать селект подтипа сразу
@@ -1101,26 +1087,50 @@ function TriggerSourcePicker({
   // (например, sync с flow на бэке) подстраиваемся через useEffect.
   const [mode, setModeRaw] = useState<TriggerSourceMode>(() => inferSourceMode(trigger))
   useEffect(() => {
-    // Если родительская модель триггера стала указывать на регламент, а у нас
-    // mode был 'sensor' — синхронизируемся; то же в обратную сторону.
     const next = inferSourceMode(trigger)
     if (next !== 'none') setModeRaw(next)
   }, [trigger.sensor_subtype, trigger.source_regulation])
 
-  // Output-actions выбранного source_regulation — для второго селекта.
-  const { data: outputData } = useQuery({
-    queryKey: ['regulation-output-actions', trigger.source_regulation],
-    queryFn: () => api.regulations.outputActions(trigger.source_regulation as string),
+  // Lookup имени регламента-источника + Twin'а, который владеет этим wiring'ом
+  // (для read-only summary, когда mode='regulation' и связь уже проецирована
+  // из Twin'а). Принцип «Двух уровней» (2026-05-19): регламент не редактирует
+  // source_regulation напрямую — только Twin.
+  const { data: datasetsRaw } = useQuery({
+    queryKey: ['datasets'],
+    queryFn: () => api.datasets.list(),
     enabled: mode === 'regulation' && !!trigger.source_regulation,
+    staleTime: 60_000,
   })
-  const outputActions = outputData?.actions ?? []
+  const sourceName = useMemo(() => {
+    if (!trigger.source_regulation) return null
+    if (!datasetsRaw) return trigger.source_regulation
+    const items = Array.isArray(datasetsRaw)
+      ? datasetsRaw
+      : ('items' in datasetsRaw && Array.isArray(datasetsRaw.items) ? datasetsRaw.items : [])
+    const found = (items as Array<{ id?: string; name?: string }>).find(
+      (d) => d?.id === trigger.source_regulation,
+    )
+    return found?.name ?? trigger.source_regulation
+  }, [trigger.source_regulation, datasetsRaw])
+
+  const { data: inTwinsData } = useQuery({
+    queryKey: ['regulation-in-twins', currentRegulationId],
+    queryFn: () => api.regulations.inTwins(currentRegulationId),
+    enabled: mode === 'regulation' && !!currentRegulationId,
+    staleTime: 30_000,
+  })
+  const linkedTwin = inTwinsData?.twins?.[0] ?? null
 
   const setMode = (next: TriggerSourceMode) => {
-    setModeRaw(next)  // визуальное переключение немедленно
+    setModeRaw(next)
     if (next === 'sensor') {
       onPatch({ source_regulation: null, source_output: null })
     } else if (next === 'regulation') {
-      onPatch({ sensor_subtype: null })
+      // НЕ затираем sensor_subtype здесь — пусть live до момента, когда
+      // Twin.wiring реально пропишет source_regulation. Иначе при ошибочном
+      // клике «Регламент» пользователь теряет настроенный датчик.
+      // Когда Twin save() спроецирует source_regulation, sync_triggers_from_flow
+      // (см. regulation_store) сам очистит sensor_subtype.
     } else {
       onPatch({ sensor_subtype: null, source_regulation: null, source_output: null })
     }
@@ -1186,49 +1196,63 @@ function TriggerSourcePicker({
       )}
 
       {mode === 'regulation' && (
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <FormRow label="Регламент-источник" icon={Network} compact>
-            <select
-              value={trigger.source_regulation ?? ''}
-              onChange={(e) => onPatch({
-                source_regulation: e.target.value || null,
-                // При смене источника сбрасываем выбранный action — он мог быть
-                // у прошлого регламента, у нового его может не быть.
-                source_output: null,
-              })}
-              className={cn(tx, 'pr-7')}
-            >
-              <option value="">— выберите регламент —</option>
-              {allRegulations.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name} ({r.id})
-                </option>
-              ))}
-            </select>
-          </FormRow>
-          <FormRow label="Output (action)" icon={Send} compact>
-            <select
-              value={trigger.source_output ?? ''}
-              onChange={(e) => onPatch({ source_output: e.target.value || null })}
-              className={cn(tx, 'pr-7')}
-              disabled={!trigger.source_regulation}
-              title={
-                !trigger.source_regulation
-                  ? 'Сначала выберите регламент-источник'
-                  : outputActions.length === 0
-                    ? 'У выбранного регламента нет output-action`ов в flow.json'
-                    : undefined
-              }
-            >
-              <option value="">— любой вердикт —</option>
-              {outputActions.map((a) => (
-                <option key={a.action} value={a.action}>
-                  {a.label} ({a.action})
-                </option>
-              ))}
-            </select>
-          </FormRow>
-        </div>
+        // Принцип «Двух уровней»: регламент не выбирает конкретный регламент-
+        // источник здесь. Эту связь делает Twin (Цифровой Двойник), и она
+        // приходит сюда уже спроецированной. Поэтому показываем:
+        //   • read-only summary, если связь уже задана (Twin её прописал);
+        //   • placeholder + кнопка «Открыть Двойник», если нет.
+        trigger.source_regulation ? (
+          <div className="rounded-md border border-indigo-200 bg-indigo-50/60 p-2 text-[11px] leading-snug text-indigo-900">
+            <div className="mb-0.5 flex items-center gap-1 font-semibold uppercase tracking-wide text-indigo-700">
+              <Send size={11} />
+              Связано Двойником
+            </div>
+            <div>
+              Источник: <b>{sourceName}</b>
+              {trigger.source_output && (
+                <>
+                  {' '}/ выход <code className="rounded bg-white/70 px-1 font-mono">{trigger.source_output}</code>
+                </>
+              )}
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {linkedTwin && (
+                <Link
+                  to={`/twins/${encodeURIComponent(linkedTwin.id)}`}
+                  className="inline-flex items-center gap-1 font-medium text-indigo-700 underline hover:text-indigo-900"
+                >
+                  Открыть Двойник «{linkedTwin.name}» <ExternalLink size={10} />
+                </Link>
+              )}
+              <Link
+                to={`/regulations/${encodeURIComponent(trigger.source_regulation)}/edit`}
+                className="inline-flex items-center gap-1 text-indigo-700 underline hover:text-indigo-900"
+              >
+                Перейти в регламент-источник <ExternalLink size={10} />
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-md border border-dashed border-indigo-300 bg-indigo-50/40 p-2 text-[11px] leading-snug text-indigo-900">
+            <div className="mb-1 flex items-center gap-1 font-semibold uppercase tracking-wide text-indigo-700">
+              <AlertTriangle size={11} />
+              Настраивается в Двойнике
+            </div>
+            <p>
+              Регламент атомарен и не привязан к конкретному источнику здесь.
+              Конкретная связь «B → A» делается в редакторе{' '}
+              <Link
+                to={linkedTwin ? `/twins/${encodeURIComponent(linkedTwin.id)}` : '/twins'}
+                className="font-medium text-indigo-700 underline hover:text-indigo-900"
+              >
+                {linkedTwin
+                  ? `Двойника «${linkedTwin.name}»`
+                  : 'Цифрового Двойника'}
+              </Link>
+              {' '}— секция «Связи между регламентами».
+            </p>
+          </div>
+        )
       )}
 
       {mode === 'none' && (
