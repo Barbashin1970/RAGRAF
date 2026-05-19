@@ -517,6 +517,32 @@ def _run_data_migrations() -> None:
                 f"[regulation_store] migration fix_trigger_param_ref_to_id_v1 failed: {e}"
             )
 
+    # ── seed_arch_pdf_medical_modules_v1 ────────────────────────────────
+    # 2026-04-14 (дата пояснительной записки «Описание архитектуры»).
+    # Документ описывает 2 специфичных медицинских модуля, которых в
+    # старом seed не было: ИИ-диагностика МРТ/туберкулёза и оценка
+    # воздействия городской среды на здоровье. Раньше был один общий
+    # `health-services` placeholder.
+    #
+    # Миграция аддитивная: только INSERT, если модулей с такими id ещё
+    # нет. Уже отредактированные пользователем модули не трогаем.
+    # Свежие установки получают эти модули через module_store.seed_if_empty().
+    if "seed_arch_pdf_medical_modules_v1" not in applied:
+        try:
+            from app.services import module_store
+            module_store.seed_arch_pdf_medical_modules_if_missing()
+            c.execute(
+                "INSERT INTO _migrations (name) VALUES (?)",
+                ["seed_arch_pdf_medical_modules_v1"],
+            )
+            print(
+                "[regulation_store] migration seed_arch_pdf_medical_modules_v1 applied"
+            )
+        except Exception as e:
+            print(
+                f"[regulation_store] migration seed_arch_pdf_medical_modules_v1 failed: {e}"
+            )
+
 
 def has(source_id: str) -> bool:
     with _LOCK:

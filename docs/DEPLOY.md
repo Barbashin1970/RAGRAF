@@ -248,7 +248,7 @@ git push
 
 ## 10. Связанные документы
 
-- [README.md](README.md) — quickstart для разработчика.
+- [README.md](../README.md) — quickstart для разработчика.
 - [ARC.md](ARC.md) — общая архитектура RAGRAF.
 - [ARC-SIGMA.md](ARC-SIGMA.md) — место RAGRAF в архитектуре СИГМЫ.
 - [BACKLOG.md](BACKLOG.md) — что в очереди.

@@ -136,7 +136,7 @@ app = FastAPI(
         "**Запись через PUT:** всегда DuckDB + версия в `regulation_history`. "
         "При `WRITEBACK_UPSTREAM=true` (по дефолту выключено) дополнительно "
         "публикуется в opt-in upstream `/data`.\n\n"
-        "Пояснительная записка по докрутке модели: [`RULES-MANAGEMENT.md`](../RULES-MANAGEMENT.md). "
+        "Пояснительная записка по докрутке модели: [`RULES-MANAGEMENT.md`](../docs/RULES-MANAGEMENT.md). "
         "Каталог фикстур: [`backend/data/fixtures/INDEX.md`](../backend/data/fixtures/INDEX.md)."
     ),
     contact={

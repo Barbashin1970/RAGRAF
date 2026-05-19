@@ -233,7 +233,7 @@ React Flow + Cytoscape + rest тянут ~1.05 MB JS-чанк. Сделать la
 *Complexity: средняя–высокая · частично сделано (май 2026)*
 
 > **Что сделано:** `sensor`-нода во Flow Editor (визуально кружок, привязка
-> к input через `bindsTo`), [flow_executor.py](backend/app/services/flow_executor.py)
+> к input через `bindsTo`), [flow_executor.py](../backend/app/services/flow_executor.py)
 > с интерпретатором флоу, endpoint `POST /api/regulations/{sid}/execute`,
 > панель «Запуск» в UI с пресетами/подсветкой сработавшего пути.
 > Это закрывает пункт 3 списка ниже (engine `match-event`) и большую
@@ -306,7 +306,7 @@ React Flow + Cytoscape + rest тянут ~1.05 MB JS-чанк. Сделать la
 *Complexity: средняя*
 
 Принимает SIGMA-event, маппит `payload.<field>` в `SensorReading[]`
-([flow_executor.py](backend/app/services/flow_executor.py)) по
+([flow_executor.py](../backend/app/services/flow_executor.py)) по
 эвристике: `pressure→p`, `temperature→t`, `flow→flow`, и т.д. Решает
 какие регламенты применять — варианты:
 
@@ -339,7 +339,7 @@ payload JSON, matched_regulations JSON, levels JSON).
 ### Граф связей × Библиотека датчиков × ETL match-event
 *Complexity: средняя*
 
-Сейчас граф (`/api/graph`, [graph_builder.py](backend/app/services/graph_builder.py)) показывает только `Regulation → Parameter / Constraint / Recommendation`. Каждый регламент — изолированный остров. Это документация структуры, а не runtime-инструмент.
+Сейчас граф (`/api/graph`, [graph_builder.py](../backend/app/services/graph_builder.py)) показывает только `Regulation → Parameter / Constraint / Recommendation`. Каждый регламент — изолированный остров. Это документация структуры, а не runtime-инструмент.
 
 **Гэп**: когда в СИГМУ прилетает событие (например `{"event":"digging","x":3946,"confidence":0.88}`), ETL должен ответить «какой регламент применить». Сейчас связь от полей payload до регламента нигде не материализована — она разбросана по четырём хранилищам:
 - `sensor_field_schemas` знает «у `fiber` есть поля `event`, `x`, `confidence`»
@@ -463,9 +463,9 @@ for r in row:
 **Почему Natasha, а не NEREL fine-tune.** Natasha — pip-пакет `pip install natasha`, pre-trained на русском, без GPU и без обучения. F1 ~80 на новостях, для наших технических текстов скорее всего сопоставимо или чуть ниже. Альтернатива (fine-tune `rubert-base-cased` на [NEREL](https://github.com/nerel-ds/NEREL) dataset) даёт +5 F1, но требует 2-4 GPU-часа и пайплайн обучения. Для MVP это лишнее.
 
 **Что делаем (за полдня):**
-1. `pip install natasha` в [backend/requirements.txt](backend/requirements.txt).
+1. `pip install natasha` в [backend/requirements.txt](../backend/requirements.txt).
 2. Новый сервис `backend/app/services/ner_temporal.py` — обёртка над `natasha.NamesExtractor` + `DatesExtractor` + регулярки на LAW (`ГОСТ \d`, `ФЗ-\d`, `СНиП [\d.-]+`).
-3. В [sandbox.extract_parameters](backend/app/services/sandbox.py) — после числового извлечения, дополнительный проход NER, найденные `DATE/TIME/LAW` подцепляются как мета-атрибуты регламента:
+3. В [sandbox.extract_parameters](../backend/app/services/sandbox.py) — после числового извлечения, дополнительный проход NER, найденные `DATE/TIME/LAW` подцепляются как мета-атрибуты регламента:
    - `validity_period: {from, to}` если есть date-диапазон
    - `source_law_refs: [...]` массив строк
    - `periodicity: "каждые 30 минут"` свободный текст

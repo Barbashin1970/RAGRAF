@@ -11,7 +11,7 @@
 - локальный fallback (по умолчанию `USE_FIXTURES=true` в `.env.example`),
 - стартовая нагрузка для UI: при открытии `/regulations/pressure-diameter/flow` редактор покажет преднастроенный Rule DSL.
 
-Реестр: см. [`backend/data/fixtures/INDEX.md`](backend/data/fixtures/INDEX.md). Регулируется `app/services/fixtures.py` (просто словарь `REGISTRY`).
+Реестр: см. [`backend/data/fixtures/INDEX.md`](../backend/data/fixtures/INDEX.md). Регулируется `app/services/fixtures.py` (просто словарь `REGISTRY`).
 
 **Реальная схема Turtle:** параметры — плоские scalar-свойства `:Regulation`-инстанса (`:pressure 20.5 ; :pressureDeviation 1.5`), а не отдельные `:Parameter` сущности. Парсер в `turtle_bridge.parse_regulation_turtle()` это учитывает: пары `<param> + <param>Deviation` → `Parameter(referenceValue, deviationAllowed)`, плюс bounds из SHACL-shape подмешиваются через аргумент `shapes_turtle`.
 
@@ -220,7 +220,7 @@ useMutation({
 | Tree (parsed YAML) | Form view (Pydantic-mapped поля) |
 | Quick sliders (path) | Sliders view (per-parameter ref + dev) |
 
-**Авто-range у слайдеров:** в NSK слайдеры описаны вручную; у нас выводятся из SHACL `sh:minInclusive`/`sh:maxInclusive`, fallback на эвристику `[ref − 5·dev, ref + 5·dev]`. Шаг — ближайший nice из `[0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10]` к `span/100`. См. `deriveSliderRange()` в [`RegulationEditorScreen.tsx`](frontend/src/components/regulations/RegulationEditorScreen.tsx).
+**Авто-range у слайдеров:** в NSK слайдеры описаны вручную; у нас выводятся из SHACL `sh:minInclusive`/`sh:maxInclusive`, fallback на эвристику `[ref − 5·dev, ref + 5·dev]`. Шаг — ближайший nice из `[0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10]` к `span/100`. См. `deriveSliderRange()` в [`RegulationEditorScreen.tsx`](../frontend/src/components/regulations/RegulationEditorScreen.tsx).
 
 **Local draft + dirty-state:** `draft` — структурный клон серверного state. «Сохранить» disabled пока `draft === regulation`. «Отменить» восстанавливает draft. После save react-query инвалидирует `['regulation', id]`, `['datasets']`, `['flow', id]` — все экраны подхватят свежие значения автоматически.
 
@@ -249,7 +249,7 @@ useMutation({
 
 **Применение:** writeback домена в формат OWL-онтологии (как в `Rules-Management.pdf` и фикстурах).
 
-**Контракт:** `regulation_to_turtle(reg: Regulation) -> str` в [`turtle_bridge.py`](backend/app/services/turtle_bridge.py). Эмитит:
+**Контракт:** `regulation_to_turtle(reg: Regulation) -> str` в [`turtle_bridge.py`](../backend/app/services/turtle_bridge.py). Эмитит:
 - `:Regulation a owl:Class`
 - Для каждого param: `:<param> a owl:DatatypeProperty ; rdfs:domain :Regulation ; rdfs:range xsd:decimal` + парное `:<param>Deviation`
 - Метапроперти: `:name xsd:string`, `:date xsd:date`, `:recommendation xsd:string`

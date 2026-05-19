@@ -613,8 +613,8 @@ export function LandingScreen() {
             <div className="sm:col-span-4">
               <FooterColumn title="Ресурсы">
                 <FooterExtLink href="https://github.com/Barbashin1970/RAGRAF" icon={Github} label="GitHub проекта" />
-                <FooterExtLink href="https://github.com/Barbashin1970/RAGRAF/blob/main/ARC.md" icon={FileText} label="Архитектура RAGRAF" />
-                <FooterExtLink href="https://github.com/Barbashin1970/RAGRAF/blob/main/ARC-SIGMA.md" icon={FileText} label="Архитектура Сигма" />
+                <FooterExtLink href="https://github.com/Barbashin1970/RAGRAF/blob/main/docs/ARC.md" icon={FileText} label="Архитектура RAGRAF" />
+                <FooterExtLink href="https://github.com/Barbashin1970/RAGRAF/blob/main/docs/ARC-SIGMA.md" icon={FileText} label="Архитектура Сигма" />
                 <FooterExtLink href="https://sigma-operator.vercel.app/operator" icon={GraduationCap} label="Тренажёр операторов" />
                 <FooterExtLink href="https://stroyka-alpha.vercel.app/" icon={HardHat} label="Тест по ИИ для строителей" />
                 <FooterExtLink href="https://leyka-nsu.vercel.app" icon={KanbanSquare} label="Управление проектами ЦИИ НГУ" />

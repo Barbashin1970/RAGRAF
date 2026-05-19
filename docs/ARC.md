@@ -228,14 +228,14 @@ flowchart TB
   API --> STORE
 ```
 
-**Правило компонентов:** screens живут в `src/components/<domain>/<Screen>.tsx`, primitives — в `src/components/ui/`. Никакого прямого `bg-violet-*` / `bg-stone-*` в продуктовом коде — только через `<Button>` / `<Badge>` / семантические Tailwind-токены (см. [DESIGN_SYSTEM.md](frontend/DESIGN_SYSTEM.md)).
+**Правило компонентов:** screens живут в `src/components/<domain>/<Screen>.tsx`, primitives — в `src/components/ui/`. Никакого прямого `bg-violet-*` / `bg-stone-*` в продуктовом коде — только через `<Button>` / `<Badge>` / семантические Tailwind-токены (см. [DESIGN_SYSTEM.md](../frontend/DESIGN_SYSTEM.md)).
 
 ### 2.3 Стратегия мутаций: react-query + optimistic в Flow Editor
 
 Большинство мутаций RAGRAF идут через стандартный `useMutation({ mutationFn, onSuccess: invalidate })` — нет облака между UI и backend, RTT 1–5 мс по localhost, perceived latency и так нулевая. Optimistic updates применяются **точечно**, только там где локальный state в react-flow или редакторе:
 
-- **Flow Editor** ([FlowEditorScreen.tsx](frontend/src/components/flow/FlowEditorScreen.tsx)) — узлы/рёбра живут в локальном `useState`, save идёт всем DSL в `POST /flow/{id}`. Между правкой и сохранением аналитик видит результат мгновенно; refetch на success обновляет `last_saved_version_id` в HistoryPanel.
-- **Regulation Form** ([RegulationEditorScreen.tsx](frontend/src/components/regulations/RegulationEditorScreen.tsx)) — draft хранится в локальной копии `Regulation`, dirty-tracking через сравнение JSON. Save отправляет весь draft; на success — invalidate `['regulation', id]` + `['regulation-history', id]` + `['datasets']`.
+- **Flow Editor** ([FlowEditorScreen.tsx](../frontend/src/components/flow/FlowEditorScreen.tsx)) — узлы/рёбра живут в локальном `useState`, save идёт всем DSL в `POST /flow/{id}`. Между правкой и сохранением аналитик видит результат мгновенно; refetch на success обновляет `last_saved_version_id` в HistoryPanel.
+- **Regulation Form** ([RegulationEditorScreen.tsx](../frontend/src/components/regulations/RegulationEditorScreen.tsx)) — draft хранится в локальной копии `Regulation`, dirty-tracking через сравнение JSON. Save отправляет весь draft; на success — invalidate `['regulation', id]` + `['regulation-history', id]` + `['datasets']`.
 
 **Когда NOT optimistic:** для создания / удаления (DELETE регламента, POST новой версии Flow) — стандартный flow `mutate → wait → invalidate → refetch`, потому что эти операции структурно меняют список и optimistic-вставка с временным UUID не окупается на single-user-нагрузке.
 
@@ -501,7 +501,7 @@ sequenceDiagram
   Note over ST,DB: regulation_history теперь содержит<br>N+1 snapshot-ов, doff_summary<br>считается между соседними
 ```
 
-**Diff между версиями** ([regulation_diff.py](backend/app/services/regulation_diff.py)) — структурное сравнение двух snapshot-ов с группировкой изменений по типам:
+**Diff между версиями** ([regulation_diff.py](../backend/app/services/regulation_diff.py)) — структурное сравнение двух snapshot-ов с группировкой изменений по типам:
 
 | Тип изменения | Семантика                                        | UI-индикатор          |
 |---------------|--------------------------------------------------|-----------------------|
@@ -518,7 +518,7 @@ sequenceDiagram
 
 ### 6.1 7 типов узлов
 
-Визуальный редактор реализован на React Flow ([FlowEditorScreen.tsx](frontend/src/components/flow/FlowEditorScreen.tsx)). Палитра слева содержит 7 типов узлов, сгруппированных по семантике (Вход / Логика / Выход / Ограничения).
+Визуальный редактор реализован на React Flow ([FlowEditorScreen.tsx](../frontend/src/components/flow/FlowEditorScreen.tsx)). Палитра слева содержит 7 типов узлов, сгруппированных по семантике (Вход / Логика / Выход / Ограничения).
 
 ```mermaid
 flowchart LR
@@ -556,11 +556,11 @@ flowchart LR
   style N7 fill:#F5F5F4,stroke:#78716C
 ```
 
-Визуальный паттерн — **Node-RED-style icon-pill** ([styles.css → .rf-node](frontend/src/styles.css)): цветная icon-секция слева (lucide-иконка типа узла) + светлый body с тип-меткой uppercase-капителью. Полное имя и детали — в правой `<PropertyPanel>` (сворачиваемой как в Node-RED).
+Визуальный паттерн — **Node-RED-style icon-pill** ([styles.css → .rf-node](../frontend/src/styles.css)): цветная icon-секция слева (lucide-иконка типа узла) + светлый body с тип-меткой uppercase-капителью. Полное имя и детали — в правой `<PropertyPanel>` (сворачиваемой как в Node-RED).
 
 ### 6.2 Валидация Rule DSL
 
-Перед сохранением Flow проходит проверки в [validator.py](backend/app/services/validator.py):
+Перед сохранением Flow проходит проверки в [validator.py](../backend/app/services/validator.py):
 
 | Код ошибки           | Что проверяет                                                   |
 |----------------------|-----------------------------------------------------------------|
@@ -586,7 +586,7 @@ flowchart LR
   JSON -.->|model_validate| DSL
 ```
 
-Помощники `flowToDsl` / `dslToFlow` живут в [frontend/src/lib/rulesDsl.ts](frontend/src/lib/rulesDsl.ts) и покрыты юнит-тестами (9 кейсов в `rulesDsl.test.ts`).
+Помощники `flowToDsl` / `dslToFlow` живут в [frontend/src/lib/rulesDsl.ts](../frontend/src/lib/rulesDsl.ts) и покрыты юнит-тестами (9 кейсов в `rulesDsl.test.ts`).
 
 ---
 
@@ -630,7 +630,7 @@ flowchart LR
 
 Обе LLM — из одной семьи (qwen2.5-instruct), поэтому промпт-поведение совместимо: переключение в UI не требует переписывания системных промптов. 7b как дефолт даёт качество, 3b — скорость для коротких сценариев.
 
-**Переключение моделей в UI** ([SandboxScreen](frontend/src/components/sandbox/SandboxScreen.tsx), секция «Модель LLM» в правой панели):
+**Переключение моделей в UI** ([SandboxScreen](../frontend/src/components/sandbox/SandboxScreen.tsx), секция «Модель LLM» в правой панели):
 - Выбор персистится в `localStorage` ключом `ragraf:sandbox:model-kind:v1`
 - Каждый `ChatRequest` несёт поле `model` — backend подставляет в OpenAI client; `None` = дефолт из `settings.ragu_llm_model`
 - Если выбранная модель не установлена в Ollama, UI показывает плашку с командой `ollama pull <tag>` — обнаружение через `available_models` из `/api/sandbox/llm-info`
@@ -642,7 +642,7 @@ flowchart LR
 - `POST /api/sandbox/llm/unload` — Ollama `keep_alive: 0` → выгрузка немедленно (освободить 2-5 ГБ под другие задачи)
 - Кнопка-индикатор «прогреть / в RAM» в подвале правой панели Студии, рядом со строкой `LLM:` — состояние читается из `loaded_models` в llm-info
 
-**Где Ollama хранит модели** (см. также [README §LLM-модели](README.md#llm-модели-и-ollama)):
+**Где Ollama хранит модели** (см. также [README §LLM-модели](../README.md#llm-модели-и-ollama)):
 - macOS: `~/.ollama/models/{blobs,manifests}/`
 - Linux: `/usr/share/ollama/.ollama/models/` или `~/.ollama/models/`
 - Windows: `C:\Users\<user>\.ollama\models\`
@@ -665,7 +665,7 @@ RAGU в своей [документации](external/RAGU/README.md) и [docs/
 
 ### 7.3 EmbeddingIndex и batched rebuild
 
-`EmbeddingIndex` ([embedding_index.py](backend/app/services/embedding_index.py)) — in-memory кэш с сигнатурой ревалидации:
+`EmbeddingIndex` ([embedding_index.py](../backend/app/services/embedding_index.py)) — in-memory кэш с сигнатурой ревалидации:
 
 - **Сигнатура** = sha256 от `(reg.id, reg.name, recommendations[].text)` всех регламентов;
 - При первом обращении (или при изменении корпуса) — пересборка через **батч-эндпоинт** Ollama (`POST /v1/embeddings` с `input=[t1, t2, ...]`);
@@ -735,7 +735,7 @@ flowchart LR
 только при `provider == 'ollama'`. Для cloud-провайдеров `extra_body`
 не выставляется — иначе Cerebras/Groq возвращают 400.
 
-**Подбор модели в UI** ([llmModels.ts](frontend/src/components/sandbox/llmModels.ts))
+**Подбор модели в UI** ([llmModels.ts](../frontend/src/components/sandbox/llmModels.ts))
 теперь идентифицирует каждую модель по её tag-у (не по слотам `precise/fast`).
 Это исправляет баг, когда несколько cloud-моделей шарили один kind и
 подсвечивались синхронно — см. коммит 2026-05-17.
@@ -1070,7 +1070,7 @@ flowchart TB
 **Подводные камни (вылечены при первых деплоях):**
 - `openai` пакет был только в локальном `.venv`, в `requirements.txt` отсутствовал —
   cloud-провайдер падал с `ModuleNotFoundError` на проде. Исправлено добавлением
-  `openai==2.36.0` в [`backend/requirements.txt`](backend/requirements.txt).
+  `openai==2.36.0` в [`backend/requirements.txt`](../backend/requirements.txt).
 - `fixtures.py` использует `Path(__file__).parents[2]/data/fixtures` — в Docker-image
   это путь `/srv/backend/data/fixtures`, и его пришлось копировать **отдельно** от
   `/srv/_seed_data` (последний — для volume seeding'а, первый — для flow-схем).
@@ -1252,7 +1252,7 @@ flowchart TB
 
 ТЗ §4.1.3 требует: «каждое правило должно быть связано с источником (нормативный акт + пункт), периодом действия и историей изменений».
 
-RAGRAF хранит эти поля в DuckDB ([Regulation schema](backend/app/schemas/domain.py)):
+RAGRAF хранит эти поля в DuckDB ([Regulation schema](../backend/app/schemas/domain.py)):
 
 | RAGRAF поле | Turtle property | DuckDB колонка |
 |---|---|---|
@@ -1265,7 +1265,7 @@ RAGRAF хранит эти поля в DuckDB ([Regulation schema](backend/app/s
 
 ### 16.3.3 Реализация
 
-[services/sigma_export.py](backend/app/services/sigma_export.py) — сборщик bundle:
+[services/sigma_export.py](../backend/app/services/sigma_export.py) — сборщик bundle:
 
 ```python
 build_regulation_bundle(source_id) -> bytes  # один регламент → ZIP
@@ -1274,7 +1274,7 @@ build_corpus_bundle(domain=None) -> (bytes, manifest)  # batch
 
 Внутри: вытащить `Regulation` из DuckDB → `regulation_to_turtle()` → `regulation_to_shacl_shapes()` → запаковать в ZIP с `manifest.json` (метадата для трассировки, не парсится СИГМОЙ).
 
-API endpoints в [api/regulations.py](backend/app/api/regulations.py):
+API endpoints в [api/regulations.py](../backend/app/api/regulations.py):
 - `GET /api/regulations/{id}/export-bundle` — один регламент
 - `GET /api/sigma-export/corpus?domain=heating` — batch (отдельный prefix чтобы не конфликтнуть с `{source_id}` маршрутами)
 
@@ -1301,21 +1301,21 @@ UI: кнопка «Экспорт в СИГМУ» в шапке Regulation Edito
 
 **Стратегия — вариант B** (см. README §«Документ-основание»): URL + цитата + локальный кэш файла. Лимит 25 МБ. Файл хранится в `data/source_documents/{source_id}/<filename>` (один регламент = одна папка, чистка через `shutil.rmtree` при удалении регламента).
 
-**Сериализация в bundle** ([turtle_bridge.py](backend/app/services/turtle_bridge.py) `regulation_to_turtle`): через W3C PROV-O — `prov:wasDerivedFrom` от инстанса регламента → именованный узел `:Source_<instance>` с метаданными. Apache Jena парсит `prov:` нативно. Локальный файл попадает в ZIP как `<source_id>/source.<ext>` ([sigma_export.py](backend/app/services/sigma_export.py) `_add_source_file`), путь дублируется в `manifest.json['source_attachment']['file']`.
+**Сериализация в bundle** ([turtle_bridge.py](../backend/app/services/turtle_bridge.py) `regulation_to_turtle`): через W3C PROV-O — `prov:wasDerivedFrom` от инстанса регламента → именованный узел `:Source_<instance>` с метаданными. Apache Jena парсит `prov:` нативно. Локальный файл попадает в ZIP как `<source_id>/source.<ext>` ([sigma_export.py](../backend/app/services/sigma_export.py) `_add_source_file`), путь дублируется в `manifest.json['source_attachment']['file']`.
 
-**Round-trip.** При импорте bundle обратно `import_bundle` извлекает `source.<ext>` из ZIP, кладёт его в `<DATA_DIR>/source_documents/{id}/` через `source_documents.save_upload()` (пересчитывая checksum). PROV-O в data.ttl парсится `parse_regulation_turtle()` — URL/excerpt/checksum попадают в Regulation. Тест [test_source_document_round_trip](backend/tests/test_sigma_export.py) подтверждает: после export→delete→import файл на диске и хеш проходит verify.
+**Round-trip.** При импорте bundle обратно `import_bundle` извлекает `source.<ext>` из ZIP, кладёт его в `<DATA_DIR>/source_documents/{id}/` через `source_documents.save_upload()` (пересчитывая checksum). PROV-O в data.ttl парсится `parse_regulation_turtle()` — URL/excerpt/checksum попадают в Regulation. Тест [test_source_document_round_trip](../backend/tests/test_sigma_export.py) подтверждает: после export→delete→import файл на диске и хеш проходит verify.
 
 **Безопасность.** `source_documents.resolve_path()` проверяет что путь не вышел за DATA_DIR (защита от подсунутого `../../etc/passwd` в БД). При загрузке имя файла санитизируется до basename.
 
-**REST:** `POST /source-upload` · `GET /source-document` · `DELETE /source-document` · `GET /source-verify` ([backend/app/api/regulations.py](backend/app/api/regulations.py)). UI — секция «Документ-основание» в `RegulationEditorScreen.FormView` + badge «📎 источник прикреплён» в `RegulationList`.
+**REST:** `POST /source-upload` · `GET /source-document` · `DELETE /source-document` · `GET /source-verify` ([backend/app/api/regulations.py](../backend/app/api/regulations.py)). UI — секция «Документ-основание» в `RegulationEditorScreen.FormView` + badge «📎 источник прикреплён» в `RegulationList`.
 
 ### 16.3.6 Round-trip обратно в RAGRAF (реализовано 2026-05-17)
 
 СИГМА ещё в разработке, поэтому правка регламентов остаётся в RAGRAF. Реализован полный круг RAGRAF → СИГМА → RAGRAF.
 
-**Endpoint:** `POST /api/sigma-import/bundle` ([backend/app/api/regulations.py](backend/app/api/regulations.py)) — multipart ZIP.
+**Endpoint:** `POST /api/sigma-import/bundle` ([backend/app/api/regulations.py](../backend/app/api/regulations.py)) — multipart ZIP.
 
-**Поток импорта** ([backend/app/services/sigma_export.py](backend/app/services/sigma_export.py) `import_bundle()`):
+**Поток импорта** ([backend/app/services/sigma_export.py](../backend/app/services/sigma_export.py) `import_bundle()`):
 
 1. ZIP распаковывается через `_parse_bundle_zip()`: каждая папка верхнего уровня → один регламент. `corpus_manifest.json` на корне игнорируется (informational).
 2. `source_id` берётся из `manifest.json` → fallback на имя папки в ZIP.
@@ -1324,14 +1324,14 @@ UI: кнопка «Экспорт в СИГМУ» в шапке Regulation Edito
 5. `shapes.ttl` пушится в upstream `client.update_shapes()`. Если upstream недоступен — мягко пропускается (`shapes_error` в отчёте), регламент уже в store.
 6. Возвращается отчёт `{imported, skipped, failed}` с разбивкой по `source_id`.
 
-**Гарантия валидации.** В [regulation_client.py](backend/app/services/regulation_client.py) `get_shapes()` теперь имеет 4-шаговый fallback: фикстура → upstream → фикстура (без флага) → **derived из `regulation_to_shacl_shapes(reg)`**. Любой регламент в store отдаёт непустой `RegulationShape` — bundle всегда валидируется СИГМОЙ. Закрывает требование ТЗ СИГМА §4.1.3 + [Rules-Management.pdf](Rules-Management.pdf): «каждое правило должно иметь форму валидации».
+**Гарантия валидации.** В [regulation_client.py](../backend/app/services/regulation_client.py) `get_shapes()` теперь имеет 4-шаговый fallback: фикстура → upstream → фикстура (без флага) → **derived из `regulation_to_shacl_shapes(reg)`**. Любой регламент в store отдаёт непустой `RegulationShape` — bundle всегда валидируется СИГМОЙ. Закрывает требование ТЗ СИГМА §4.1.3 + [Rules-Management.pdf](Rules-Management.pdf): «каждое правило должно иметь форму валидации».
 
 **UI-вход:**
 
 - `/regulations` — кнопка **«Импорт из СИГМЫ»** в toolbar (рядом с «Экспорт в СИГМУ»). Принимает single/corpus ZIP. На успех показывается inline-баннер с списком имён регламентов.
-- `/regulations/{id}/constraints` — кнопка **«Импорт SHACL»** теперь принимает и `.ttl`, и `.zip`. Из ZIP'а ([shacl.py](backend/app/api/shacl.py) `_extract_shapes_from_zip`) вытащит только `shapes.ttl` (первый встретившийся). Для полного импорта bundle с регламентом — используем `/sigma-import/bundle`.
+- `/regulations/{id}/constraints` — кнопка **«Импорт SHACL»** теперь принимает и `.ttl`, и `.zip`. Из ZIP'а ([shacl.py](../backend/app/api/shacl.py) `_extract_shapes_from_zip`) вытащит только `shapes.ttl` (первый встретившийся). Для полного импорта bundle с регламентом — используем `/sigma-import/bundle`.
 
-**Тесты** ([backend/tests/test_sigma_export.py](backend/tests/test_sigma_export.py), 6 кейсов):
+**Тесты** ([backend/tests/test_sigma_export.py](../backend/tests/test_sigma_export.py), 6 кейсов):
 - round-trip export → delete → import восстанавливает регламент и его параметры
 - corpus bundle (несколько регламентов) импортируется корректно
 - ZIP без `data.ttl` мягко скипается
@@ -1410,10 +1410,10 @@ UI: кнопка «Экспорт в СИГМУ» в шапке Regulation Edito
 
 | Документ                                          | Содержание                                                  |
 |---------------------------------------------------|-------------------------------------------------------------|
-| [README.md](README.md)                            | Запуск, проверка зависимостей, типовые сценарии             |
+| [README.md](../README.md)                            | Запуск, проверка зависимостей, типовые сценарии             |
 | [TZ_RAGRAF.md](TZ_RAGRAF.md)                      | Техническое задание по ГОСТ-19 (623 строки)                 |
 | [BACKLOG.md](BACKLOG.md)                          | Дорожная карта · Author/Execute split · SIGMA-compliance    |
-| [DESIGN_SYSTEM.md](frontend/DESIGN_SYSTEM.md)     | UI-конвенции, примитивы, цветовые токены                    |
+| [DESIGN_SYSTEM.md](../frontend/DESIGN_SYSTEM.md)     | UI-конвенции, примитивы, цветовые токены                    |
 | Swagger UI (live)                                 | http://localhost:8000/docs (при запущенном backend)         |
 | OpenAPI JSON (live)                               | http://localhost:8000/openapi.json                          |
 

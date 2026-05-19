@@ -211,7 +211,7 @@ flowchart TB
 
 ## 3. Author / Model / Execute split
 
-Архитектурная программа RAGRAF (см. [BACKLOG.md § Author/Execute split](BACKLOG.md)) — разделение функциональности на три слоя по типу обработки и стоимости:
+Архитектурная программа RAGRAF (см. [BACKLOG.md § Author/Execute split](docs/BACKLOG.md)) — разделение функциональности на три слоя по типу обработки и стоимости:
 
 ```mermaid
 %%{init: {'theme':'neutral', 'themeVariables': {'fontSize': '15px'}, 'flowchart':{'nodeSpacing': 32, 'rankSpacing': 70, 'padding': 14, 'subGraphTitleMargin': {'top': 18, 'bottom': 18}}}}%%
@@ -259,7 +259,7 @@ flowchart TD
 | **Цвет UI**             | violet `#6B46C1`                          | teal `#2C7A7B` (primary)                 | blue `#3182CE`                   |
 | **Что в RAGRAF**        | ✅ Реализовано (LLM chat · rules-based extract) | ✅ Реализовано (регламенты + sensor library) | 🟡 Симулятор готов · приёмник СИГМЫ в бэклоге |
 
-Подробнее — [BACKLOG.md → Phase 3 · Execute Layer](BACKLOG.md).
+Подробнее — [BACKLOG.md → Phase 3 · Execute Layer](docs/BACKLOG.md).
 
 ---
 
@@ -602,12 +602,12 @@ RAGU в своей [документации](external/RAGU/README.md) и [docs/
 |---|---|---|---|
 | **LLM (генерация)** | `mistralai/mistral-medium-3` (cloud) или `gpt-4o-mini` (cloud) | `qwen2.5:7b-instruct-q4_K_M` (Ollama, локально) | Mistral и GPT — закрытые cloud-API: требуют интернет, ключи, биллинг, данные уходят на чужой сервер. Для НГУ/ТЭЦ-кейса с конфиденциальными регламентами — неприемлемо. Локальная Ollama даёт сравнимое качество ответов на наших коротких русскоязычных Q&A. |
 | **Embedder** | `emb-qwen/qwen3-embedding-8b` (4096-d) или `text-embedding-3-large` (3072-d, cloud) | `bge-m3` (1024-d, Ollama) | Qwen3-embedding-8b не имеет нативной Ollama-сборки (нужен vLLM/transformers — heavy на macOS). bge-m3 поддерживает русский, multi-lingual, всего 1.2 ГБ, отлично индексирует короткие тексты регламентов. На 6 регламентах разница в качестве retrieval'а незаметна. |
-| **NER / Extraction** | **`RaguTeam/RAGU-lm`** (Qwen-3-0.6B, fine-tuned на NEREL, через vLLM) — даёт F1=0.6 по сущностям против 0.32 у Qwen-2.5-14B-Instruct | Не используется — наш `sandbox.chat` строит retrieval напрямую через bge-m3, без artifact extraction'а | RAGU-lm — лучший выбор для **строительства графа знаний** из больших корпусов. У нас 6 регламентов, граф собирается из Turtle/DuckDB напрямую (subj-predicate-obj от руки), LLM-extraction не нужен. **При росте корпуса до 50+ регламентов и при необходимости автоматически вытаскивать сущности из загруженных PDF/DOCX** — стоит интегрировать `RaguLmArtifactExtractor` (см. [RAGU_SURFACE.md](RAGU_SURFACE.md) Tier 3). vLLM на macOS работает плохо (нет Metal-поддержки), потребует Linux-машину или Docker. |
+| **NER / Extraction** | **`RaguTeam/RAGU-lm`** (Qwen-3-0.6B, fine-tuned на NEREL, через vLLM) — даёт F1=0.6 по сущностям против 0.32 у Qwen-2.5-14B-Instruct | Не используется — наш `sandbox.chat` строит retrieval напрямую через bge-m3, без artifact extraction'а | RAGU-lm — лучший выбор для **строительства графа знаний** из больших корпусов. У нас 6 регламентов, граф собирается из Turtle/DuckDB напрямую (subj-predicate-obj от руки), LLM-extraction не нужен. **При росте корпуса до 50+ регламентов и при необходимости автоматически вытаскивать сущности из загруженных PDF/DOCX** — стоит интегрировать `RaguLmArtifactExtractor` (см. [RAGU_SURFACE.md](docs/RAGU_SURFACE.md) Tier 3). vLLM на macOS работает плохо (нет Metal-поддержки), потребует Linux-машину или Docker. |
 | **Runtime** | vLLM (для local моделей) или cloud REST | Ollama 0.23+ | Ollama проще: brew install, фоновый сервис, native Metal на M-серии, готовые GGUF-биндинги. vLLM требует отдельной конфигурации, GPU/CUDA на Linux. На M2 Air alternative нет. |
 
 **Краткий итог**: RAGU оптимизирован под cloud-LLM (Mistral/GPT) или vLLM-сценарий с большими корпусами и автоматическим extraction'ом. RAGRAF — локально-first для M-серии Mac, малый корпус (6-50 регламентов), извлечение сущностей делается через RAGU-промпты (без RAGU-lm). При переходе к большим объёмам и необходимости NER из произвольных документов — апгрейд через RAGU-lm/vLLM на Linux-машине (backlog).
 
-См. также [RAGU_SURFACE.md](RAGU_SURFACE.md) — там разобран весь публичный API RAGU и какие куски мы используем / могли бы использовать.
+См. также [RAGU_SURFACE.md](docs/RAGU_SURFACE.md) — там разобран весь публичный API RAGU и какие куски мы используем / могли бы использовать.
 
 ### 7.3 EmbeddingIndex и batched rebuild
 
@@ -872,7 +872,7 @@ sequenceDiagram
 
 ### 10.4 Миграция DuckDB → Postgres
 
-Условия миграции и план шагов — подробно в [TZ_RAGRAF.md Приложение А](TZ_RAGRAF.md). Кратко — миграция запускается при:
+Условия миграции и план шагов — подробно в [TZ_RAGRAF.md Приложение А](docs/TZ_RAGRAF.md). Кратко — миграция запускается при:
 
 - **≥3 одновременных пользователей** (DuckDB single-writer)
 - **Деплой в продакшен** с требованиями репликации / HA
@@ -1023,7 +1023,7 @@ flowchart TB
 - Railway Volume пустой при первом монтировании → start.sh обязательно seed'ит
   его из baked-in `/srv/_seed_data` перед запуском uvicorn.
 
-Полная инструкция со всеми переменными — [DEPLOY.md](DEPLOY.md).
+Полная инструкция со всеми переменными — [DEPLOY.md](docs/DEPLOY.md).
 
 ### 12.4 Будущий многоинстансный режим (опционально, см. §10.4)
 
@@ -1044,7 +1044,7 @@ flowchart TB
   BE_PROD -.-> OL_PROD
 ```
 
-Шаги миграции DuckDB → Postgres — Приложение А [TZ_RAGRAF.md](TZ_RAGRAF.md), оценка 2–4 рабочих дня.
+Шаги миграции DuckDB → Postgres — Приложение А [TZ_RAGRAF.md](docs/TZ_RAGRAF.md), оценка 2–4 рабочих дня.
 
 ---
 
@@ -1185,14 +1185,14 @@ flowchart TB
 
 ### 16.3.1 Что соответствует формату СИГМЫ
 
-Из [Rules-Management.pdf](Rules-Management.pdf) известно что СИГМА ожидает на вход пару Turtle-файлов:
+Из [Rules-Management.pdf](docs/Rules-Management.pdf) известно что СИГМА ожидает на вход пару Turtle-файлов:
 
 | Файл | Содержание | Источник в RAGRAF |
 |---|---|---|
 | `<id>.data.ttl` | OWL-инстанс регламента: декларация `:Regulation` + properties + значения | `regulation_to_turtle()` в `services/turtle_bridge.py` |
 | `<id>.shapes.ttl` | SHACL-форма валидации: `sh:NodeShape`, `sh:targetClass :Regulation`, обязательные поля + типы данных | `regulation_to_shacl_shapes()` в `services/turtle_bridge.py` |
 
-При загрузке в СИГМУ происходит автоматическая валидация data.ttl против shapes.ttl ([ТЗ §4.1.3](TZ_RAGRAF.md)).
+При загрузке в СИГМУ происходит автоматическая валидация data.ttl против shapes.ttl ([ТЗ §4.1.3](docs/TZ_RAGRAF.md)).
 
 ### 16.3.2 SIGMA-compliance поля
 
@@ -1270,7 +1270,7 @@ UI: кнопка «Экспорт в СИГМУ» в шапке Regulation Edito
 5. `shapes.ttl` пушится в upstream `client.update_shapes()`. Если upstream недоступен — мягко пропускается (`shapes_error` в отчёте), регламент уже в store.
 6. Возвращается отчёт `{imported, skipped, failed}` с разбивкой по `source_id`.
 
-**Гарантия валидации.** В [regulation_client.py](backend/app/services/regulation_client.py) `get_shapes()` теперь имеет 4-шаговый fallback: фикстура → upstream → фикстура (без флага) → **derived из `regulation_to_shacl_shapes(reg)`**. Любой регламент в store отдаёт непустой `RegulationShape` — bundle всегда валидируется СИГМОЙ. Закрывает требование ТЗ СИГМА §4.1.3 + [Rules-Management.pdf](Rules-Management.pdf): «каждое правило должно иметь форму валидации».
+**Гарантия валидации.** В [regulation_client.py](backend/app/services/regulation_client.py) `get_shapes()` теперь имеет 4-шаговый fallback: фикстура → upstream → фикстура (без флага) → **derived из `regulation_to_shacl_shapes(reg)`**. Любой регламент в store отдаёт непустой `RegulationShape` — bundle всегда валидируется СИГМОЙ. Закрывает требование ТЗ СИГМА §4.1.3 + [Rules-Management.pdf](docs/Rules-Management.pdf): «каждое правило должно иметь форму валидации».
 
 **UI-вход:**
 
@@ -1305,7 +1305,7 @@ UI: кнопка «Экспорт в СИГМУ» в шапке Regulation Edito
 - Webhook-actions на OUTPUT-ноде.
 - `POST /api/etl/match-event` — поиск подходящего регламента по полям payload.
 
-См. секцию «📡 Приёмник событий СИГМЫ» в [BACKLOG.md](BACKLOG.md).
+См. секцию «📡 Приёмник событий СИГМЫ» в [BACKLOG.md](docs/BACKLOG.md).
 
 ## 16.5 Sensor library — схемы JSON-событий датчиков (класс → подтип → поля)
 
@@ -1357,8 +1357,8 @@ UI: кнопка «Экспорт в СИГМУ» в шапке Regulation Edito
 | Документ                                          | Содержание                                                  |
 |---------------------------------------------------|-------------------------------------------------------------|
 | [README.md](README.md)                            | Запуск, проверка зависимостей, типовые сценарии             |
-| [TZ_RAGRAF.md](TZ_RAGRAF.md)                      | Техническое задание по ГОСТ-19 (623 строки)                 |
-| [BACKLOG.md](BACKLOG.md)                          | Дорожная карта · Author/Execute split · SIGMA-compliance    |
+| [TZ_RAGRAF.md](docs/TZ_RAGRAF.md)                      | Техническое задание по ГОСТ-19 (623 строки)                 |
+| [BACKLOG.md](docs/BACKLOG.md)                          | Дорожная карта · Author/Execute split · SIGMA-compliance    |
 | [DESIGN_SYSTEM.md](frontend/DESIGN_SYSTEM.md)     | UI-конвенции, примитивы, цветовые токены                    |
 | Swagger UI (live)                                 | http://localhost:8000/docs (при запущенном backend)         |
 | OpenAPI JSON (live)                               | http://localhost:8000/openapi.json                          |

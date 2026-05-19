@@ -162,37 +162,93 @@ def seed_if_empty() -> None:
         # ── Из § 5 СИГМА ──
         Module(
             id="heating-network",
-            name="Управление теплосетями",
-            purpose="События состояния теплосетей: давление, температура, расход, риски прорывов; "
-                    "прогнозы и рекомендации для предупреждения аварий.",
-            owner="МУП «Тепловые сети»",
+            name="Энергетика и распределительные сети умного города (теплоснабжение)",
+            purpose=(
+                "КПО для интеллектуального анализа состояния и процессов сетей теплоснабжения, "
+                "сопровождение цифровых двойников систем теплоснабжения. Теплогидравлические "
+                "расчёты, реконструкция состояний сети по ML-моделям, детектирование аномалий "
+                "и идентификация аварийных участков."
+            ),
+            owner="ЦИИ НГУ (Центр искусственного интеллекта НГУ)",
             domain="heating",
-            status="production",
+            status="piloting",
             icon="energy",
             color="orange",
             api_contract=ModuleApiContract(
-                channel="rest", event_format="json", auth_type="api_key",
-                rate_limit="100 событий/мин",
+                channel="rest", event_format="json", auth_type="oauth2",
+                notes=(
+                    "RESTful HTTP API (GET/POST/PUT/PATCH/DELETE), JSON в телах запросов, "
+                    "application/octet-stream для бинарных данных. Эндпоинты: "
+                    "/api/v1/net_graphs/current-graph-representation, /api/v1/net_graphs/baselines, "
+                    "/api/v1/state_prediction/predict-charts, /api/v1/resource_loader/dataset-groups, "
+                    "/api/v1/datasets/networks, /api/v1/auth/login. Для длительных расчётов — "
+                    "request-polling (в перспективе web-socket)."
+                ),
             ),
             quality_rules=ModuleQualityRules(
                 completeness="≥ 99% обязательных полей",
                 max_latency_seconds=60,
                 max_error_rate_percent=0.5,
             ),
-            event_types=["telemetry.pressure", "telemetry.temperature", "telemetry.flow", "alert.leak"],
+            event_types=[
+                "telemetry.pressure",
+                "telemetry.temperature",
+                "telemetry.flow",
+                "state.reconstruction",
+                "alert.anomaly_detected",
+                "alert.emergency_segment",
+            ],
+            notes=(
+                "Архитектура: клиент-серверное веб-приложение, монолит с модульным разделением. "
+                "Стек: React (frontend), Python/FastAPI + JWT (IAM, рабочие пространства, сервис данных), "
+                "Python/NumPy/SciPy (ядро численного моделирования — теплогидравлика), "
+                "Python/PyTorch/TorchGeometric (ML-Service — реконструкция состояний, аномалии, "
+                "аварийные участки), PostgreSQL (топология сетей, метаданные, пользователи). "
+                "Файловое хранилище в перспективе — MinIO/S3 (артефакты ML-моделей, обучающие "
+                "выборки, результаты объёмных расчётов). Мониторинг (в перспективе): Grafana/Prometheus. "
+                "Развёртывание: Docker Compose; в перспективе Kubernetes. Гибридная модель доступа: "
+                "ролевая + атрибутная."
+            ),
         ),
         Module(
             id="noise-monitoring",
-            name="Мониторинг шума",
-            purpose="События превышения шумовых параметров, зоны и периоды превышений, "
-                    "аналитика для контроля городской среды.",
+            name="ШУМ-ИИ — сейсмоакустика и шумовое загрязнение",
+            purpose=(
+                "Мониторинг сейсмоакустических колебаний и шумового загрязнения в городской "
+                "среде. Сбор, обработка и предоставление данных с распределённой сети "
+                "сейсмических станций, интеграция с видеопотоками, выдача типизированных "
+                "событий для фреймворка СИГМА."
+            ),
             owner="Городское управление экологии",
             domain="environment",
             status="piloting",
             icon="monitoring",
             color="emerald",
-            api_contract=ModuleApiContract(channel="webhook", event_format="json", auth_type="api_key"),
-            event_types=["telemetry.noise_db", "alert.noise_exceed"],
+            api_contract=ModuleApiContract(
+                channel="rest", event_format="json", auth_type="api_key",
+                notes=(
+                    "Seismic Data Hub — REST-подобное API. Форматы ответа: JSON, ZIP, бинарный. "
+                    "Эндпоинты: список станций, список каналов, исторические данные, данные "
+                    "«почти реального времени». Источники данных подключаются по протоколам "
+                    "SeedLink, Telnet, FTP."
+                ),
+            ),
+            event_types=[
+                "telemetry.noise_db",
+                "alert.noise_exceed",
+                "event.heavy_transport",
+            ],
+            notes=(
+                "Источники данных: сейсмические станции Baykal-8 (несколько независимых каналов "
+                "измерений: CH0–CH5). Узлы хранения: вычислительные машины с утилитой slinktool, "
+                "формат записи SDS, автоматический перезапуск при обрыве соединения. "
+                "Конвертация форматов MiniSEED ↔ PC-A; объединение и временная обрезка "
+                "сейсмограмм. Веб-сервисы: буферизация потоковых данных, спектральный анализ "
+                "(октавные/третьоктавные спектры, «мозговые волны»), синхронизация с "
+                "видеопотоками HLS/WebRTC. Объяснимость — детерминированные алгоритмы "
+                "спектрального анализа (БПФ с фиксированными параметрами), без ML «чёрных "
+                "ящиков» в базовой логике детекции."
+            ),
         ),
         Module(
             id="air-quality",
@@ -223,10 +279,13 @@ def seed_if_empty() -> None:
         ),
         Module(
             id="das-fiber-monitoring",
-            name="Оптоволоконный мониторинг инфраструктуры (DAS)",
-            purpose="Distributed Acoustic Sensing — события сенсорного мониторинга инфраструктуры "
-                    "(трубопроводы, кабели, мосты): аномалии вибрации/температуры, сигналы риска "
-                    "повреждения, локализация воздействия на объект.",
+            name="Умные оптоволоконные датчики для городской инфраструктуры (DAS)",
+            purpose=(
+                "Программный комплекс обработки, анализа и интерпретации данных от "
+                "распределённого оптоволоконного датчика при мониторинге объектов городской "
+                "инфраструктуры. Бинарная классификация событий контроля периметра: "
+                "«шаг человека», «копка человеком», «шумовое событие»."
+            ),
             owner="АО «Дунай-Связь» / ЦИИНГУ",
             domain="safety",
             status="piloting",
@@ -234,33 +293,116 @@ def seed_if_empty() -> None:
             color="violet",
             api_contract=ModuleApiContract(
                 channel="webhook", event_format="json", auth_type="mtls",
-                rate_limit="1000 событий/сек (пиковая)", notes="DAS-кабель: 10 000+ виртуальных датчиков на километр",
             ),
-            quality_rules=ModuleQualityRules(
-                max_latency_seconds=10, max_error_rate_percent=0.1,
+            quality_rules=ModuleQualityRules(),
+            event_types=[
+                "das.step_human",
+                "das.digging_human",
+                "das.noise_event",
+            ],
+            notes=(
+                "Модульная структура: Data Preprocessing, Model Training (Encoder/Decoder/"
+                "Classifier + остаточные блоки, PCAWithLogisticRegression — модель "
+                "предварительной фильтрации), Quality Analysis, Performance Analysis, "
+                "Data Analysis. Обучение с частичным привлечением учителя (SSLAE), "
+                "оптимизация гиперпараметров через Optuna. Стек: Python, PyTorch, "
+                "TorchMetrics, Pandas, Matplotlib, Seaborn, scikit-learn (PCA, "
+                "LogisticRegression). Метрики качества: Accuracy, Precision, F1-score, "
+                "Recall, ROC AUC, плюс PSNR и MSE для оценки реконструкции автокодировщика. "
+                "Объяснимость: визуализация ложноположительных/ложноотрицательных "
+                "классификаций (особенности сигнала и реконструированного изображения)."
             ),
-            event_types=["das.vibration_anomaly", "das.temperature_anomaly", "das.cable_damage_alert"],
-            notes="Один физический оптический кабель = виртуальный массив 10 000+ датчиков "
-                  "вдоль трассы. Платформа агрегирует события по сегментам.",
         ),
         Module(
-            id="health-services",
-            name="Улучшение качества жизни — медицинские услуги",
-            purpose="События и агрегированные показатели для оценки и предотвращения рисков "
-                    "позднего обнаружения социально значимых заболеваний, приоритизации "
-                    "профилактических мероприятий.",
+            id="medical-imaging-diagnostics",
+            name="ИИ-диагностика социально-значимых заболеваний (МРТ, рентген)",
+            purpose=(
+                "Дистанционная и ранняя диагностика, динамический мониторинг по данным "
+                "медицинской визуализации: сегментация поражений головного мозга по МРТ "
+                "(T1, T1 с контрастом, T2, T2-FLAIR), классификация туберкулёза лёгких "
+                "по рентгенограммам."
+            ),
             owner="Региональный Минздрав",
-            domain="emergency_response",  # ЕДДС-кейс эскалаций
+            domain="emergency_response",
             status="draft",
             icon="healthcare",
             color="rose",
             api_contract=ModuleApiContract(
                 channel="rest", event_format="json", auth_type="oauth2",
-                notes="ПДн → требования 152-ФЗ",
+                notes=(
+                    "REST API + очереди сообщений (RabbitMQ/Redis), отчёты JSON/XML. "
+                    "На входе деперсонализированные DICOM 3.0 и NIfTI. Интеграция с "
+                    "внешними МИС/РИС/ЕМИАС через HL7/DICOM. ПДн → 152-ФЗ, ИСПДн-"
+                    "аттестованный контур."
+                ),
             ),
-            event_types=["health.screening_overdue", "health.profilactic_recommendation"],
-            notes="Состав данных, правовые основания и ограничения определяются в "
-                  "контуре внедрения. Обязательно ИСПДн-аттестованный контур.",
+            quality_rules=ModuleQualityRules(
+                max_latency_seconds=300,  # < 5 мин на пациента (4 серии, 600 срезов) по ТЗ
+            ),
+            event_types=[
+                "diagnostics.mri_brain_segmentation",
+                "diagnostics.tuberculosis_classification",
+                "diagnostics.report_ready",
+                "diagnostics.image_quality_warning",
+            ],
+            notes=(
+                "Целевые показатели по ТЗ: AUC-ROC > 0.85 для детекции патологий МРТ, "
+                "Dice > 0.80 для сегментации опухолей ГМ, AUC-ROC > 0.90 для туберкулёза, "
+                "чувствительность/специфичность > 0.85 / > 0.90. Архитектуры: U-Net, "
+                "nnU-Net (МРТ), EfficientNet/ResNet (рентген). Стек: Python 3.10+, "
+                "PyTorch, TensorFlow, MONAI, FastAI, pydicom, NiBabel, SimpleITK, OpenCV, "
+                "SciPy, NumPy, Pandas, CUDA 11.8+, TorchMetrics, Scikit-learn, Matplotlib, "
+                "Plotly. Хранение: PostgreSQL + SQLAlchemy + Pydantic (метаданные), "
+                "MinIO/S3 (сырые/размеченные данные, маски, чекпоинты), MLflow, NFS "
+                "(бэкапы). Мониторинг: GPUtil, Prometheus + Grafana. Оркестрация: Docker, "
+                "Kubernetes (опционально), RabbitMQ/Redis. Гибридное развёртывание — "
+                "облако или on-premise контур медучреждения. Три режима: базовый "
+                "(визуализация), экспертный (аннотирование), потоковый (пакетная обработка). "
+                "Автоматическая деперсонализация ПДн; ролевой доступ (врач/администратор/"
+                "эксперт-исследователь)."
+            ),
+        ),
+        Module(
+            id="urban-health-impact-assessment",
+            name="Персонализированная оценка воздействия городской среды на здоровье",
+            purpose=(
+                "Формирование персонализированного перечня диагностических и "
+                "профилактических мероприятий на основе оценки индивидуальных рисков с "
+                "учётом экологических факторов городской среды. Ранжированный список "
+                "заболеваний с оценками вероятности развития в заданный временной горизонт."
+            ),
+            owner="Региональный Минздрав",
+            domain="emergency_response",
+            status="draft",
+            icon="healthcare",
+            color="rose",
+            api_contract=ModuleApiContract(
+                channel="rest", event_format="json", auth_type="oauth2",
+                notes=(
+                    "Уровень представления — REST API + пользовательские интерфейсы + "
+                    "визуализация. Модуль интеграции с СИГМОЙ генерирует события для "
+                    "ядра. Экспорт отчётов: PDF, XLSX, JSON. ПДн → 152-ФЗ."
+                ),
+            ),
+            event_types=[
+                "health.risk_assessment",
+                "health.lab_priority_recommendation",
+                "health.prophylactic_recommendation",
+            ],
+            notes=(
+                "Архитектура: распределённая интеллектуальная система. Модули — обучения, "
+                "приоритизации, аналитики, интеграции с СИГМОЙ. Уровень данных и знаний: "
+                "(1) векторное хранилище эмбеддингов концептов; (2) база знаний — граф "
+                "знаний (онтология заболеваний/симптомов/лабораторных показателей/"
+                "экологических факторов/патогенетических механизмов + извлечённые связи); "
+                "(3) реляционное/аналитическое хранилище статистики (OLAP). Извлечение "
+                "знаний: text-mining PubMed/ClinicalTrials.gov/локальных репозиториев, "
+                "NER на BioBERT/SciBERT, семантико-лингвистические правила, нормализация "
+                "к онтологии через fuzzy-matching и векторную близость. Оценка рисков — "
+                "графовые нейронные сети (GNN) над эмбеддингами вершин. Приоритизация "
+                "лабораторных исследований — Concrete Autoencoder (стохастический отбор "
+                "признаков)."
+            ),
         ),
         # ── НГУ-кампус (наши реальные коннекторы) ──
         Module(
@@ -331,3 +473,110 @@ def seed_if_empty() -> None:
     ]
     for m in seeds:
         save(m)
+
+
+# ── Targeted seed для медицинских модулей из пояснительной записки ────
+# Эти 2 модуля описаны в «ПОЯСНИТЕЛЬНАЯ ЗАПИСКА — Описание архитектуры»
+# (14.04.2026): ИИ-диагностика по МРТ/рентгену и оценка воздействия
+# городской среды на здоровье. Раньше был один placeholder `health-services`.
+#
+# Функция вызывается из миграции seed_arch_pdf_medical_modules_v1 в
+# regulation_store, чтобы добавить эти модули в уже-установленные
+# инстансы без перезатирания пользовательских правок других модулей.
+_MEDICAL_MODULES_FROM_ARCH_PDF: tuple[Module, ...] = (
+    Module(
+        id="medical-imaging-diagnostics",
+        name="ИИ-диагностика социально-значимых заболеваний (МРТ, рентген)",
+        purpose=(
+            "Дистанционная и ранняя диагностика, динамический мониторинг по данным "
+            "медицинской визуализации: сегментация поражений головного мозга по МРТ "
+            "(T1, T1 с контрастом, T2, T2-FLAIR), классификация туберкулёза лёгких "
+            "по рентгенограммам."
+        ),
+        owner="Региональный Минздрав",
+        domain="emergency_response",
+        status="draft",
+        icon="healthcare",
+        color="rose",
+        api_contract=ModuleApiContract(
+            channel="rest", event_format="json", auth_type="oauth2",
+            notes=(
+                "REST API + очереди сообщений (RabbitMQ/Redis), отчёты JSON/XML. "
+                "На входе деперсонализированные DICOM 3.0 и NIfTI. Интеграция с "
+                "внешними МИС/РИС/ЕМИАС через HL7/DICOM. ПДн → 152-ФЗ, ИСПДн-"
+                "аттестованный контур."
+            ),
+        ),
+        quality_rules=ModuleQualityRules(max_latency_seconds=300),
+        event_types=[
+            "diagnostics.mri_brain_segmentation",
+            "diagnostics.tuberculosis_classification",
+            "diagnostics.report_ready",
+            "diagnostics.image_quality_warning",
+        ],
+        notes=(
+            "Целевые показатели по ТЗ: AUC-ROC > 0.85 для детекции патологий МРТ, "
+            "Dice > 0.80 для сегментации опухолей ГМ, AUC-ROC > 0.90 для туберкулёза, "
+            "чувствительность/специфичность > 0.85 / > 0.90. Архитектуры: U-Net, "
+            "nnU-Net (МРТ), EfficientNet/ResNet (рентген). Стек: Python 3.10+, "
+            "PyTorch, TensorFlow, MONAI, FastAI, pydicom, NiBabel, SimpleITK, OpenCV, "
+            "SciPy, NumPy, Pandas, CUDA 11.8+, TorchMetrics, Scikit-learn, Matplotlib, "
+            "Plotly. Хранение: PostgreSQL + SQLAlchemy + Pydantic, MinIO/S3, MLflow, "
+            "NFS (бэкапы). Мониторинг: GPUtil, Prometheus + Grafana. Оркестрация: "
+            "Docker, Kubernetes (опционально), RabbitMQ/Redis. Гибридное "
+            "развёртывание — облако или on-premise. Три режима: базовый "
+            "(визуализация), экспертный (аннотирование), потоковый (пакетная "
+            "обработка). Автоматическая деперсонализация ПДн; ролевой доступ."
+        ),
+    ),
+    Module(
+        id="urban-health-impact-assessment",
+        name="Персонализированная оценка воздействия городской среды на здоровье",
+        purpose=(
+            "Формирование персонализированного перечня диагностических и "
+            "профилактических мероприятий на основе оценки индивидуальных рисков с "
+            "учётом экологических факторов городской среды. Ранжированный список "
+            "заболеваний с оценками вероятности развития в заданный временной горизонт."
+        ),
+        owner="Региональный Минздрав",
+        domain="emergency_response",
+        status="draft",
+        icon="healthcare",
+        color="rose",
+        api_contract=ModuleApiContract(
+            channel="rest", event_format="json", auth_type="oauth2",
+            notes=(
+                "Уровень представления — REST API + пользовательские интерфейсы + "
+                "визуализация. Модуль интеграции с СИГМОЙ генерирует события для "
+                "ядра. Экспорт отчётов: PDF, XLSX, JSON. ПДн → 152-ФЗ."
+            ),
+        ),
+        event_types=[
+            "health.risk_assessment",
+            "health.lab_priority_recommendation",
+            "health.prophylactic_recommendation",
+        ],
+        notes=(
+            "Архитектура: распределённая интеллектуальная система. Модули — обучения, "
+            "приоритизации, аналитики, интеграции с СИГМОЙ. Уровень данных и знаний: "
+            "(1) векторное хранилище эмбеддингов концептов; (2) база знаний — граф "
+            "знаний (онтология заболеваний/симптомов/лабораторных показателей/"
+            "экологических факторов/патогенетических механизмов + извлечённые связи); "
+            "(3) реляционное/аналитическое хранилище статистики (OLAP). Извлечение "
+            "знаний: text-mining PubMed/ClinicalTrials.gov, NER на BioBERT/SciBERT, "
+            "нормализация к онтологии через fuzzy-matching и векторную близость. "
+            "Оценка рисков — графовые нейронные сети (GNN). Приоритизация "
+            "лабораторных исследований — Concrete Autoencoder."
+        ),
+    ),
+)
+
+
+def seed_arch_pdf_medical_modules_if_missing() -> None:
+    """Аддитивный seed: вставляет 2 медицинских модуля из пояснительной
+    записки, если их ещё нет. Пользовательские правки других модулей
+    не трогает.
+    """
+    for m in _MEDICAL_MODULES_FROM_ARCH_PDF:
+        if get(m.id) is None:
+            save(m)

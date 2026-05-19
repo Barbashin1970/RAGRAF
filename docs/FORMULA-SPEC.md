@@ -14,7 +14,7 @@
 
 Подмножество Python expression syntax (парсим через `ast.parse(mode="eval")`).
 Никакого `eval()` / `exec()`: AST-walker с белым списком узлов
-([`backend/app/services/formula_eval.py`](backend/app/services/formula_eval.py)).
+([`backend/app/services/formula_eval.py`](../backend/app/services/formula_eval.py)).
 
 ### Литералы
 ```

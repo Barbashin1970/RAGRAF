@@ -1,7 +1,7 @@
 # Fixtures — golden seed для RAGRAF
 
 Извлечено из трёх источников:
-- `Rules-Management.pdf` (корень проекта) — формальный пример SHACL/OWL онтологии Sigma на Apache Jena.
+- `docs/Rules-Management.pdf` — формальный пример SHACL/OWL онтологии Sigma на Apache Jena.
 - `~/demo-sigma-main/src/config/regulations.yaml` — реальные сценарии НГУ-кампуса
   (пожар в серверной, прорыв теплового ввода, ночная протечка в общежитии, СКУД и др.).
 - `~/NSK_OpenData_Bot/config/rules/ecology_rules.yaml` — экологические пороги Новосибирска
