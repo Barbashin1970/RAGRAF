@@ -910,6 +910,16 @@ export const api = {
       `/api/processes/${encodeURIComponent(id)}/bundle.zip`,
     turtleUrl: (id: string) =>
       `/api/processes/${encodeURIComponent(id)}/turtle`,
+    /** In-app верификатор: прогон сгенерированного Turtle через rdflib.
+     *  Возвращает либо `{ok:true, triples, stats}` либо `{ok:false, error}`. */
+    verifyTurtle: (id: string) =>
+      request<{
+        ok: boolean
+        error?: string
+        triples: number
+        stats: { digital_twins?: number; wirings?: number; regulations?: number }
+        namespaces?: string[]
+      }>(`/api/processes/${encodeURIComponent(id)}/verify-turtle`),
   },
   // ── Словарь rules-based извлечения ─────────────────────────────────
   // CRUD над DuckDB extraction_terms: пополнение нераспознанными словами

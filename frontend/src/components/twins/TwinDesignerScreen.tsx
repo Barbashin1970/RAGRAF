@@ -2,14 +2,18 @@ import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  AlertTriangle,
   Check,
+  CheckCircle2,
   Download,
   FileCode2,
   FileText,
   GitBranch,
   Link2,
+  Loader2,
   Plus,
   Send,
+  ShieldCheck,
   Trash2,
   X,
   Zap,
@@ -518,6 +522,15 @@ function TwinEditor({
             <FileText size={13} />
             Объединённый Turtle (.ttl)
           </a>
+          <TurtleVerifyButton
+            twinId={draft.id}
+            disabled={dirty || draft.regulation_ids.length === 0}
+            disabledHint={
+              dirty
+                ? 'Сначала сохраните двойник'
+                : 'Добавьте хотя бы один регламент'
+            }
+          />
           {dirty && (
             <span className="text-[11px] text-violet-700/70">
               Сохраните двойник, чтобы экспорт стал активен.
@@ -799,4 +812,91 @@ function WiringSelect({
       </select>
     </label>
   )
+}
+
+
+// ── Кнопка «Проверить Turtle» — встроенный rdflib-валидатор ────────────
+//
+// UX: один клик → запрос на /verify-turtle → inline результат рядом
+// с кнопкой (зелёный «valid + статистика» или красный «строка X: ошибка»).
+// Не нужно идти на RDF Grapher / RDFShape ради проверки синтаксиса.
+
+function TurtleVerifyButton({
+  twinId,
+  disabled,
+  disabledHint,
+}: {
+  twinId: string
+  disabled: boolean
+  disabledHint: string
+}) {
+  const [state, setState] = useState<
+    | { kind: 'idle' }
+    | { kind: 'loading' }
+    | { kind: 'ok'; triples: number; stats: { digital_twins?: number; wirings?: number; regulations?: number } }
+    | { kind: 'error'; message: string }
+  >({ kind: 'idle' })
+
+  const verify = async () => {
+    setState({ kind: 'loading' })
+    try {
+      const r = await api.processes.verifyTurtle(twinId)
+      if (r.ok) {
+        setState({ kind: 'ok', triples: r.triples, stats: r.stats })
+      } else {
+        setState({ kind: 'error', message: r.error || 'Ошибка парсинга' })
+      }
+    } catch (e) {
+      setState({ kind: 'error', message: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={verify}
+        disabled={disabled || state.kind === 'loading'}
+        title={disabled ? disabledHint : 'Прогнать Turtle через rdflib и показать результат'}
+        className={cn(
+          'inline-flex items-center gap-1.5 rounded-md border border-violet-300 bg-white px-3 py-1.5 text-sm font-medium text-violet-900 hover:bg-violet-50',
+          (disabled || state.kind === 'loading') && 'pointer-events-none opacity-50',
+        )}
+      >
+        {state.kind === 'loading'
+          ? <Loader2 size={13} className="animate-spin" />
+          : <ShieldCheck size={13} />}
+        Проверить Turtle
+      </button>
+      {state.kind === 'ok' && (
+        <span className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-900">
+          <CheckCircle2 size={12} className="text-emerald-600" />
+          <span className="font-medium">Валидно</span>
+          <span className="font-mono opacity-70">
+            · {state.triples} трипл{plural(state.triples, 'а', 'а', 'ов')}
+            {state.stats.digital_twins ? ` · twin: ${state.stats.digital_twins}` : ''}
+            {state.stats.wirings ? ` · wiring: ${state.stats.wirings}` : ''}
+            {state.stats.regulations ? ` · reg: ${state.stats.regulations}` : ''}
+          </span>
+        </span>
+      )}
+      {state.kind === 'error' && (
+        <span
+          className="inline-flex max-w-md items-start gap-1 rounded-md border border-rose-300 bg-rose-50 px-2 py-1 text-[11px] text-rose-900"
+          title={state.message}
+        >
+          <AlertTriangle size={12} className="mt-0.5 shrink-0 text-rose-600" />
+          <span className="line-clamp-2 break-all">{state.message}</span>
+        </span>
+      )}
+    </div>
+  )
+}
+
+function plural(n: number, one: string, few: string, many: string): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return one
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few
+  return many
 }

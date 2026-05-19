@@ -367,6 +367,64 @@ def export_process_turtle(process_id: str) -> str:
     return "\n".join(chunks)
 
 
+@router.get("/processes/{process_id}/verify-turtle")
+def verify_process_turtle(process_id: str) -> dict[str, Any]:
+    """Прогнать сгенерированный Turtle двойника через rdflib-парсер.
+
+    UX: кнопка «Проверить Turtle» рядом со скачкой — мгновенный feedback
+    «синтаксис валиден, столько-то триплов» или «строка X колонка Y: ошибка
+    такая-то». Без выхода на внешние сервисы (RDF Grapher / RDFShape).
+
+    Также агрегируем небольшую статистику: число триплов, число вхождений
+    ключевых классов (`:DigitalTwin`, `:Wiring`, `:Regulation`) — даёт
+    sanity-check «всё на месте» без необходимости вручную грепать файл.
+    """
+    p = process_store.get(process_id)
+    if p is None:
+        raise HTTPException(status_code=404, detail=f"Двойник '{process_id}' не найден")
+
+    # Переиспользуем тот же путь генерации что и /turtle — иначе верификатор
+    # проверял бы не тот текст, что скачивает пользователь.
+    turtle_text = export_process_turtle(process_id)
+
+    from rdflib import Graph
+    from rdflib.namespace import RDF, Namespace
+    from rdflib.plugins.parsers.notation3 import BadSyntax
+
+    g = Graph()
+    try:
+        g.parse(data=turtle_text, format="turtle")
+    except BadSyntax as e:
+        # BadSyntax даёт `lines`/`_str` атрибуты в новых rdflib; стабильнее
+        # вытащить через repr/str. Сообщение содержит «at line X of ...».
+        return {
+            "ok": False,
+            "error": str(e),
+            "triples": 0,
+            "stats": {},
+        }
+    except Exception as e:
+        return {
+            "ok": False,
+            "error": f"{type(e).__name__}: {e}",
+            "triples": 0,
+            "stats": {},
+        }
+
+    REG_NS = Namespace("http://regulations.local/ontology#")
+    stats = {
+        "digital_twins": len(list(g.subjects(RDF.type, REG_NS["DigitalTwin"]))),
+        "wirings": len(list(g.subjects(RDF.type, REG_NS["Wiring"]))),
+        "regulations": len(list(g.subjects(RDF.type, REG_NS["Regulation"]))),
+    }
+    return {
+        "ok": True,
+        "triples": len(g),
+        "stats": stats,
+        "namespaces": [str(uri) for _, uri in g.namespaces()],
+    }
+
+
 def _turtle_string(s: str) -> str:
     """Сериализовать строку для Turtle как quoted-literal.
 

@@ -88,6 +88,45 @@ def test_turtle_no_wiring_block_when_empty_wiring(client):
     assert ":Wiring " not in text  # пробел гарантирует что это класс :Wiring, не подстрока
 
 
+def test_verify_turtle_passes_on_valid_twin(client):
+    """`/verify-turtle` парсит Turtle двойника через rdflib без ошибок."""
+    a = _create_reg(client, name="A")
+    b = _create_reg(client, name="B")
+    _flow_with_input(client, a, "pressure")
+    twin = client.post("/api/processes", json={
+        "id": "", "name": "Чистая цепочка", "description": None,
+        "regulation_ids": [a, b],
+        "wiring": [{
+            "target_regulation": a, "target_param_ref": "pressure",
+            "source_regulation": b, "source_output": None,
+        }],
+    }).json()
+
+    r = client.get(f"/api/processes/{twin['id']}/verify-turtle")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["ok"] is True
+    assert data["triples"] > 0
+    # Должны быть видны хотя бы один DigitalTwin, одно Wiring, два регламента.
+    assert data["stats"]["digital_twins"] == 1
+    assert data["stats"]["wirings"] == 1
+    assert data["stats"]["regulations"] == 2
+
+
+def test_verify_turtle_empty_twin(client):
+    """Пустой двойник тоже валиден (только Twin-блок, ничего не падает)."""
+    a = _create_reg(client, name="A")
+    twin = client.post("/api/processes", json={
+        "id": "", "name": "Пустой", "description": None,
+        "regulation_ids": [a], "wiring": [],
+    }).json()
+    r = client.get(f"/api/processes/{twin['id']}/verify-turtle")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["ok"] is True
+    assert data["stats"]["wirings"] == 0
+
+
 def test_turtle_escapes_quotes_in_name(client):
     a = _create_reg(client, name="A")
     twin = client.post("/api/processes", json={
