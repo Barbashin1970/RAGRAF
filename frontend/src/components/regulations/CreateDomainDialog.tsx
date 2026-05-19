@@ -79,14 +79,13 @@ export function CreateDomainDialog({ open, onClose, onCreated, initialLabel, ini
     },
   })
 
-  // Превью карточки домена с выбранными иконкой+цветом
+  // Превью карточки домена с выбранными иконкой+цветом.
+  // ВАЖНО: все useMemo ОБЯЗАНЫ стоять ДО `if (!open) return null` — иначе
+  // Rules of Hooks нарушены (hooks вызываются в разном порядке между
+  // render'ами), React падает «белым экраном» с ошибкой
+  // «Rendered fewer hooks than expected». Раньше iconsByGroup стоял после
+  // guard'а — это и был баг при первом клике «Создать домен».
   const previewVisual = useMemo(() => buildUserDomainVisual(icon, color), [icon, color])
-  const PreviewIcon = previewVisual.icon
-
-  if (!open) return null
-
-  const canSubmit = label.trim().length > 0 && !create.isPending
-
   const iconsByGroup = useMemo(() => {
     const map: Record<DomainIconOption['group'], DomainIconOption[]> = {
       infra: [], tech: [], people: [], env: [], transport: [], trade: [], safety: [],
@@ -96,6 +95,11 @@ export function CreateDomainDialog({ open, onClose, onCreated, initialLabel, ini
     }
     return map
   }, [])
+  const PreviewIcon = previewVisual.icon
+
+  if (!open) return null
+
+  const canSubmit = label.trim().length > 0 && !create.isPending
 
   return (
     <div
