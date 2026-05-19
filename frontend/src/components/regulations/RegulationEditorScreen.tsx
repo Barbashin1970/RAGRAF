@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   Archive,
+  Atom,
   BookOpen,
   CalendarClock,
   Calendar,
@@ -18,6 +19,7 @@ import {
   FileCode2,
   FileText,
   Flag,
+  GitBranch,
   GitCommit,
   Hash,
   History,
@@ -504,6 +506,12 @@ function FormView({
 
   return (
     <div className="space-y-4">
+      {/* Онтологическая плашка: «Атомарный регламент» или «В Двойниках: A, B».
+          Принцип «Двух уровней» (2026-05-19): сам регламент не «знает» о
+          композиции — она живёт в Twin'е. Плашка визуально подчёркивает это
+          разделение, кликабельные ссылки ведут в редактор двойника. */}
+      <InTwinsBanner regulationId={draft.id} />
+
       {/* Reverse-lookup: «этот регламент — триггер для N других». Видно сразу
           при открытии Edit/«Поля», чтобы аналитик понимал, что этот регламент
           участвует в event-driven цепочке. Загружается через отдельный query —
@@ -793,6 +801,67 @@ function SectionTitle({
 // Делает event-driven композицию видимой со стороны регламента-источника,
 // аналогично бэйджу подтипа датчика в Sensor Library.
 // ──────────────────────────────────────────────────────────
+
+// ──────────────────────────────────────────────────────────
+// Онтологическая плашка: «Атомарный регламент» / «В Двойниках: …».
+// Принцип «Двух уровней» (2026-05-19): wiring между регламентами живёт
+// в Twin.wiring, не в самом регламенте. Плашка визуально подчёркивает
+// статус регламента — самодостаточный или часть композиции.
+// ──────────────────────────────────────────────────────────
+
+function InTwinsBanner({ regulationId }: { regulationId: string }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['regulation-in-twins', regulationId],
+    queryFn: () => api.regulations.inTwins(regulationId),
+    enabled: Boolean(regulationId),
+  })
+  if (isLoading) return null
+  const twins = data?.twins ?? []
+
+  if (twins.length === 0) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-stone-200 bg-stone-50/70 px-3 py-2 text-[11px] text-stone-700">
+        <Atom size={13} className="text-stone-500" />
+        <span>
+          <b>Атомарный регламент</b> — самодостаточен, не привязан к конкретным
+          регламентам-источникам. Чтобы связать с другими, добавьте в{' '}
+          <Link to="/twins" className="text-violet-700 underline hover:text-violet-900">
+            Цифровой Двойник
+          </Link>.
+        </span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-md border border-violet-200 bg-violet-50/70 p-3 text-violet-900">
+      <div className="mb-1.5 flex items-center gap-2 text-[12px] font-semibold">
+        <GitBranch size={13} className="text-violet-600" />
+        <span>
+          В составе{' '}
+          <span className="font-mono">{twins.length}</span>{' '}
+          {twins.length === 1 ? 'двойника' : 'двойников'}
+        </span>
+      </div>
+      <ul className="ml-5 list-disc space-y-0.5 text-[11px]">
+        {twins.map((t) => (
+          <li key={t.id}>
+            <Link
+              to={`/twins/${encodeURIComponent(t.id)}`}
+              className="font-medium underline-offset-2 hover:underline"
+            >
+              {t.name}
+            </Link>
+            {t.description && (
+              <span className="ml-1 text-violet-700/70">— {t.description}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 
 function TriggeredByBanner({ regulationId }: { regulationId: string }) {
   const { data } = useQuery({

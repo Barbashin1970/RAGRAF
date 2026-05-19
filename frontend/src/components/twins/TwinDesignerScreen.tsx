@@ -1,21 +1,24 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Check,
   Download,
   FileCode2,
   FileText,
   GitBranch,
+  Link2,
   Plus,
+  Send,
   Trash2,
   X,
   Zap,
 } from 'lucide-react'
-import { api, type Process } from '@/lib/api'
+import { api, type Process, type ProcessWiringEntry } from '@/lib/api'
 import { Button } from '@/components/ui'
 import { cn } from '@/lib/cn'
 import { DOMAIN_VISUALS, getDomainVisual } from '@/lib/domains'
+import { TwinFlowTabsView } from './TwinFlowTabsView'
 
 /**
  * «Цифровой двойник управления» — страница /twins.
@@ -89,6 +92,7 @@ export function TwinDesignerScreen() {
         name: 'Новый двойник',
         description: null,
         regulation_ids: [],
+        wiring: [],
       }),
     onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ['processes'] })
@@ -386,6 +390,22 @@ function TwinEditor({
         )}
       </div>
 
+      {/* Связи внутри двойника — wiring B.output → A.input */}
+      <WiringSection
+        draft={draft}
+        setDraft={setDraft}
+        included={included}
+      />
+
+      {/* Полотно «как поток»: вкладки по регламентам + click-through по wiring.
+          UX: каждый регламент на своей вкладке (тот же reactflow что в Flow
+          Editor), на output/event-пилюлях overlay-кнопки ↘ / ↖ для прыжка
+          к связанному регламенту с подсветкой узла. */}
+      <TwinFlowTabsView
+        twin={draft}
+        members={included.map((r) => ({ id: r.id, name: r.name }))}
+      />
+
       {/* Доступные для добавления */}
       <div className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
         <h2 className="mb-3 text-sm font-semibold text-stone-800">
@@ -514,4 +534,254 @@ function pluralRus(n: number, forms: [string, string, string]): string {
   if (mod10 === 1 && mod100 !== 11) return forms[0]
   if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return forms[1]
   return forms[2]
+}
+
+
+// ── Секция «Связи» — wiring внутри Twin'а ─────────────────────────────
+//
+// Принцип «Двух уровней» (2026-05-19): композиция регламентов живёт ТУТ,
+// в двойнике, а не на самих регламентах. Каждая запись wiring говорит
+// «выход регламента B (action Y) кормит вход регламента A (параметр X)».
+// На save Twin'а backend проецирует эти записи в flow.json членов
+// (см. process_store.project_wiring_to_flows).
+//
+// UX: dropdown для target_regulation → target_param_ref → source_regulation
+// → source_output. Все источники и цели — только члены этого Twin'а
+// (иначе wiring «утекает» наружу и теряет смысл).
+
+function WiringSection({
+  draft,
+  setDraft,
+  included,
+}: {
+  draft: Process
+  setDraft: (p: Process) => void
+  included: Array<{ id: string; name: string; domain: string | null }>
+}) {
+  // Параметры каждого регламента-члена — нужно для dropdown target_param_ref.
+  const regulationQueries = useQueries({
+    queries: included.map((r) => ({
+      queryKey: ['regulation', r.id],
+      queryFn: () => api.regulations.get(r.id),
+      staleTime: 30_000,
+    })),
+  })
+  // Output-actions каждого регламента — нужно для source_output dropdown.
+  const outputQueries = useQueries({
+    queries: included.map((r) => ({
+      queryKey: ['output-actions', r.id],
+      queryFn: () => api.regulations.outputActions(r.id),
+      staleTime: 30_000,
+    })),
+  })
+
+  // Индексируем по id для быстрого lookup'а в рендере и validation'е.
+  const paramsByReg = useMemo(() => {
+    const out = new Map<string, Array<{ id: string; name: string }>>()
+    included.forEach((r, i) => {
+      const reg = regulationQueries[i]?.data
+      out.set(r.id, (reg?.parameters ?? []).map((p) => ({ id: p.id, name: p.name })))
+    })
+    return out
+  }, [included, regulationQueries])
+  const outputsByReg = useMemo(() => {
+    const out = new Map<string, Array<{ action: string; label: string }>>()
+    included.forEach((r, i) => {
+      const data = outputQueries[i]?.data
+      out.set(r.id, (data?.actions ?? []).map((a) => ({ action: a.action, label: a.label })))
+    })
+    return out
+  }, [included, outputQueries])
+
+  const wiring = draft.wiring ?? []
+
+  const addEntry = () => {
+    // Стартовый шаблон — пользователь дозаполнит. Чтобы не «прятать» пустые
+    // dropdown'ы за «+ Добавить», создаём строку с дефолтами и сразу рендерим
+    // её с пустыми селектами; пользователь выбирает поэтапно.
+    setDraft({
+      ...draft,
+      wiring: [
+        ...wiring,
+        { target_regulation: '', target_param_ref: '', source_regulation: '', source_output: null },
+      ],
+    })
+  }
+  const updateEntry = (idx: number, patch: Partial<ProcessWiringEntry>) => {
+    const next = [...wiring]
+    next[idx] = { ...next[idx], ...patch }
+    setDraft({ ...draft, wiring: next })
+  }
+  const removeEntry = (idx: number) => {
+    const next = wiring.filter((_, i) => i !== idx)
+    setDraft({ ...draft, wiring: next })
+  }
+
+  if (included.length < 2) {
+    return (
+      <div className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+        <h2 className="mb-1 text-sm font-semibold text-stone-800 flex items-center gap-1.5">
+          <Link2 size={14} className="text-violet-600" />
+          Связи между регламентами
+        </h2>
+        <div className="text-[11px] text-stone-500">
+          Добавьте минимум два регламента в состав, чтобы связать их выходы и входы.
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-stone-800 flex items-center gap-1.5">
+          <Link2 size={14} className="text-violet-600" />
+          Связи между регламентами ({wiring.length})
+        </h2>
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<Plus size={13} />}
+          onClick={addEntry}
+        >
+          Добавить связь
+        </Button>
+      </div>
+
+      {wiring.length === 0 ? (
+        <div className="rounded-md border border-dashed border-stone-300 p-4 text-center text-xs text-stone-500">
+          Связей пока нет. Кнопка «+ Добавить связь» сверху создаёт wiring:
+          выход одного регламента → вход другого.
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {wiring.map((w, idx) => {
+            const targetParams = paramsByReg.get(w.target_regulation) ?? []
+            const sourceOutputs = outputsByReg.get(w.source_regulation) ?? []
+            return (
+              <li
+                key={idx}
+                className="rounded-md border border-violet-200 bg-violet-50/40 p-3"
+              >
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[10px] font-semibold uppercase tracking-wide text-violet-700">
+                    Связь #{idx + 1}
+                  </span>
+                  <button
+                    onClick={() => removeEntry(idx)}
+                    className="rounded p-1 text-rose-500 hover:bg-rose-50"
+                    title="Удалить связь"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {/* Source — слева */}
+                  <div className="space-y-1.5 rounded border border-violet-200 bg-white/50 p-2">
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-violet-700">
+                      <Send size={9} className="-mt-0.5 mr-1 inline" />
+                      Источник
+                    </div>
+                    <WiringSelect
+                      label="Регламент"
+                      value={w.source_regulation}
+                      onChange={(v) => updateEntry(idx, {
+                        source_regulation: v,
+                        // При смене источника старый action заведомо может
+                        // не существовать. Чистим.
+                        source_output: null,
+                      })}
+                      options={[
+                        { value: '', label: '— выберите —' },
+                        ...included.map((r) => ({ value: r.id, label: r.name })),
+                      ]}
+                    />
+                    <WiringSelect
+                      label="Output (action)"
+                      value={w.source_output ?? ''}
+                      onChange={(v) => updateEntry(idx, { source_output: v || null })}
+                      disabled={!w.source_regulation}
+                      options={[
+                        { value: '', label: '— любой —' },
+                        ...sourceOutputs.map((o) => ({
+                          value: o.action,
+                          label: o.label && o.label !== o.action
+                            ? `${o.action} · ${o.label}` : o.action,
+                        })),
+                      ]}
+                    />
+                  </div>
+                  {/* Target — справа */}
+                  <div className="space-y-1.5 rounded border border-violet-200 bg-white/50 p-2">
+                    <div className="text-[10px] font-medium uppercase tracking-wide text-violet-700">
+                      → Цель
+                    </div>
+                    <WiringSelect
+                      label="Регламент"
+                      value={w.target_regulation}
+                      onChange={(v) => updateEntry(idx, {
+                        target_regulation: v,
+                        target_param_ref: '',
+                      })}
+                      options={[
+                        { value: '', label: '— выберите —' },
+                        ...included
+                          .filter((r) => r.id !== w.source_regulation)
+                          .map((r) => ({ value: r.id, label: r.name })),
+                      ]}
+                    />
+                    <WiringSelect
+                      label="Параметр (вход)"
+                      value={w.target_param_ref}
+                      onChange={(v) => updateEntry(idx, { target_param_ref: v })}
+                      disabled={!w.target_regulation}
+                      options={[
+                        { value: '', label: '— выберите —' },
+                        ...targetParams.map((p) => ({
+                          value: p.id,
+                          label: p.name && p.name !== p.id ? `${p.id} · ${p.name}` : p.id,
+                        })),
+                      ]}
+                    />
+                  </div>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
+      <div className="mt-3 rounded-md border border-violet-100 bg-violet-50/40 p-2 text-[10px] leading-relaxed text-violet-900">
+        <b>Как это работает:</b> при сохранении двойника backend прописывает
+        связи во flow.json целевых регламентов (sensor с режимом «Регламент»
+        получает конкретный источник). Удаление связи здесь — wiring снимается.
+        Один параметр одного регламента может быть в связи только одного двойника.
+      </div>
+    </div>
+  )
+}
+
+function WiringSelect({
+  label, value, onChange, options, disabled,
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  options: Array<{ value: string; label: string }>
+  disabled?: boolean
+}) {
+  return (
+    <label className="block">
+      <div className="text-[10px] text-violet-700">{label}</div>
+      <select
+        disabled={disabled}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-0.5 w-full rounded border border-violet-200 bg-white px-1.5 py-1 text-xs text-stone-800 disabled:bg-stone-50 disabled:text-stone-400"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+    </label>
+  )
 }

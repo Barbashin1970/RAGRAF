@@ -1,9 +1,33 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
+import { execSync } from 'node:child_process'
+
+// Версия сборки — пробрасывается в бандл через define, чтобы фронт мог
+// сравнить с сохранённым в localStorage и принудительно сбросить кэш
+// (см. main.tsx и принцип «после деплоя — нет прошлых сессий»).
+//
+// Приоритет источников:
+//   1) Явный env VITE_BUILD_VERSION (CI / Railway может проставить).
+//   2) Короткий git SHA если репо доступно при билде.
+//   3) Timestamp билда как последний fallback (всегда уникален).
+function resolveBuildVersion(): string {
+  if (process.env.VITE_BUILD_VERSION) return process.env.VITE_BUILD_VERSION
+  try {
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString().trim()
+  } catch {
+    return `t-${Date.now()}`
+  }
+}
+const BUILD_VERSION = resolveBuildVersion()
 
 export default defineConfig({
   plugins: [react()],
+  define: {
+    // Доступно в коде как `__BUILD_VERSION__` (см. global.d.ts).
+    __BUILD_VERSION__: JSON.stringify(BUILD_VERSION),
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

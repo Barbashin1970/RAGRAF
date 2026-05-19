@@ -348,6 +348,30 @@ class RuleDSL(BaseModel):
 # читаемый snapshot.
 
 
+class ProcessWiringEntry(BaseModel):
+    """Wiring внутри Twin'а: «выход B/action кормит вход A/param».
+
+    Принцип «Двух уровней» (2026-05-19):
+      • Регламент — атомарное правило, самодостаточно, ничего не знает о других.
+      • Twin (Process) — композиция, ХРАНИТ wiring между членами.
+
+    Wiring живёт ТОЛЬКО в Twin'е. На save Twin'а backend проецирует записи
+    в flow.json целевых регламентов (sensor с sourceKind='regulation' получает
+    sourceRegulationId/sourceOutputAction). Без Twin'а атомарный регламент
+    в Flow Editor может иметь sensor[sourceKind='regulation'] как placeholder,
+    без конкретной привязки.
+
+    Ограничение мягкого пути: один параметр одного регламента может быть
+    в wiring только ОДНОГО Twin'а одновременно. Иначе проекция в flow.json
+    становится неоднозначной (там одно поле sourceRegulationId).
+    """
+    target_regulation: str   # FK на Regulation.id (член Twin'а)
+    target_param_ref: str    # Parameter.id внутри target_regulation
+    source_regulation: str   # FK на Regulation.id (тоже член Twin'а)
+    source_output: str | None = None  # action из output-ноды source_regulation
+    # None означает «слушаю любой вердикт» — sensor.sourceOutputAction = null.
+
+
 class Process(BaseModel):
     id: str
     name: str
@@ -357,6 +381,10 @@ class Process(BaseModel):
     # аналитик. Не валидируем на существование регламентов здесь —
     # это делается на read через JOIN в process_store.
     regulation_ids: list[str] = Field(default_factory=list)
+    # Wiring внутри Twin'а — авторитативный источник правды для
+    # композиционных связей между членами. См. ProcessWiringEntry.
+    # На save Twin'а проецируется в flow.json регламентов-целей.
+    wiring: list[ProcessWiringEntry] = Field(default_factory=list)
     # ISO datetime, выставляется в process_store. None на новом черновике
     # до первого save.
     created_at: str | None = None

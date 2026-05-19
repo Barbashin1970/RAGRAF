@@ -88,12 +88,21 @@ export const regulationSchema = z.object({
 })
 
 // Process — цифровой двойник процесса управления (страница /twins).
-// Именованная коллекция регламентов; экспорт в Turtle / SIGMA-bundle.
+// Именованная коллекция регламентов + wiring (см. ProcessWiringEntry).
+export const processWiringEntrySchema = z.object({
+  target_regulation: z.string(),
+  target_param_ref: z.string(),
+  source_regulation: z.string(),
+  source_output: z.string().nullable().optional(),
+})
 export const processSchema = z.object({
   id: z.string(),
   name: z.string(),
   description: z.string().nullable().optional(),
   regulation_ids: z.array(z.string()).default([]),
+  // wiring добавлено 2026-05-19 — backward compat: старые ответы без поля
+  // получают default=[] от zod.
+  wiring: z.array(processWiringEntrySchema).default([]),
   created_at: z.string().nullable().optional(),
   updated_at: z.string().nullable().optional(),
 })

@@ -379,13 +379,6 @@ function ByType({ type, data, parameters, allNodes, constraints, regulationId, s
                 currentRegulationId={regulationId ?? null}
                 sourceRegulationId={data.sourceRegulationId ?? null}
                 sourceOutputAction={data.sourceOutputAction ?? null}
-                onChangeRegulation={(id) => set({
-                  sourceRegulationId: id,
-                  // При смене регламента-источника старый action заведомо
-                  // невалиден (это action другого регламента). Чистим.
-                  sourceOutputAction: null,
-                })}
-                onChangeOutput={(action) => set({ sourceOutputAction: action })}
               />
               {bindsToBlock}
             </>
@@ -544,124 +537,105 @@ function SourceKindToggle({
 }
 
 /**
- * Подбор регламента-источника + его output-action для режима 'regulation'.
+ * Информер для режима 'regulation' — БЕЗ конкретного picker'а регламента.
  *
- * UX-логика:
- *   1. Dropdown «Регламент-источник» — список ВСЕХ регламентов через
- *      /api/datasets (cross-domain, user явно просил). Self-исключается.
- *   2. Когда регламент выбран — fetch /output-actions того регламента.
- *      Dropdown «Output» рендерим его action'ами.
- *   3. Если у выбранного регламента вообще нет output-нод → отдельная
- *      подсказка с linkout «открыть Flow Editor X и добавить action».
- *   4. Если sourceOutputAction задан, но action не находится в списке —
- *      красный badge «связь сломана»: показываем сохранённое значение,
- *      позволяем выбрать замену из доступных.
- *   5. Линк-кнопка «Открыть регламент-источник →» — для клика-перехода.
+ * Принцип «Двух уровней» (2026-05-19):
+ *   Регламент — атомарное правило, не знает о других регламентах.
+ *   Композиция регламентов живёт в Цифровом Двойнике (Process.wiring).
+ *
+ * Здесь, в Flow Editor одного регламента, пилюля события в режиме
+ * «слушаю выход регламента» — placeholder. Конкретное wiring («какой
+ * именно регламент кормит этот вход») делается на странице /twins,
+ * в редакторе двойника.
+ *
+ * Если wiring уже спроецирован (Twin сохранён) — показываем read-only
+ * summary «Привязано Twin'ом …» с переходом в редактор того Twin'а.
  */
 function RegulationSourcePicker({
   currentRegulationId,
   sourceRegulationId,
   sourceOutputAction,
-  onChangeRegulation,
-  onChangeOutput,
 }: {
   currentRegulationId: string | null
   sourceRegulationId: string | null
   sourceOutputAction: string | null
-  onChangeRegulation: (id: string | null) => void
-  onChangeOutput: (action: string | null) => void
 }) {
-  // Список регламентов для dropdown. Кэшируется react-query — много open'ов
-  // PropertyPanel в одном сеансе не повторно дёргают /api/datasets.
   const { data: datasets = [] } = useQuery({
     queryKey: ['datasets-for-picker'],
     queryFn: () => api.datasets.list(),
-  })
-  // Output-action'ы выбранного регламента-источника.
-  const { data: outputData } = useQuery({
-    queryKey: ['output-actions', sourceRegulationId],
-    queryFn: () => api.regulations.outputActions(sourceRegulationId!),
     enabled: !!sourceRegulationId,
   })
-  const availableActions = outputData?.actions ?? []
-  const actionExists = sourceOutputAction
-    ? availableActions.some((a) => a.action === sourceOutputAction)
-    : true
+  const { data: inTwinsData } = useQuery({
+    queryKey: ['regulation-in-twins', currentRegulationId],
+    queryFn: () => api.regulations.inTwins(currentRegulationId!),
+    enabled: !!currentRegulationId,
+  })
 
-  const regulationOptions = useMemo(() => {
-    const list = (datasets as Array<{ id?: string; name?: string }>).filter(
-      (d): d is { id: string; name: string } =>
-        typeof d?.id === 'string' && d.id !== currentRegulationId,
-    )
-    return list.map((d) => ({ value: d.id, label: d.name || d.id }))
-  }, [datasets, currentRegulationId])
+  const sourceName = sourceRegulationId
+    ? ((datasets as Array<{ id?: string; name?: string }>)
+        .find((d) => d?.id === sourceRegulationId)?.name ?? sourceRegulationId)
+    : null
+  const inTwins = inTwinsData?.twins ?? []
+  const linkedTwin = inTwins[0] ?? null   // если регламент в N twin'ах, ведём в первый
 
   return (
     <>
-      <FieldSelect
-        label="Регламент-источник"
-        value={sourceRegulationId ?? ''}
-        onChange={(v) => onChangeRegulation(v || null)}
-        options={[
-          { value: '', label: '— выберите регламент —' },
-          ...regulationOptions,
-        ]}
-      />
-      {sourceRegulationId && availableActions.length === 0 && (
-        <div className="mt-2 rounded-md border border-amber-300 bg-amber-50 px-2 py-1.5 text-[11px] leading-snug text-amber-900">
-          У регламента «{regulationOptions.find((o) => o.value === sourceRegulationId)?.label ?? sourceRegulationId}»
-          нет output-нод. <Link
-            to={`/regulations/${encodeURIComponent(sourceRegulationId)}/flow`}
-            className="font-medium underline hover:text-amber-700"
+      {sourceRegulationId ? (
+        <div className="mt-2 rounded-md border border-indigo-300 bg-indigo-50/70 p-2.5 text-[11px] leading-snug text-indigo-900">
+          <div className="flex items-center gap-1 font-semibold uppercase tracking-wide text-indigo-700">
+            <Send size={11} />
+            Привязано Двойником
+          </div>
+          <div className="mt-1">
+            Источник: <b>{sourceName}</b>
+            {sourceOutputAction && (
+              <>
+                {' '}/ выход <code className="rounded bg-white/70 px-1">{sourceOutputAction}</code>
+              </>
+            )}
+          </div>
+          {linkedTwin && (
+            <Link
+              to={`/twins/${encodeURIComponent(linkedTwin.id)}`}
+              className="mt-2 inline-flex items-center gap-1 font-medium text-indigo-700 underline hover:text-indigo-900"
+            >
+              Открыть Двойник «{linkedTwin.name}» <ExternalLink size={10} />
+            </Link>
+          )}
+          {sourceRegulationId && (
+            <Link
+              to={`/regulations/${encodeURIComponent(sourceRegulationId)}/edit`}
+              className="mt-1 inline-flex items-center gap-1 text-indigo-700 underline hover:text-indigo-900"
+            >
+              Перейти в регламент-источник <ExternalLink size={10} />
+            </Link>
+          )}
+        </div>
+      ) : (
+        <div className="mt-2 rounded-md border border-dashed border-indigo-300 bg-indigo-50/50 p-2.5 text-[11px] leading-snug text-indigo-900">
+          <div className="flex items-center gap-1 font-semibold uppercase tracking-wide text-indigo-700">
+            <AlertTriangle size={11} />
+            Placeholder
+          </div>
+          <div className="mt-1">
+            Это событие слушает выход <b>другого регламента</b>, но конкретная
+            связь задаётся в <b>Цифровом Двойнике</b>, не здесь.
+          </div>
+          <Link
+            to={linkedTwin ? `/twins/${encodeURIComponent(linkedTwin.id)}` : '/twins'}
+            className="mt-2 inline-flex items-center gap-1 font-medium text-indigo-700 underline hover:text-indigo-900"
           >
-            Открыть Flow Editor →
+            {linkedTwin
+              ? `Открыть Двойник «${linkedTwin.name}» →`
+              : 'Открыть страницу Двойников →'}
+            <ExternalLink size={10} />
           </Link>
         </div>
       )}
-      {sourceRegulationId && availableActions.length > 0 && (
-        <>
-          <FieldSelect
-            label="Output (action)"
-            value={sourceOutputAction ?? ''}
-            onChange={(v) => onChangeOutput(v || null)}
-            options={[
-              { value: '', label: '— любой output —' },
-              ...availableActions.map((a) => ({
-                value: a.action,
-                label: a.label && a.label !== a.action ? `${a.action} · ${a.label}` : a.action,
-              })),
-              // Если action сохранён, но в списке его нет — добавляем как
-              // явную «битую» опцию, чтобы пользователь видел что выбрано.
-              ...(!actionExists && sourceOutputAction
-                ? [{ value: sourceOutputAction, label: `${sourceOutputAction} (нет в источнике)` }]
-                : []),
-            ]}
-          />
-          {!actionExists && sourceOutputAction && (
-            <div className="mt-1 flex items-start gap-1 rounded-md border border-rose-300 bg-rose-50 px-2 py-1.5 text-[11px] leading-snug text-rose-900">
-              <AlertTriangle size={12} className="mt-0.5 shrink-0 text-rose-600" />
-              <div>
-                <b>Связь сломана:</b> action <code>{sourceOutputAction}</code> не
-                найден в outputs регламента-источника. Возможно его удалили
-                или переименовали. Выберите замену из dropdown выше.
-              </div>
-            </div>
-          )}
-        </>
-      )}
-      {sourceRegulationId && (
-        <Link
-          to={`/regulations/${encodeURIComponent(sourceRegulationId)}/edit`}
-          className="mt-2 inline-flex items-center gap-1 text-[11px] text-indigo-700 underline hover:text-indigo-900"
-        >
-          Открыть регламент-источник <ExternalLink size={11} />
-        </Link>
-      )}
       <div className="mt-2 rounded-md border border-stone-200 bg-stone-50 px-2 py-1.5 text-[10px] leading-relaxed text-stone-600">
-        <b>Что это даёт:</b> ваш регламент будет реагировать на срабатывание
-        регламента-источника как на событие — событийная композиция в одной
-        цепочке. На save потока backend синхронизирует <code>RegulationTrigger</code>,
-        чтобы reverse-lookup (кто кого слушает) работал.
+        <b>Зачем так:</b> регламент остаётся атомарным и переиспользуемым.
+        Конкретный «B → A» делается только в Двойнике — его можно собрать
+        под разные сценарии, не модифицируя сами регламенты.
       </div>
     </>
   )

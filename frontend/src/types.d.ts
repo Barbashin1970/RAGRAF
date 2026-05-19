@@ -6,3 +6,7 @@ declare module 'cytoscape-cola' {
   const cola: Ext
   export default cola
 }
+
+// Build-version, проставляемая в vite.config.ts через define. Используется
+// для авто-сброса localStorage при деплое новой версии (см. main.tsx).
+declare const __BUILD_VERSION__: string

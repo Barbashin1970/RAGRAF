@@ -368,11 +368,24 @@ def _init_schema(c: duckdb.DuckDBPyConnection) -> None:
             name            VARCHAR NOT NULL,
             description     VARCHAR,
             regulation_ids  JSON NOT NULL DEFAULT '[]',
+            -- wiring: авторитативный источник композиционных связей между
+            -- членами Twin'а. Каждая запись: {target_regulation, target_param_ref,
+            -- source_regulation, source_output}. См. ProcessWiringEntry в schemas/domain.py.
+            -- На save Twin'а проецируется в flow.json членов.
+            wiring          JSON NOT NULL DEFAULT '[]',
             created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
+    # Идемпотентный ALTER для существующих БД, где колонки `wiring` ещё нет:
+    # PRAGMA table_info + ADD COLUMN. Без этого старые установки падают на
+    # INSERT INTO processes (..., wiring, ...) — DuckDB ругается «no column wiring».
+    proc_cols = {
+        row[1] for row in c.execute("PRAGMA table_info('processes')").fetchall()
+    }
+    if "wiring" not in proc_cols:
+        c.execute("ALTER TABLE processes ADD COLUMN wiring JSON NOT NULL DEFAULT '[]'")
 
     # ── Миграции (одноразовые data-migrations) ───────────────────────────
     # Лёгкий tracker: имя миграции + applied_at. Используется для апгрейдов
@@ -541,6 +554,67 @@ def _run_data_migrations() -> None:
         except Exception as e:
             print(
                 f"[regulation_store] migration seed_arch_pdf_medical_modules_v1 failed: {e}"
+            )
+
+    # ── clear_regsource_to_twin_v1 ──────────────────────────────────────
+    # 2026-05-19. Принцип «Двух уровней»: wiring между регламентами теперь
+    # живёт ТОЛЬКО в Twin.wiring (см. ProcessWiringEntry). Очищаем все
+    # старые regsource-привязки из:
+    #   • regulation_triggers (source_regulation/source_output) — обнуляем поля;
+    #   • flow.json у каждого регламента — sensor с sourceKind='regulation'
+    #     получает sourceRegulationId/sourceOutputAction = null (placeholder).
+    # Пользователь пересоберёт wiring через Twin Editor (это сознательный choice
+    # — см. soft refactor decision 2026-05-19).
+    if "clear_regsource_to_twin_v1" not in applied:
+        try:
+            # 1. Очищаем regulation_triggers regsource-поля. Удаляем целиком
+            # триггеры, у которых ТОЛЬКО regsource был причиной существования
+            # (sensor_subtype=NULL И source_regulation IS NOT NULL).
+            c.execute(
+                """
+                DELETE FROM regulation_triggers
+                WHERE sensor_subtype IS NULL
+                  AND source_regulation IS NOT NULL
+                """
+            )
+            # 2. Чистим flow.json у каждого регламента — sensor-ноды теряют
+            # sourceRegulationId / sourceOutputAction. Sensor с sourceKind=
+            # 'regulation' остаётся, но превращается в placeholder.
+            from app.services.flow_storage import load_flow, save_flow
+            reg_ids = [
+                row[0] for row in c.execute(
+                    "SELECT source_id FROM regulations"
+                ).fetchall()
+            ]
+            cleared_flows = 0
+            for rid in reg_ids:
+                flow = load_flow(rid)
+                if flow is None:
+                    continue
+                mutated = False
+                for n in flow.nodes:
+                    if n.type != "sensor":
+                        continue
+                    if (n.sourceKind or "sensor") != "regulation":
+                        continue
+                    if n.sourceRegulationId or n.sourceOutputAction:
+                        n.sourceRegulationId = None
+                        n.sourceOutputAction = None
+                        mutated = True
+                if mutated:
+                    save_flow(rid, flow, author="migration",
+                              comment="clear_regsource_to_twin_v1: wiring переехал в Twin")
+                    cleared_flows += 1
+            c.execute(
+                "INSERT INTO _migrations (name) VALUES (?)",
+                ["clear_regsource_to_twin_v1"],
+            )
+            print(
+                f"[regulation_store] migration clear_regsource_to_twin_v1 applied — {cleared_flows} flow(s) cleaned"
+            )
+        except Exception as e:
+            print(
+                f"[regulation_store] migration clear_regsource_to_twin_v1 failed: {e}"
             )
 
 

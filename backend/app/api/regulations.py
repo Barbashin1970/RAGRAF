@@ -662,6 +662,26 @@ async def import_sigma_bundle(file: UploadFile = File(...)) -> dict[str, Any]:
         raise HTTPException(status_code=400, detail=f"Импорт не удался: {e}") from e
 
 
+@router.get("/regulations/{source_id}/in-twins")
+def list_in_twins(source_id: str) -> dict[str, Any]:
+    """В каких Цифровых Двойниках состоит этот регламент (reverse-lookup).
+
+    Используется для плашки в Edit регламента: «Атомарный регламент / В Двойниках:
+    A · B · C». Кликабельные ссылки ведут в редактор соответствующего двойника.
+
+    См. также: ProcessWiringEntry — авторитативный источник wiring живёт в Twin'е,
+    не в регламенте; принцип «Двух уровней» (2026-05-19).
+    """
+    from app.services import process_store
+
+    twins = process_store.list_in_twins(source_id)
+    return {
+        "regulation_id": source_id,
+        "count": len(twins),
+        "twins": twins,
+    }
+
+
 @router.get("/regulations/{source_id}/triggered-by")
 def list_triggered_by(source_id: str) -> dict[str, Any]:
     """Какие регламенты слушают output этого регламента (композиция).

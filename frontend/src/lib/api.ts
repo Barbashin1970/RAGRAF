@@ -157,14 +157,25 @@ export interface Domain {
   hint?: string
 }
 
+// ProcessWiringEntry — авторитативный источник связи «выход регламента B
+// кормит вход регламента A» в составе Twin'а. См. backend ProcessWiringEntry
+// и принцип «Двух уровней» (2026-05-19): регламент атомарен, wiring живёт
+// в двойнике.
+export interface ProcessWiringEntry {
+  target_regulation: string
+  target_param_ref: string
+  source_regulation: string
+  source_output?: string | null
+}
+
 // Process — цифровой двойник процесса управления. Именованная коллекция
-// регламентов с возможностью экспорта артефакта (Turtle/SIGMA-bundle).
-// Страница /twins.
+// регламентов + wiring между ними. Страница /twins.
 export interface Process {
   id: string
   name: string
   description?: string | null
   regulation_ids: string[]
+  wiring: ProcessWiringEntry[]
   created_at?: string | null
   updated_at?: string | null
 }
@@ -429,6 +440,14 @@ export const api = {
       request(`/api/regulations/${encodeURIComponent(id)}/publish`, { method: 'POST' }, regulationSchema),
     archive: (id: string) =>
       request(`/api/regulations/${encodeURIComponent(id)}/archive`, { method: 'POST' }, regulationSchema),
+    // В каких Цифровых Двойниках состоит регламент (reverse-lookup для
+    // плашки в Edit и для PropertyPanel sensor[regulation] placeholder).
+    inTwins: (id: string) =>
+      request<{
+        regulation_id: string
+        count: number
+        twins: Array<{ id: string; name: string; description?: string | null }>
+      }>(`/api/regulations/${encodeURIComponent(id)}/in-twins`),
     // Композиция регламентов: какие регламенты слушают output этого.
     triggeredBy: (id: string) =>
       request<{
