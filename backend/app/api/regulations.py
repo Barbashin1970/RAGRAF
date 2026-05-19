@@ -140,10 +140,13 @@ async def duplicate_regulation(source_id: str, payload: DuplicateRequest) -> Reg
 
     # 3. Клонируем через model_copy с заменой ключевых полей. deep=True чтобы
     # вложенные параметры/recommendation/constraints не шарились с оригиналом.
+    # ВАЖНО: поле в схеме называется `id`, а не `source_id`. Pydantic тихо
+    # игнорит неизвестный ключ в update= → копия унаследовала бы id оригинала,
+    # и regulation_store.save() перезаписал бы оригинал её содержимым.
     new_reg = src.model_copy(
         deep=True,
         update={
-            "source_id": new_source_id,
+            "id": new_source_id,
             "name": new_name,
             "version": "1.0",
             "status": "draft",  # копия всегда стартует как draft

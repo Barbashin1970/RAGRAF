@@ -599,10 +599,6 @@ export function LandingScreen() {
                 </div>
               </div>
               <DownloadInstallers />
-
-              <div className="mt-4 text-xs text-slate-500">
-                Кампус НГУ · Кольцово · Мэрия города Новосибирска · 2026
-              </div>
             </div>
 
             <div className="sm:col-span-3">
