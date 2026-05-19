@@ -269,16 +269,65 @@ def execute_regulation(regulation_id: str, payload: ExecuteRequest) -> Execution
     """Прогнать flow с конкретными значениями. Возвращает level/recommendation/trace.
 
     404 — регламент не найден; 409 — flow не сохранён и не передан в payload.
+
+    Аудит: каждый execute пишет одну строку в incident_audit_log с
+    incident_id = новый UUID. Юзер позже может приписать действие через
+    POST /api/audit-log с тем же incident_id (action + outcome).
     """
     reg = regulation_store.get(regulation_id)
     if reg is None:
         raise HTTPException(status_code=404, detail=f"Регламент {regulation_id} не найден")
     dsl = payload.dsl or load_flow(regulation_id)
     if dsl is None:
-        # Stub-flow из фикстуры — для нетронутых регламентов даёт читаемый
-        # ответ «нет потока» вместо 500.
         raise HTTPException(
             status_code=409,
             detail="Для регламента нет сохранённого flow — откройте Редактор Потока и сохраните",
         )
-    return execute_flow(dsl, reg, payload.readings)
+    result = execute_flow(dsl, reg, payload.readings)
+
+    # ── Audit instrumentation (СИГМА § 2 «Объяснимость и аудит») ─────────
+    # Пишем одну запись в журнал инцидентов: event(input readings) →
+    # verdict(regulation). Юзер может дополнить цепочку через
+    # POST /api/audit-log (user_action, outcome) — incident_id берёт
+    # из ответа result.incident_id (см. ExecutionResult).
+    try:
+        from app.services import audit_log_store
+
+        incident_id = audit_log_store.new_incident_id()
+        # Шаг 1: событие (если есть readings — берём первое как контекст).
+        first_reading = payload.readings[0] if payload.readings else None
+        evidence_level = "measured" if payload.readings else "unknown"
+        audit_log_store.append_event(
+            incident_id=incident_id,
+            event_type=f"execute.{regulation_id}",
+            source_sensor_id=first_reading.sensor_id if first_reading else None,
+            source_sensor_subtype=(
+                first_reading.sensor_type if first_reading and first_reading.sensor_type else None
+            ),
+            event_value=first_reading.value if first_reading else None,
+            event_payload={
+                "readings_count": len(payload.readings),
+                "dsl_inline": payload.dsl is not None,
+            },
+            evidence_level=evidence_level,
+        )
+        # Шаг 2: вердикт регламента.
+        audit_log_store.append_event(
+            incident_id=incident_id,
+            event_type="verdict",
+            regulation_id=regulation_id,
+            regulation_version=reg.version,
+            level=result.level,
+            recommendation=result.recommendation,
+            verdict_status="fired" if result.level > 0 else "no_match",
+            evidence_level=evidence_level,
+        )
+        # Прикрепляем incident_id в результат (через model_copy на pydantic
+        # — поле не объявлено в схеме, поэтому добавим к JSON-respose
+        # через extra). FastAPI сериализует dict через jsonable_encoder.
+        out = result.model_dump()
+        out["incident_id"] = incident_id
+        return out  # type: ignore[return-value]
+    except Exception:
+        # Аудит — best-effort, не валим execute если store упал.
+        return result
